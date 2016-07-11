@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
+'''implementation of a getting things done style command line utiltiy
+using python and the trello API. Uses a configuration file for things like API
+keys, board names, etc
 
-# implementation of a getting things done style command line utiltiy using python and the trello API
-# uses a configuration file for things like API keys, board names, etc
-
-'''
 functionality we want:
     Some kind of prompted/scheduled review of all inbound and/or holding items
     Easy categorization interface, preferrably with single button push decisions
@@ -31,9 +30,12 @@ design ideas
 
 import sys
 import logging
+import argparse
 
 from trello import TrelloClient
 import yaml
+
+VERSION='0.0.2'
 
 logging.basicConfig(level=logging.INFO)
 stringerize = lambda x: [b.name.decode('utf-8') for b in x]
@@ -176,7 +178,27 @@ class GTD_Controller:
         # requires Gcal API
         pass
 
-config_properties = parse_configuration()
-gtd = GTD_Controller(config_properties)
-print(gtd._dump_lists())
-print(gtd._dump_list_cards('57804c751f3086bbc0fa1e19'))
+def main():
+    '''argument parsing, config file parsing
+    '''
+    p = argparse.ArgumentParser()
+    actions = p.add_subparsers(help='Actions/Commands:', dest='subparser_name')
+
+    add = actions.add_parser('add', help='Create a new inbound item')
+    add.add_argument('title', help='title for the new card')
+    add.add_argument('-m', '--message', help='append a description for the new card')
+
+    version = actions.add_parser('version', help='display program version')
+
+    args = p.parse_args()
+    print(args)
+
+    if args.subparser_name == 'version':
+        print('{0} version {1}'.format(sys.argv[0], VERSION))
+    elif args.subparser_name == 'add':
+        config_properties = parse_configuration()
+        gtd = GTD_Controller(config_properties)
+        gtd.add_incoming(args.title, args.message)
+
+if __name__ == '__main__':
+    main()
