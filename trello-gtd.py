@@ -35,12 +35,12 @@ import logging
 from trello import TrelloClient
 import yaml
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 stringerize = lambda x: [b.name.decode('utf-8') for b in x]
 
-# load user-defined configuration for what boards and lists to use
-
 def parse_configuration(configfile='gtd.config.yaml'):
+    '''load user-defined configuration for what boards and lists to use
+    '''
     logging.info('Opening configuration file...')
     with open(configfile, 'r') as config_yaml:
         logging.info('Loading configuration properties...')
@@ -53,6 +53,8 @@ class GTD_Controller:
         self.config = config
         self.trello = self.initialize_trello()
         self.board = self.validate_config()
+
+    # Discovery & Initialization steps
 
     def initialize_trello(self):
         '''Initializes our connection to the trello API
@@ -83,8 +85,11 @@ class GTD_Controller:
         # TODO may be nice to display a message about when the board was last modified here
         # Check for existence of all configuration-requested lists
         board_list_names = stringerize(target_board.get_lists('open'))
-        config_lists = [v for k, v in self.config['list_names'].items() if v]
-        for requested_list in config_lists:
+        self.lists = {}
+        # TODO validation that all the required list names exist in the config file
+        for list_label, requested_list in self.config['list_names'].items():
+            if not requested_list:
+                continue
             if requested_list not in board_list_names:
                 logging.fatal('List {0} not found in board {1}'.format(
                     requested_list, target_board.name
@@ -92,16 +97,86 @@ class GTD_Controller:
                 return False
             else:
                 logging.debug('List {0} exists...'.format(requested_list))
+                self.lists[list_label] = self._find_list_id(
+                    target_board,
+                    requested_list
+                )
         logging.info('All boards/lists exist')
         return target_board
 
-    def dump_list_yaml(self):
+    # Utility Functions
+
+    def _find_list_id(self, board, list_name):
+        '''Pull out the list id which matches the given name from the board
+        '''
+        open_lists = board.get_lists('open')
+        fl = lambda x: x.name.decode('utf-8') == list_name
+        target_list = next(filter(fl, open_lists))
+        return target_list.id
+
+    def _dump_lists(self):
         shortened = {
-            i.name.decode('utf-8'): i.id for i in self.board.get_lists('open')
+            i.id: i.name.decode('utf-8') for i in self.board.get_lists('open')
         }
-        logging.debug('Dumping {0} to yaml...'.format(shortened))
+        logging.debug('Dumping lists {0} to yaml...'.format(shortened))
         return yaml.dump(shortened, default_flow_style=False)
+
+    def _dump_list_cards(self, list_id):
+        target_list = self.board.get_list(list_id)
+        shortened = {
+            i.id: i.name.decode('utf-8') for i in target_list.list_cards()
+        }
+        logging.debug('Dumping cards {0} to yaml...'.format(shortened))
+        return yaml.dump(shortened, default_flow_style=False)
+
+    # Higher-level functions, steps in the decision tree
+
+    def add_incoming(self, title, description=None):
+        target_list = self.board.get_list(self.lists['incoming'])
+        return target_list.add_card(name=title, desc=description)
+
+    # not actionable
+
+    def trash(self, card_id):
+        pass
+
+    def someday(self, card_id):
+        pass
+
+    def reference(self, card_id):
+        pass
+
+    def bookmark(self, card_id):
+        pass
+
+    # Plan Project task
+
+    def add_project(self, card_id):
+        pass
+
+    # Do it now!
+
+    def doing(self, card_id):
+        pass
+
+    def blocked(self, card_id):
+        pass
+
+    def schedule_follow_up(self, card_id):
+        # would be called in conjunction with "blocked" in certain situations
+        # requires Gcal API
+        pass
+
+    def add_holding_task(self, card_id):
+        ''' includes prompting for additional metadata and labels
+        '''
+        pass
+
+    def add_calendar_event(self, card_id):
+        # requires Gcal API
+        pass
 
 config_properties = parse_configuration()
 gtd = GTD_Controller(config_properties)
-logging.info(gtd.dump_list_yaml())
+print(gtd._dump_lists())
+print(gtd._dump_list_cards('57804c751f3086bbc0fa1e19'))
