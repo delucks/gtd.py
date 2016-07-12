@@ -28,6 +28,7 @@ design ideas
     $EDITOR would just need state and controller to diff the states and update API
 '''
 
+import os
 import sys
 import logging
 import argparse
@@ -37,7 +38,6 @@ import yaml
 
 VERSION='0.0.2'
 
-logging.basicConfig(level=logging.INFO)
 stringerize = lambda x: [b.name.decode('utf-8') for b in x]
 
 def parse_configuration(configfile='gtd.config.yaml'):
@@ -51,10 +51,12 @@ def parse_configuration(configfile='gtd.config.yaml'):
 # TODO initialize google calendar API client
 
 class GTD_Controller:
-    def __init__(self, config):
+    def __init__(self, config, display):
         self.config = config
         self.trello = self.initialize_trello()
         self.board = self.validate_config()
+        self.display = display
+        # potentially set up a decorator to call a known callback after certain methods are called
 
     # Discovery & Initialization steps
 
@@ -134,7 +136,10 @@ class GTD_Controller:
     # Higher-level functions, steps in the decision tree
 
     def add_incoming(self, title, description=None):
+        '''Add a new card to the list designated for new cards
+        '''
         target_list = self.board.get_list(self.lists['incoming'])
+        logging.info('Adding new card with title {0} and description {1} to list {2}'.format(title, description, target_list))
         return target_list.add_card(name=title, desc=description)
 
     # not actionable
@@ -178,27 +183,82 @@ class GTD_Controller:
         # requires Gcal API
         pass
 
+    def search(self, pattern):
+        '''try to find cards that match a pattern in either the names or the
+        descriptions. return a list of card metadata
+        '''
+        pass
+
+
+class GTD_Display:
+    '''these can be a wrapper with certain event calls that get passed known 
+    data types (like lists of Cards)
+    the example one is a terminal display for testing purposes :)
+    '''
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        pass
+
+    def _draw_blank(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+
+    def _draw_menu(self, options: list):
+        for count, item in enumerate(options):
+            print('{0}: {1}'.format(count, item))
+
 def main():
     '''argument parsing, config file parsing
     '''
     p = argparse.ArgumentParser()
     actions = p.add_subparsers(help='Actions/Commands:', dest='subparser_name')
+    version = actions.add_parser('version', help='display program version')
+    ui = actions.add_parser(
+        'ui',
+        help='start the program\'s "graphical" interface'
+    )
+    bootstrap = actions.add_parser('bootstrap', help='create the initial lists and boards as defined in the configuration')
 
-    add = actions.add_parser('add', help='Create a new inbound item')
+    # suggested alias this to 'todo' or something
+    cli = actions.add_parser('cli', help='use the interface through cli options')
+    cli_options = cli.add_subparsers(help='cli commands', dest='cli_subparser')
+    add = cli_options.add_parser('add', help='Create a new inbound item')
     add.add_argument('title', help='title for the new card')
     add.add_argument('-m', '--message', help='append a description for the new card')
-
-    version = actions.add_parser('version', help='display program version')
+    review = cli_options.add_parser('review', help='Create a new inbound item')
 
     args = p.parse_args()
-    print(args)
-
     if args.subparser_name == 'version':
         print('{0} version {1}'.format(sys.argv[0], VERSION))
-    elif args.subparser_name == 'add':
+    elif args.subparser_name == 'ui':
+        with GTD_Display() as g:
+            # could use decorators in the controller class
+            config_properties = parse_configuration()
+            gtd = GTD_Controller(config_properties, g)
+            # TODO move this to a loop method
+            while True:
+                user = input('> ')
+                if user == 'lists':
+                    g._draw_menu(stringerize(gtd.board.get_lists('open')))
+                elif user == 'clear':
+                    g._draw_blank()
+                elif user == 'quit':
+                    break
+                else:
+                    print('??') 
+    elif args.subparser_name == 'cli':
+        logging.basicConfig(level=logging.INFO)
         config_properties = parse_configuration()
         gtd = GTD_Controller(config_properties)
-        gtd.add_incoming(args.title, args.message)
+        if args.cli_subparser == 'add':
+            if not gtd.add_incoming(args.title, args.message):
+                logging.fatal('Card add failed! :(')
+
+    # TODO option for the ability to bootstrap all the required lists in the new board
 
 if __name__ == '__main__':
     main()
