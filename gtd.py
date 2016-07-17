@@ -52,9 +52,12 @@ def parse_configuration(configfile='gtd.config.yaml'):
 
 class GTD_Controller:
     def __init__(self, config, display):
-        self.config = config
-        self.trello = self.initialize_trello()
-        self.board = self.validate_config()
+        self.trello = self.initialize_trello(config)
+        if self.validate_config(config):
+            self.config = config
+        else:
+            # TODO improve this
+            raise Exception('Invalid configuration')
         if display:
             display.controller = self
             self.display = display
@@ -62,32 +65,32 @@ class GTD_Controller:
 
     # Discovery & Initialization steps
 
-    def initialize_trello(self):
+    def initialize_trello(self, config):
         '''Initializes our connection to the trello API
         '''
         logging.info('Connecting to the Trello API...')
         trello_client = TrelloClient(
-            api_key=self.config['trello']['api_key'],
-            api_secret=self.config['trello']['api_secret'],
-            token=self.config['trello']['oauth_token'],
-            token_secret=self.config['trello']['oauth_token_secret']
+            api_key=config['trello']['api_key'],
+            api_secret=config['trello']['api_secret'],
+            token=config['trello']['oauth_token'],
+            token_secret=config['trello']['oauth_token_secret']
         )
         logging.info('Connected to Trello.')
         return trello_client
 
-    def validate_config(self):
+    def validate_config(self, config):
         '''Validates that all required lists and boards exist
         Returns the selected Board on success, or False if failure
         '''
         # hit trello API to make sure the board exists
         board_names = stringerize(self.trello.list_boards())
-        if self.config['board_name'] not in board_names:
+        if config['board_name'] not in board_names:
             logging.fatal('Board {0} not found in board list!'.format(
-                self.config['board_name']
+                config['board_name']
             ))
             return False
         else:
-            fb = lambda x: x.name.decode('utf-8') == self.config['board_name']
+            fb = lambda x: x.name.decode('utf-8') == config['board_name']
             target_board = next(filter(fb, self.trello.list_boards()))
             logging.info('Target board {0} exists'.format(target_board))
         # TODO may be nice to display a message about when the board was last modified here
@@ -95,7 +98,7 @@ class GTD_Controller:
         board_list_names = stringerize(target_board.get_lists('open'))
         self.lists = {}
         # TODO validation that all the required list names exist in the config file
-        for list_label, requested_list in self.config['list_names'].items():
+        for list_label, requested_list in config['list_names'].items():
             if not requested_list:
                 continue
             if requested_list not in board_list_names:
@@ -110,6 +113,7 @@ class GTD_Controller:
                     requested_list
                 )
         logging.info('All boards/lists exist')
+        self.board = target_board
         return target_board
 
     # Utility Functions
@@ -136,6 +140,12 @@ class GTD_Controller:
         }
         logging.debug('Dumping cards {0} to yaml...'.format(shortened))
         return yaml.dump(shortened, default_flow_style=False)
+
+    def _create_all(self, config):
+        '''hit the Trello API to create (if not exists) all boards
+        and lists passed in from the configuration
+        '''
+        pass
 
     # Higher-level functions, steps in the decision tree
 
