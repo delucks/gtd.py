@@ -55,7 +55,9 @@ class GTD_Controller:
         self.config = config
         self.trello = self.initialize_trello()
         self.board = self.validate_config()
-        self.display = display
+        if display:
+            display.controller = self
+            self.display = display
         # potentially set up a decorator to call a known callback after certain methods are called
 
     # Discovery & Initialization steps
@@ -63,12 +65,14 @@ class GTD_Controller:
     def initialize_trello(self):
         '''Initializes our connection to the trello API
         '''
+        logging.info('Connecting to the Trello API...')
         trello_client = TrelloClient(
             api_key=self.config['trello']['api_key'],
             api_secret=self.config['trello']['api_secret'],
             token=self.config['trello']['oauth_token'],
             token_secret=self.config['trello']['oauth_token_secret']
         )
+        logging.info('Connected to Trello.')
         return trello_client
 
     def validate_config(self):
@@ -211,6 +215,21 @@ class GTD_Display:
         for count, item in enumerate(options):
             print('{0}: {1}'.format(count, item))
 
+    def loop(self):
+        '''keep execution in this class until the program terminates
+        '''
+        while True:
+            user = input('> ')
+            if user == 'lists':
+                self._draw_menu(stringerize(self.controller.board.get_lists('open')))
+            elif user == 'clear':
+                self._draw_blank()
+            elif user == 'quit':
+                break
+            else:
+                print('??') 
+
+
 def main():
     '''argument parsing, config file parsing
     '''
@@ -239,23 +258,15 @@ def main():
             # could use decorators in the controller class
             config_properties = parse_configuration()
             gtd = GTD_Controller(config_properties, g)
-            # TODO move this to a loop method
-            while True:
-                user = input('> ')
-                if user == 'lists':
-                    g._draw_menu(stringerize(gtd.board.get_lists('open')))
-                elif user == 'clear':
-                    g._draw_blank()
-                elif user == 'quit':
-                    break
-                else:
-                    print('??') 
+            g.loop()
     elif args.subparser_name == 'cli':
         logging.basicConfig(level=logging.INFO)
         config_properties = parse_configuration()
-        gtd = GTD_Controller(config_properties)
+        gtd = GTD_Controller(config_properties, None)
         if args.cli_subparser == 'add':
-            if not gtd.add_incoming(args.title, args.message):
+            if gtd.add_incoming(args.title, args.message):
+                logging.info('Added card successfully')
+            else:
                 logging.fatal('Card add failed! :(')
 
     # TODO option for the ability to bootstrap all the required lists in the new board
