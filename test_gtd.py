@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.2
+#!/usr/bin/env python
 from gtd import parse_configuration, GTD_Controller, GTD_Display
 
 import trello
@@ -48,6 +48,15 @@ def uninitialized(configs):
     with mock.patch.object(GTD_Controller, '__init__', return_value=None) as mock_init:
         return GTD_Controller(configs, None)
 
+@pytest.fixture(scope='session')
+def testing_board(configs):
+    '''a GTD_Controller that's initialized on a testing board
+    '''
+    with mock.patch.object(GTD_Controller, '__init__', return_value=None) as mock_init:
+        g = GTD_Controller(configs, None, testing=True)
+        g.trello = g.initialize_trello(configs)
+        return g
+
 def test_initialize_trello(uninitialized, configs):
     with pytest.raises(AttributeError):
         getattr(uninitialized, 'trello')
@@ -70,3 +79,6 @@ def test_validate_config(uninitialized, configs):
     for label, id in uninitialized.lists.items():
         list_name = configs['list_names'][label]
         assert uninitialized._find_list_id(board, list_name) == id
+
+def test_nonexistent_board(testing_board, configs):
+    assert testing_board._validate_board_existence(configs['testing_board_name']) == False

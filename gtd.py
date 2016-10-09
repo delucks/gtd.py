@@ -28,6 +28,8 @@ design ideas
     $EDITOR would just need state and controller to diff the states and update API
 '''
 
+# TODO write ncurses display with basic addition tasks on good keybinds. that's what we're here for.
+
 import os
 import sys
 import logging
@@ -51,9 +53,9 @@ def parse_configuration(configfile='gtd.config.yaml'):
 # TODO initialize google calendar API client
 
 class GTD_Controller:
-    def __init__(self, config, display):
+    def __init__(self, config, display, testing=False):
         self.trello = self.initialize_trello(config)
-        if self.validate_config(config):
+        if self.validate_config(config, testing):
             self.config = config
         else:
             # TODO improve this
@@ -78,21 +80,26 @@ class GTD_Controller:
         logging.info('Connected to Trello.')
         return trello_client
 
-    def validate_config(self, config):
-        '''Validates that all required lists and boards exist
-        Returns the selected Board on success, or False if failure
-        '''
+    def _validate_board_existence(self, board_name):
         # hit trello API to make sure the board exists
         board_names = stringerize(self.trello.list_boards())
-        if config['board_name'] not in board_names:
+        if board_name not in board_names:
             logging.fatal('Board {0} not found in board list!'.format(
-                config['board_name']
+                board_name
             ))
             return False
         else:
-            fb = lambda x: x.name.decode('utf-8') == config['board_name']
-            target_board = next(filter(fb, self.trello.list_boards()))
-            logging.info('Target board {0} exists'.format(target_board))
+            find_board = lambda x: x.name.decode('utf-8') == board_name
+            b = next(filter(find_board, self.trello.list_boards()))
+            logging.info('Target board {0} exists'.format(b))
+            return b
+
+    def validate_config(self, config, testing=False):
+        '''Validates that all required lists and boards exist
+        Returns the selected Board on success, or False if failure
+        '''
+        board_prop = 'testing_board_name' if testing else 'board_name'
+        target_board = self._validate_board_existence(config[board_prop])
         # TODO may be nice to display a message about when the board was last modified here
         # Check for existence of all configuration-requested lists
         board_list_names = stringerize(target_board.get_lists('open'))
@@ -240,6 +247,15 @@ class GTD_Display:
                 print('??') 
 
 
+class NCurses_GTD_Display(GTD_Display):
+    def __init__(self):
+        pass
+
+def ncurses_interface():
+    # just do the whole thing here and transfer it to a class later
+
+
+
 def main():
     '''argument parsing, config file parsing
     '''
@@ -258,6 +274,7 @@ def main():
     add = cli_options.add_parser('add', help='Create a new inbound item')
     add.add_argument('title', help='title for the new card')
     add.add_argument('-m', '--message', help='append a description for the new card')
+    add.add_argument('-t', '--tags', help='comma-separated tags to add to the new card')
     review = cli_options.add_parser('review', help='Create a new inbound item')
 
     args = p.parse_args()
