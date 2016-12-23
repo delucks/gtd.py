@@ -1,4 +1,9 @@
-'''Incremental development is a thing dude'''
+'''Incremental development is a thing dude
+TODOs:
+- Arg parsing
+- Option to work on a list other than "Inbound"
+- "Daily review" mode where you review the active and blocked ones as well
+'''
 import logging
 import readline
 import datetime
@@ -43,7 +48,6 @@ def filter_them(iterable, name):
 
 
 def display_card(card):
-    # TODO add due date
     created = card.create_date
     print('Card {0}'.format(card.id))
     print('  Name: {0}'.format(card.name.decode('utf8')))
@@ -54,8 +58,10 @@ def display_card(card):
     if card.get_attachments():
         print('  Attachments: {0}'.format(','.join([a['name'] for a in card.get_attachments()])))
     if card.due:
+        # TODO add red for overdue cards
+        diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
         print('  Due: {0}'.format(card.due_date))
-        print('  (Remaining): {0}'.format(card.due_date - datetime.datetime.now(datetime.timezone.utc)))
+        print('  (Remaining): {0}'.format(diff))
 
 
 def prompt_for_user_choice(iterable):
@@ -63,7 +69,7 @@ def prompt_for_user_choice(iterable):
     for index, item in enumerate(iterable):
         print('  [{0}] {1}'.format(index, item.decode('utf8')))
     broken = False
-    while not broken: #index <= 0 or index > len(iterable):
+    while not broken:
         usersel = input('Input the numeric ID or IDs of the item(s) you want: ').strip()
         try:
             if ',' in usersel or ' ' in usersel:
