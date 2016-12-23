@@ -3,6 +3,7 @@ TODOs:
 - Option to work on a list other than "Inbound"
 - "Daily review" mode where you review the active and blocked ones as well
 '''
+import re
 import sys
 import logging
 import readline  # noqa
@@ -27,12 +28,14 @@ class Colors:
 
 
 __version__ = '0.0.3'
-__banner__ = '''Welcome to{1.blue}
+__banner__ = '''Welcome to{1.green}
+
   __|_ _| ._
  (_||_(_|o|_)\/
-  _|      |  /{1.reset}
+  _|      |  /{1.red}
+
 version {0}
-by delucks
+by delucks{1.reset}
 '''.format(__version__, Colors)
 
 
@@ -59,7 +62,7 @@ def initialize_trello(config):
     return trello_client
 
 
-def filter_them(iterable, name):
+def _filter_by_name(iterable, name):
     return [b for b in iterable if b.name == bytes(name, 'utf8')][0]
 
 
@@ -78,7 +81,6 @@ def display_card(card):
     if card.get_attachments():
         print(_colorize('Attachments:', ','.join([a['name'] for a in card.get_attachments()])))
     if card.due:
-        # TODO add red for overdue cards
         diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
         if diff < datetime.timedelta(0):
             display = Colors.red
@@ -144,35 +146,45 @@ def make_readable(object_grouping):
     return {o.name: o for o in object_grouping}
 
 
+def apply_filters(cardlist, reverse=False, regex=None):
+    cards = list(cardlist) 
+    if regex:
+        selected = [c for c in cardlist if re.search(regex, c.name.decode('utf8'))]
+    else:
+        selected = cards
+    if reverse:
+        return reversed(selected)
+    else:
+        return selected
+
 def main():
     config_properties = parse_configuration()
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
-    #p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
-    #p.add_argument('-m', '--match', help='provide a regex to filter the card names on')
+    p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
+    p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
     p.add_argument('-d', '--display', help='just show em', action='store_true')
     p.add_argument('-l', '--list', help='list to use', default=config_properties['list_names']['incoming'])
     p.add_argument('--lists', help='dump lists', action='store_true')
     args = p.parse_args()
     trello = initialize_trello(config_properties)
-    main_board = filter_them(trello.list_boards(), config_properties['board_name'])
-    inbound_list = filter_them(main_board.get_lists('open'), args.list)
+    main_board = _filter_by_name(trello.list_boards(), config_properties['board_name'])
 
     print(__banner__)
-
-    if args.display:
-        for card in inbound_list.list_cards():
-            display_card(card)
-        sys.exit(0)
-    elif args.lists:
+    if args.lists:
         for l in main_board.get_lists('open'):
             print(l.name.decode('utf8'))
-        sys.exit(0)
+        return True
 
-    other_lists = main_board.get_lists('open')
-    all_labels = main_board.get_labels()
-    label_lookup = make_readable(all_labels)
-    list_lookup = make_readable(other_lists)
-    for card in inbound_list.list_cards():
+    inbound_list = _filter_by_name(main_board.get_lists('open'), args.list)
+    cards = apply_filters(inbound_list.list_cards(), reverse=args.reverse, regex=args.match)
+    if args.display:
+        for card in cards:
+            display_card(card)
+        return True
+
+    label_lookup = make_readable(main_board.get_labels())
+    list_lookup = make_readable(main_board.get_lists('open'))
+    for card in cards:
         display_card(card)
         keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
         if keep:
