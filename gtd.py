@@ -3,6 +3,8 @@ TODOs:
 - Arg parsing
 - Option to work on a list other than "Inbound"
 - "Daily review" mode where you review the active and blocked ones as well
+- Arg to invert the list (most recent first)
+- Arg to filter the list to only items matching a regex
 '''
 import logging
 import readline
@@ -109,7 +111,7 @@ def add_labels(card, lookup):
 
 def move_to_list(card, lookup, current):
     dest = prompt_for_user_choice(lookup.keys())[0]
-    if lookup[dest] == current:
+    if lookup[dest].id == current.id:
         logging.info('Did not want to move')
         return False
     else:
@@ -144,6 +146,8 @@ for card in inbound_list.list_cards():
         if destination:
             card.change_list(destination.id)
             print('Moved to {0}'.format(destination.name.decode('utf8')))
+        else:
+            print('Staying in inbound')
     else:
         card.delete()
 print('Good show, chap. Have a great day')
