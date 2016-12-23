@@ -5,9 +5,10 @@ TODOs:
 '''
 import sys
 import logging
-import readline
+import readline  # noqa
 import datetime
 import argparse
+
 from trello import TrelloClient
 import yaml
 
@@ -24,11 +25,12 @@ class Colors:
     white = esc + '[0;37m'
     reset = esc + '[0m'
 
-__version__ = '0.0.2'
+
+__version__ = '0.0.3'
 __banner__ = '''Welcome to{1.blue}
   __|_ _| ._
  (_||_(_|o|_)\/
-  _|      |  /{1.reset} 
+  _|      |  /{1.reset}
 version {0}
 by delucks
 '''.format(__version__, Colors)
@@ -172,7 +174,7 @@ def main():
     list_lookup = make_readable(other_lists)
     for card in inbound_list.list_cards():
         display_card(card)
-        keep =  prompt_for_confirmation('Should we keep it? (Y/n) ', True)
+        keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
         if keep:
             labels = add_labels(card, label_lookup)
             if labels:
@@ -187,6 +189,7 @@ def main():
         else:
             card.delete()
     print('Good show, chap. Have a great day')
+
 
 if __name__ == '__main__':
     try:
