@@ -6,9 +6,11 @@ TODOs:
 - Arg to invert the list (most recent first)
 - Arg to filter the list to only items matching a regex
 '''
+import sys
 import logging
 import readline
 import datetime
+#import argparse
 from trello import TrelloClient
 import yaml
 
@@ -122,32 +124,41 @@ def make_readable(object_grouping):
     return {o.name: o for o in object_grouping}
 
 
-config_properties = parse_configuration()
-trello = initialize_trello(config_properties)
+def main():
+    #p = argparse.ArgumentParser('gtd.py version {0}'.format(__version__))
+    config_properties = parse_configuration()
+    trello = initialize_trello(config_properties)
 
-main_board = filter_them(trello.list_boards(), config_properties['board_name'])
-inbound_list = filter_them(main_board.get_lists('open'), config_properties['list_names']['incoming'])
-other_lists = main_board.get_lists('open')
-all_labels = main_board.get_labels()
+    main_board = filter_them(trello.list_boards(), config_properties['board_name'])
+    inbound_list = filter_them(main_board.get_lists('open'), config_properties['list_names']['incoming'])
+    other_lists = main_board.get_lists('open')
+    all_labels = main_board.get_labels()
 
-label_lookup = make_readable(all_labels)
-list_lookup = make_readable(other_lists)
+    label_lookup = make_readable(all_labels)
+    list_lookup = make_readable(other_lists)
 
-print(__banner__)
-for card in inbound_list.list_cards():
-    display_card(card)
-    keep =  prompt_for_confirmation('Should we keep it? (Y/n) ', True)
-    if keep:
-        labels = add_labels(card, label_lookup)
-        if labels:
-            for label in labels:
-                card.add_label(label)
-        destination = move_to_list(card, list_lookup, inbound_list)
-        if destination:
-            card.change_list(destination.id)
-            print('Moved to {0}'.format(destination.name.decode('utf8')))
+    print(__banner__)
+    for card in inbound_list.list_cards():
+        display_card(card)
+        keep =  prompt_for_confirmation('Should we keep it? (Y/n) ', True)
+        if keep:
+            labels = add_labels(card, label_lookup)
+            if labels:
+                for label in labels:
+                    card.add_label(label)
+            destination = move_to_list(card, list_lookup, inbound_list)
+            if destination:
+                card.change_list(destination.id)
+                print('Moved to {0}'.format(destination.name.decode('utf8')))
+            else:
+                print('Staying in inbound')
         else:
-            print('Staying in inbound')
-    else:
-        card.delete()
-print('Good show, chap. Have a great day')
+            card.delete()
+    print('Good show, chap. Have a great day')
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('Quitting!')
+        sys.exit(0)

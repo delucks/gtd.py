@@ -1,4 +1,8 @@
-gtd.config.yaml
+gtd.yaml
 lib/*
 include/*
 bin/*
+pip-selfcheck.json
+*.swp
+*.pyc
+__pycache__
