@@ -1,12 +1,12 @@
 '''Incremental development is a thing dude'''
 import logging
 import readline
+import datetime
 from trello import TrelloClient
 import yaml
 
 __version__ = '0.0.2'
-__banner__ = '''
-Welcome to
+__banner__ = '''Welcome to
   __|_ _| ._    
  (_||_(_|o|_)\/ 
   _|      |  /  
@@ -44,21 +44,24 @@ def filter_them(iterable, name):
 
 def display_card(card):
     # TODO add due date
+    created = card.create_date
     print('Card {0}'.format(card.id))
     print('  Name: {0}'.format(card.name.decode('utf8')))
-    print('  Created on: {0} ({1})'.format(card.create_date.timestamp(), card.create_date))
+    print('  Created on: {0} ({1})'.format(created, created.timestamp()))
+    print('  Age: {0}'.format(datetime.datetime.now(datetime.timezone.utc) - created))
     if card.labels:
         print('  Labels: {0}'.format(','.join([l.name.decode('utf8') for l in card.labels])))
     if card.get_attachments():
         print('  Attachments: {0}'.format(','.join([a['name'] for a in card.get_attachments()])))
     if card.due:
         print('  Due: {0}'.format(card.due_date))
+        print('  (Remaining): {0}'.format(card.due_date - datetime.datetime.now(datetime.timezone.utc)))
 
 
 def prompt_for_user_choice(iterable):
     iterable = list(iterable)
     for index, item in enumerate(iterable):
-        print('[{0}] {1}'.format(index, item.decode('utf8')))
+        print('  [{0}] {1}'.format(index, item.decode('utf8')))
     broken = False
     while not broken: #index <= 0 or index > len(iterable):
         usersel = input('Input the numeric ID or IDs of the item(s) you want: ').strip()
@@ -106,6 +109,7 @@ def move_to_list(card, lookup, current):
     else:
         return lookup[dest]
 
+
 def make_readable(object_grouping):
     return {o.name: o for o in object_grouping}
 
@@ -124,12 +128,16 @@ list_lookup = make_readable(other_lists)
 print(__banner__)
 for card in inbound_list.list_cards():
     display_card(card)
-    labels = add_labels(card, label_lookup)
-    if labels:
-        for label in labels:
-            card.add_label(label)
-    destination = move_to_list(card, list_lookup, inbound_list)
-    if destination:
-        card.change_list(destination.id)
-        print('Moved to {0}'.format(destination.name.decode('utf8')))
+    keep =  prompt_for_confirmation('Should we keep it? (Y/n) ', True)
+    if keep:
+        labels = add_labels(card, label_lookup)
+        if labels:
+            for label in labels:
+                card.add_label(label)
+        destination = move_to_list(card, list_lookup, inbound_list)
+        if destination:
+            card.change_list(destination.id)
+            print('Moved to {0}'.format(destination.name.decode('utf8')))
+    else:
+        card.delete()
 print('Good show, chap. Have a great day')
