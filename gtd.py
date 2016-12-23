@@ -27,7 +27,7 @@ class Colors:
     reset = esc + '[0m'
 
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 __banner__ = '''Welcome to{1.green}
 
   __|_ _| ._
@@ -162,45 +162,48 @@ def main():
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
     p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
     p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
-    p.add_argument('-d', '--display', help='just show em', action='store_true')
-    p.add_argument('-l', '--list', help='list to use', default=config_properties['list_names']['incoming'])
-    p.add_argument('--lists', help='dump lists', action='store_true')
+    p.add_argument('-l', '--list', help='inbound list name to use', default=config_properties['list_names']['incoming'])
+    commands = p.add_subparsers(dest='command')
+    show = commands.add_parser('show')
+    show.add_argument('type', choices=('lists', 'cards'), default='lists')
+    review = commands.add_parser('review')
     args = p.parse_args()
+
     trello = initialize_trello(config_properties)
     main_board = _filter_by_name(trello.list_boards(), config_properties['board_name'])
-
-    print(__banner__)
-    if args.lists:
-        for l in main_board.get_lists('open'):
-            print(l.name.decode('utf8'))
-        return True
-
     inbound_list = _filter_by_name(main_board.get_lists('open'), args.list)
     cards = apply_filters(inbound_list.list_cards(), reverse=args.reverse, regex=args.match)
-    if args.display:
+
+    print(__banner__)
+    if args.command == 'show':
+        if args.type == 'lists':
+            for l in main_board.get_lists('open'):
+                print(l.name.decode('utf8'))
+            return True
+        elif args.type == 'cards':
+            for card in cards:
+                display_card(card)
+            return True
+    else: # args.command == 'review':
+        label_lookup = make_readable(main_board.get_labels())
+        list_lookup = make_readable(main_board.get_lists('open'))
         for card in cards:
             display_card(card)
-        return True
-
-    label_lookup = make_readable(main_board.get_labels())
-    list_lookup = make_readable(main_board.get_lists('open'))
-    for card in cards:
-        display_card(card)
-        keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
-        if keep:
-            labels = add_labels(card, label_lookup)
-            if labels:
-                for label in labels:
-                    card.add_label(label)
-            destination = move_to_list(card, list_lookup, inbound_list)
-            if destination:
-                card.change_list(destination.id)
-                print('Moved to {0}'.format(destination.name.decode('utf8')))
+            keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
+            if keep:
+                labels = add_labels(card, label_lookup)
+                if labels:
+                    for label in labels:
+                        card.add_label(label)
+                destination = move_to_list(card, list_lookup, inbound_list)
+                if destination:
+                    card.change_list(destination.id)
+                    print('Moved to {0}'.format(destination.name.decode('utf8')))
+                else:
+                    print('Staying in inbound')
             else:
-                print('Staying in inbound')
-        else:
-            card.delete()
-    print('Good show, chap. Have a great day')
+                card.delete()
+        print('Good show, chap. Have a great day')
 
 
 if __name__ == '__main__':
