@@ -4,6 +4,16 @@ import readline
 from trello import TrelloClient
 import yaml
 
+__version__ = '0.0.2'
+__banner__ = '''
+Welcome to
+  __|_ _| ._    
+ (_||_(_|o|_)\/ 
+  _|      |  /  
+version {0}
+by delucks
+'''.format(__version__)
+
 
 def parse_configuration(configfile='gtd.yaml'):
     '''load user-defined configuration for what boards and lists to use
@@ -46,42 +56,51 @@ def display_card(card):
 
 
 def prompt_for_user_choice(iterable):
-    # TODO add multiselect
+    iterable = list(iterable)
     for index, item in enumerate(iterable):
-        print('[{0}] {1}'.format(index+1, item.decode('utf8')))
-    index = 0
-    while index <= 0 or index > len(iterable):
+        print('[{0}] {1}'.format(index, item.decode('utf8')))
+    broken = False
+    while not broken: #index <= 0 or index > len(iterable):
+        usersel = input('Input the numeric ID or IDs of the item(s) you want: ').strip()
         try:
-            index = int(input('Input the numeric ID of the item you want: '))
+            if ',' in usersel or ' ' in usersel:
+                delimiter = ',' if ',' in usersel else ' '
+                indicies = [int(i) for i in usersel.split(delimiter)]
+            else:
+                indicies = [int(usersel)]
+            broken = True
         except ValueError:
-            print('Was that an integer? Study your algebra')
-    return list(iterable)[index-1]
+            print('You gave a malformed input!')
+    return [iterable[i] for i in indicies]
 
-def prompt_for_confirmation(message):
+
+def prompt_for_confirmation(message, default=False):
     while True:
         choice = input(message).strip().lower()
-        if choice == 'y' or choice == 'n':
+        if choice == 'y' or choice == 'n' or choice == '':
             break
         else:
-            print('Input was not y nor n, partner')
-    return choice == 'y'
+            print('Input was not y nor n, partner. Enter is OK if you meant to use the default')
+    return choice == 'y' if choice != '' else default
+
 
 def add_labels(card, lookup):
-    if prompt_for_confirmation('Would you like to add labels? (y/n) '):
+    if prompt_for_confirmation('Would you like to add labels? (y/N) '):
         done = False
         newlabels = []
         while not done:
             label_to_add = prompt_for_user_choice(lookup.keys())
-            newlabels.append(lookup[label_to_add])
-            done = prompt_for_confirmation('Are you done adding labels? (y/n) ')
+            newlabels.extend([lookup[l] for l in label_to_add])
+            done = prompt_for_confirmation('Are you done adding labels? (Y/n) ', default=True)
         return newlabels
     else:
         logging.info('User did not add labels')
         return False
 
+
 def move_to_list(card, lookup, current):
-    dest = prompt_for_user_choice(lookup.keys())
-    if dest == current:
+    dest = prompt_for_user_choice(lookup.keys())[0]
+    if lookup[dest] == current:
         logging.info('Did not want to move')
         return False
     else:
@@ -102,6 +121,7 @@ all_labels = main_board.get_labels()
 label_lookup = make_readable(all_labels)
 list_lookup = make_readable(other_lists)
 
+print(__banner__)
 for card in inbound_list.list_cards():
     display_card(card)
     labels = add_labels(card, label_lookup)
@@ -111,4 +131,5 @@ for card in inbound_list.list_cards():
     destination = move_to_list(card, list_lookup, inbound_list)
     if destination:
         card.change_list(destination.id)
-        print('Moved to {d.name}'.format(d=destination))
+        print('Moved to {0}'.format(destination.name.decode('utf8')))
+print('Good show, chap. Have a great day')
