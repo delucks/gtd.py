@@ -5,10 +5,14 @@ TODOs:
 '''
 import re
 import sys
+import tty
+import shutil
 import logging
+import termios
 import readline  # noqa
 import datetime
 import argparse
+from itertools import zip_longest
 
 from trello import TrelloClient
 import yaml
@@ -111,12 +115,28 @@ def prompt_for_user_choice(iterable):
 
 def prompt_for_confirmation(message, default=False):
     while True:
-        choice = input(message).strip().lower()
-        if choice == 'y' or choice == 'n' or choice == '':
+        print(message)
+        choice = getch() #input(message).strip().lower()
+        if choice == 'y' or choice == 'n' or choice == '\r':
+            break
+        elif choice == '^c':
             break
         else:
             print('Input was not y nor n, partner. Enter is OK if you meant to use the default')
-    return choice == 'y' if choice != '' else default
+    return choice == 'y' if choice != '\r' else default
+
+def add_labels2(card, lookup):
+    if prompt_for_confirmation('Would you like to add labels? (y/N) '):
+        done = False
+        newlabels = []
+        while not done:
+            label_to_add = quickmove(lookup.keys())
+            newlabels.append(lookup[label_to_add])
+            done = prompt_for_confirmation('Are you done adding labels? (Y/n) ', default=True)
+        return newlabels
+    else:
+        logging.info('User did not add labels')
+        return False
 
 
 def add_labels(card, lookup):
@@ -134,7 +154,7 @@ def add_labels(card, lookup):
 
 
 def move_to_list(card, lookup, current):
-    dest = prompt_for_user_choice(lookup.keys())[0]
+    dest = quickmove(lookup.keys())
     if lookup[dest].id == current.id:
         logging.info('Did not want to move')
         return False
@@ -156,6 +176,42 @@ def apply_filters(cardlist, reverse=False, regex=None):
         return reversed(selected)
     else:
         return selected
+
+def getch():
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+    except KeyboardInterrupt:
+        return None
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
+
+def quickmove(iterable):
+    '''a faster selection interface: get the terminal width and draw options
+    in a table squashed to the width of the terminal. Assign a unique one-char
+    identifier to each option, and read only one character from stdin. Match that
+    one character against the options, and return the one that matches. Give users
+    an error if they try to use a nonexistent char
+    We have 26 + 10 alphanumeric chars we can easily use, so there's a practical
+    limit of 36 options to this method
+    '''
+    #width, height = shutil.get_terminal_size()
+    #print(width, height)
+    lookup = {}
+    for idx, chunk in enumerate(iterable):
+        if idx < 10:
+            assigned = str(idx)
+        else:
+            assigned = chr(idx + 87)
+        lookup[assigned] = idx
+        print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
+    print('Press desired option character')
+    req = getch()
+    return list(iterable)[int(lookup.get(req, None))]
+
 
 def main():
     config_properties = parse_configuration()
@@ -191,7 +247,7 @@ def main():
             display_card(card)
             keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
             if keep:
-                labels = add_labels(card, label_lookup)
+                labels = add_labels2(card, label_lookup)
                 if labels:
                     for label in labels:
                         card.add_label(label)
