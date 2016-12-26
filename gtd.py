@@ -3,6 +3,7 @@
 TODOs:
 - Option to work on a list other than "Inbound"
 - "Daily review" mode where you review the active and blocked ones as well
+- Add a "batch mode" that allows you to only do one action (add labels, delete, ...) on all the cards at once
 
 < Pasted the rest of this comment in from the old script >
 functionality we want:
@@ -29,14 +30,14 @@ how will users interact with my program?
 import re
 import sys
 import tty
-import shutil
+import string
 import logging
 import termios
 import readline  # noqa
 import datetime
 import argparse
 
-from trello import TrelloClient
+import trello
 import yaml
 
 
@@ -82,7 +83,7 @@ def initialize_trello(config):
     '''Initializes our connection to the trello API
     '''
     logging.info('Connecting to the Trello API...')
-    trello_client = TrelloClient(
+    trello_client = trello.TrelloClient(
         api_key=config['trello']['api_key'],
         api_secret=config['trello']['api_secret'],
         token=config['trello']['oauth_token'],
@@ -145,38 +146,19 @@ def prompt_for_confirmation(message, default=False):
         choice = getch() #input(message).strip().lower()
         if choice == 'y' or choice == 'n' or choice == '\r':
             break
-        elif choice == '^c':
-            break
         else:
-            print('Input was not y nor n, partner. Enter is OK if you meant to use the default')
+            print('Input was not y, nor was it n. Enter is OK')
     return choice == 'y' if choice != '\r' else default
-
-def add_labels2(card, lookup):
-    if prompt_for_confirmation('Would you like to add labels? (y/N) '):
-        done = False
-        newlabels = []
-        while not done:
-            label_to_add = quickmove(lookup.keys())
-            newlabels.append(lookup[label_to_add])
-            done = prompt_for_confirmation('Are you done adding labels? (Y/n) ', default=True)
-        return newlabels
-    else:
-        logging.info('User did not add labels')
-        return False
 
 
 def add_labels(card, lookup):
-    if prompt_for_confirmation('Would you like to add labels? (y/N) '):
-        done = False
-        newlabels = []
-        while not done:
-            label_to_add = prompt_for_user_choice(lookup.keys())
-            newlabels.extend([lookup[l] for l in label_to_add])
-            done = prompt_for_confirmation('Are you done adding labels? (Y/n) ', default=True)
-        return newlabels
-    else:
-        logging.info('User did not add labels')
-        return False
+    done = False
+    newlabels = []
+    while not done:
+        label_to_add = prompt_for_user_choice(lookup.keys())
+        newlabels.extend([lookup[l] for l in label_to_add])
+        done = prompt_for_confirmation('Are you done adding labels? (Y/n) ', default=True)
+    return newlabels
 
 
 def move_to_list(card, lookup, current):
@@ -227,41 +209,46 @@ def quickmove(iterable):
     #width, height = shutil.get_terminal_size()
     #print(width, height)
     lookup = {}
+    preferred_keys = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"]
+    remainder = list(set(preferred_keys) - set(string.ascii_lowercase))
+    all_keys = preferred_keys + remainder
     for idx, chunk in enumerate(iterable):
-        if idx < 10:
-            assigned = str(idx)
-        else:
-            assigned = chr(idx + 87)
+        assigned = all_keys[idx]
         lookup[assigned] = idx
         print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
-    print('Press desired option character')
+    print('Press the character for the desired option. Selection will happen immediately upon keystroke')
     req = getch()
     return list(iterable)[int(lookup.get(req, None))]
 
-''' ok so those methods you wrote yesterday were a good second step, but I want a better
-review UI. Kinda like how beets does it, theirs is really nice
 
-Grabbed a screengrab of how using beets is. I notice they present all options to you all the time, even while in a select dialog. that's
-definitely something my UI is missing right now
-
-'''
-def review_card(card):
-    while True:
-    keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
-    if keep:
-        labels = add_labels2(card, label_lookup)
-        if labels:
-            for label in labels:
-                card.add_label(label)
-        destination = move_to_list(card, list_lookup, inbound_list)
-        if destination:
-            card.change_list(destination.id)
-            print('Moved to {0}'.format(destination.name.decode('utf8')))
+def review_card(card, label_lookup, list_lookup, inbound):
+    mandatory_choice_footer = '{0.blue}D{0.reset}elete, {0.blue}L{0.reset}abels, {0.blue}M{0.reset}ove, {0.blue}S{0.reset}kip'.format(Colors)
+    choice = ''
+    while choice != 'S' and choice != 'D':
+        print(mandatory_choice_footer)
+        choice = input('Input option character: ').strip().upper()
+        if choice == 'D':
+            card.delete()
+            print('Card deleted')
+            break
+        elif choice == 'L':
+            labels = add_labels(card, label_lookup)
+            if labels:
+                for label in labels:
+                    try:
+                        card.add_label(label)
+                    except trello.exceptions.ResourceUnavailable:
+                        print('Label {0} is already present!'.format(label))
+        elif choice == 'M':
+            destination = move_to_list(card, list_lookup, inbound)
+            if destination:
+                card.change_list(destination.id)
+                print('Moved to {0}'.format(destination.name.decode('utf8')))
+            else:
+                print('Staying in inbound')
+            break
         else:
-            print('Staying in inbound')
-    else:
-        card.delete()
-
+            pass
 
 
 def main():
@@ -269,7 +256,7 @@ def main():
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
     p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
     p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
-    p.add_argument('-l', '--list', help='inbound list name to use', default=config_properties['list_names']['incoming'])
+    p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
     commands = p.add_subparsers(dest='command')
     show = commands.add_parser('show')
     show.add_argument('type', choices=('lists', 'cards'), default='lists')
@@ -303,21 +290,8 @@ def main():
         list_lookup = make_readable(main_board.get_lists('open'))
         for card in cards:
             display_card(card)
-            keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
-            if keep:
-                labels = add_labels2(card, label_lookup)
-                if labels:
-                    for label in labels:
-                        card.add_label(label)
-                destination = move_to_list(card, list_lookup, inbound_list)
-                if destination:
-                    card.change_list(destination.id)
-                    print('Moved to {0}'.format(destination.name.decode('utf8')))
-                else:
-                    print('Staying in inbound')
-            else:
-                card.delete()
-        print('Good show, chap. Have a great day')
+            review_card(card, label_lookup, list_lookup, inbound_list)
+        print('All done, have a great day!')
 
 
 if __name__ == '__main__':
