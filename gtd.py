@@ -258,6 +258,7 @@ def main():
     p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
     p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
     commands = p.add_subparsers(dest='command')
+    commands.add_parser('help')
     show = commands.add_parser('show')
     show.add_argument('type', choices=('lists', 'cards'), default='lists')
     review = commands.add_parser('review')
@@ -265,6 +266,9 @@ def main():
     add.add_argument('title', help='title for the new card')
     add.add_argument('-m', '--message', help='append a description for the new card')
     args = p.parse_args()
+    if args.command == 'help':
+        p.print_help()
+        return True
 
     trello = initialize_trello(config_properties)
     main_board = _filter_by_name(trello.list_boards(), config_properties['board_name'])
