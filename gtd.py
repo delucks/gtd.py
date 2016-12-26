@@ -1,7 +1,30 @@
+#!/usr/bin/env python3
 '''Incremental development is a thing dude
 TODOs:
 - Option to work on a list other than "Inbound"
 - "Daily review" mode where you review the active and blocked ones as well
+
+< Pasted the rest of this comment in from the old script >
+functionality we want:
+    Some kind of prompted/scheduled review of all inbound and/or holding items
+    Easy categorization interface, preferrably with single button push decisions
+    Displaying the decision tree that I follow to operate the program correctly
+    Extensive documentation of what destinations things are going to, as well
+        as an audit trail of logging.
+    Ability to bookmark links that are in the incoming basket with an automatic title
+how will users interact with my program?
+    users? me. other people if they want.
+    interface?
+        ncurses
+            easy to navigate, can draw a kind of UI for myself
+            restricts the terminals this can work on
+            harder to program
+            could have cool things like certain list movements being triggered by a single keystroke
+        $EDITOR
+            take all card names and metadata, throw them into a temp file,
+            open it with $EDITOR and do all the rearrangement manually
+            read the new structure, take it as source of truth, and
+            update the API accordingly
 '''
 import re
 import sys
@@ -12,7 +35,6 @@ import termios
 import readline  # noqa
 import datetime
 import argparse
-from itertools import zip_longest
 
 from trello import TrelloClient
 import yaml
@@ -31,7 +53,7 @@ class Colors:
     reset = esc + '[0m'
 
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 __banner__ = '''Welcome to{1.green}
 
   __|_ _| ._
@@ -41,6 +63,10 @@ __banner__ = '''Welcome to{1.green}
 version {0}
 by delucks{1.reset}
 '''.format(__version__, Colors)
+
+_workflow_description = '''
+1. 
+'''
 
 
 def parse_configuration(configfile='gtd.yaml'):
@@ -212,6 +238,31 @@ def quickmove(iterable):
     req = getch()
     return list(iterable)[int(lookup.get(req, None))]
 
+''' ok so those methods you wrote yesterday were a good second step, but I want a better
+review UI. Kinda like how beets does it, theirs is really nice
+
+Grabbed a screengrab of how using beets is. I notice they present all options to you all the time, even while in a select dialog. that's
+definitely something my UI is missing right now
+
+'''
+def review_card(card):
+    while True:
+    keep = prompt_for_confirmation('Should we keep it? (Y/n) ', True)
+    if keep:
+        labels = add_labels2(card, label_lookup)
+        if labels:
+            for label in labels:
+                card.add_label(label)
+        destination = move_to_list(card, list_lookup, inbound_list)
+        if destination:
+            card.change_list(destination.id)
+            print('Moved to {0}'.format(destination.name.decode('utf8')))
+        else:
+            print('Staying in inbound')
+    else:
+        card.delete()
+
+
 
 def main():
     config_properties = parse_configuration()
@@ -223,6 +274,9 @@ def main():
     show = commands.add_parser('show')
     show.add_argument('type', choices=('lists', 'cards'), default='lists')
     review = commands.add_parser('review')
+    add = commands.add_parser('add')  # TODO add argument for tags to add
+    add.add_argument('title', help='title for the new card')
+    add.add_argument('-m', '--message', help='append a description for the new card')
     args = p.parse_args()
 
     trello = initialize_trello(config_properties)
@@ -240,6 +294,10 @@ def main():
             for card in cards:
                 display_card(card)
             return True
+    elif args.command == 'add':
+        logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, inbound_list))
+        returned = inbound_list.add_card(name=args.title, desc=args.message)
+        print('Successfully added card {0}'.format(returned))
     else: # args.command == 'review':
         label_lookup = make_readable(main_board.get_labels())
         list_lookup = make_readable(main_board.get_lists('open'))
