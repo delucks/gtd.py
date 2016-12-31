@@ -276,11 +276,9 @@ def main():
         if args.type == 'lists':
             for l in main_board.get_lists('open'):
                 print(l.name.decode('utf8'))
-            return True
         elif args.type == 'cards':
             for card in cards:
                 display_card(card)
-            return True
     elif args.command == 'add':
         logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, inbound_list))
         returned = inbound_list.add_card(name=args.title, desc=args.message)
