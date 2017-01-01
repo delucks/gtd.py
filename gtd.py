@@ -54,7 +54,7 @@ class Colors:
     reset = esc + '[0m'
 
 
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 __banner__ = '''Welcome to{1.green}
 
   __|_ _| ._
@@ -103,7 +103,7 @@ def _colorize(lbl, msg, colorstring=Colors.blue):
 
 def display_card(card):
     created = card.create_date
-    print('{1.red}Card {0}{1.reset}'.format(card.id, Colors))
+    print('{1.red}Card {1.reset}{0}'.format(card.id, Colors))
     print(_colorize('Name:', card.name.decode('utf8')))
     print(_colorize('Created on:', '{0} ({1})'.format(created, created.timestamp())))
     print(_colorize('Age:', datetime.datetime.now(datetime.timezone.utc) - created))
@@ -222,7 +222,7 @@ def quickmove(iterable):
 
 
 def review_card(card, label_lookup, list_lookup, inbound):
-    mandatory_choice_footer = '{0.blue}D{0.reset}elete, {0.blue}L{0.reset}abels, {0.blue}M{0.reset}ove, {0.blue}S{0.reset}kip'.format(Colors)
+    mandatory_choice_footer = '{0.blue}D{0.reset}elete, {0.blue}L{0.reset}abels, {0.blue}M{0.reset}ove, {0.blue}S{0.reset}kip, {0.blue}Q{0.reset}uit'.format(Colors)
     choice = ''
     while choice != 'S' and choice != 'D':
         print(mandatory_choice_footer)
@@ -247,6 +247,8 @@ def review_card(card, label_lookup, list_lookup, inbound):
             else:
                 print('Staying in inbound')
             break
+        elif choice == 'Q':
+            sys.exit(1)
         else:
             pass
 
