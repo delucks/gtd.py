@@ -35,14 +35,9 @@ class Colors:
 
 
 __version__ = '0.0.6'
-_banner = '''Welcome to{1.green}
-
-  __|_ _| ._
- (_||_(_|o|_)\/
-  _|      |  /{1.red}
-
-version {0}
-by delucks{1.reset}
+_banner = ''' __|_ _| ._     version {1.green}{0}{1.reset}
+(_||_(_|{1.green}o{1.reset}|_)\/  by {1.green}delucks{1.reset}
+ _|      |  /
 '''.format(__version__, Colors)
 _workflow_description = '''1. Collect absolutely everything that can take your attention into "Inbound"
 2. Filter:
@@ -67,8 +62,24 @@ def parse_configuration(configfile='gtd.yaml'):
     logging.info('Opening configuration file...')
     with open(configfile, 'r') as config_yaml:
         logging.info('Loading configuration properties...')
-        return yaml.safe_load(config_yaml)
+        properties = yaml.safe_load(config_yaml)
+        if validate_config(properties):
+            return properties
 
+
+def validate_config(config):
+    try:
+        config['trello']['api_key']
+        config['trello']['api_secret']
+        config['trello']['oauth_token_secret']
+        config['trello']['oauth_token']
+        config['board_name']
+        config['list_names']['incoming']
+        return True
+    except KeyError as e:
+        print('A required property in your configuration was not found!')
+        print(e)
+        return False
 
 def initialize_trello(config):
     '''Initializes our connection to the trello API
