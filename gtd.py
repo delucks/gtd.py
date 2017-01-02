@@ -20,6 +20,7 @@ import termios
 import readline  # noqa
 import datetime
 import argparse
+import webbrowser
 
 import trello
 import yaml
@@ -102,7 +103,7 @@ def initialize_trello(config):
 
 
 def _filter_by_name(iterable, name):
-    return [b for b in iterable if b.name == bytes(name, 'utf8')][0]
+    return [b for b in iterable if bytes(name, 'utf8') in b.name][0]
 
 
 def _colorize(lbl, msg, colorstring=Colors.blue):
@@ -116,7 +117,7 @@ def display_card(card):
     print(_colorize('Created on:', '{0} ({1})'.format(created, created.timestamp())))
     print(_colorize('Age:', datetime.datetime.now(datetime.timezone.utc) - created))
     if card.labels:
-        print(_colorize('Labels:', ','.join([l.name.decode('utf8') for l in card.labels])))
+        print(_colorize('Tags:', ','.join([l.name.decode('utf8') for l in card.labels])))
     if card.get_attachments():
         print(_colorize('Attachments:', ','.join([a['name'] for a in card.get_attachments()])))
     if card.due:
@@ -130,8 +131,8 @@ def display_card(card):
 
 
 def prompt_for_user_choice(iterable):
-    iterable = list(iterable)
-    for index, item in enumerate(iterable):
+    listed = list(iterable)
+    for index, item in enumerate(listed):
         print('  [{0}] {1}'.format(index, item.decode('utf8')))
     broken = False
     while not broken:
@@ -145,7 +146,7 @@ def prompt_for_user_choice(iterable):
             broken = True
         except ValueError:
             print('You gave a malformed input!')
-    return [iterable[i] for i in indicies]
+    return [listed[i] for i in indicies]
 
 
 def prompt_for_confirmation(message, default=False):
@@ -167,13 +168,13 @@ def add_labels(card, lookup):
     while not done:
         label_to_add = prompt_for_user_choice(lookup.keys())
         newlabels.extend([lookup[l] for l in label_to_add])
-        done = prompt_for_confirmation('Are you done adding labels?', default=True)
+        done = prompt_for_confirmation('Are you done tagging?', default=True)
     if newlabels:
         for label in newlabels:
             try:
                 card.add_label(label)
             except trello.exceptions.ResourceUnavailable:
-                print('Label {0} is already present!'.format(label))
+                print('Tag {0} is already present!'.format(label))
     return newlabels
 
 
@@ -190,7 +191,7 @@ def move_to_list(card, lookup, current):
         return destination_list
 
 
-def make_readable(object_grouping):
+def make_name_lookup(object_grouping):
     return {o.name: o for o in object_grouping}
 
 
@@ -241,28 +242,35 @@ def quickmove(iterable):
 def review_card(card, label_lookup, list_lookup, inbound):
     '''present the user with an option-based interface to do every operation on
     a single card'''
-    mandatory_choice_header = (
+    header = (
         '{0.blue}D{0.reset}elete, '
-        '{0.blue}L{0.reset}abels, '
+        '{0.blue}T{0.reset}ag, '
         '{0.blue}M{0.reset}ove, '
         '{0.blue}S{0.reset}kip, '
         '{0.blue}Q{0.reset}uit'
     ).format(Colors)
+    if card.get_attachments():
+        header = '{0.blue}O{0.reset}pen link, '.format(Colors) + header
     choice = ''
     while choice != 'S' and choice != 'D':
-        print(mandatory_choice_header)
+        print(header)
         choice = input('Input option character: ').strip().upper()
         if choice == 'D':
             card.delete()
             print('Card deleted')
             break
-        elif choice == 'L':
+        elif choice == 'T':
             add_labels(card, label_lookup)
         elif choice == 'M':
             if move_to_list(card, list_lookup, inbound):
                 break
         elif choice == 'Q':
             raise KeyboardInterrupt
+        elif choice == 'O':
+            if not 'link' in header:
+                print('This card does not have an attachment!')
+            else:
+                webbrowser.open([a['name'] for a in card.get_attachments()][0])
         else:
             pass
 
@@ -281,7 +289,7 @@ def main():
     batch = commands.add_parser('batch')
     batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
     show = commands.add_parser('show')
-    show.add_argument('type', choices=('lists', 'cards'), default='lists')
+    show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
     review = commands.add_parser('review')
     add = commands.add_parser('add')  # TODO add argument for tags to add
     add.add_argument('title', help='title for the new card')
@@ -307,13 +315,16 @@ def main():
         elif args.type == 'cards':
             for card in cards:
                 display_card(card)
+        else: # args.type == 'tags':
+            for t in main_board.get_labels():
+                print(t.name.decode('utf8'))
     elif args.command == 'add':
         logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, inbound_list))
         returned = inbound_list.add_card(name=args.title, desc=args.message)
         print('Successfully added card {0}'.format(returned))
     elif args.command == 'batch':
         if args.type == 'move':
-            list_lookup = make_readable(main_board.get_lists('open'))
+            list_lookup = make_name_lookup(main_board.get_lists('open'))
             for card in cards:
                 display_card(card)
                 if prompt_for_confirmation('Want to move this one?', True):
@@ -325,15 +336,15 @@ def main():
                     card.delete()
                     print('Bye!')
         else: # args.type == 'tag'
-            label_lookup = make_readable(main_board.get_labels())
+            label_lookup = make_name_lookup(main_board.get_labels())
             for card in cards:
                 display_card(card)
                 if prompt_for_confirmation('Want to tag this one?'):
                     add_labels(card, label_lookup)
         print('Batch completed')
     else: # args.command == 'review':
-        label_lookup = make_readable(main_board.get_labels())
-        list_lookup = make_readable(main_board.get_lists('open'))
+        label_lookup = make_name_lookup(main_board.get_labels())
+        list_lookup = make_name_lookup(main_board.get_lists('open'))
         for card in cards:
             display_card(card)
             review_card(card, label_lookup, list_lookup, inbound_list)
