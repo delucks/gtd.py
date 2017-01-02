@@ -5,10 +5,11 @@ Notes:
 - This only works when your terminal supports colors via escape codes
 TODOs:
 - "Daily review" mode where you review the active and blocked ones as well
-- Add an option to display the GTD process as a reminder (could just be a string)
 - Add an audit trail of logging or metrics emission so you can see where things are going
 - Ability to bookmark links that are in the incoming basket with an automatic title
+- Translate #tag into adding that tag, then removing that part of the title
 - "show" arg with a flexible argument scheme that also allows you to specify tag names and names of lists to dump
+- Method entirely for filtering the list of cards down to the user selection- we shouldn't be doing that in main()
 '''
 import re
 import sys
@@ -22,6 +23,8 @@ import argparse
 
 import trello
 import yaml
+
+__version__ = '0.0.7'
 
 
 class Colors:
@@ -37,7 +40,6 @@ class Colors:
     reset = esc + '[0m'
 
 
-__version__ = '0.0.7'
 _banner = ''' __|_ _| ._     version {1.green}{0}{1.reset}
 (_||_(_|{1.green}o{1.reset}|_)\/  by {1.green}delucks{1.reset}
  _|      |  /
@@ -51,7 +53,9 @@ _workflow_description = '''1. Collect absolutely everything that can take your a
     Your responsibility -> Your lists
 3. Write "final" state of each task and "next" state of each task
 4. Categorize inbound items into lists based on action type required (call x, talk to x, meet x...)
-5. Daily / Weekly reviews
+5. Reviews:
+    Daily -> Go through "Inbound" and "Doing"
+    Weekly -> Additionally, go through "Holding", "Blocked", and messaging lists
 6. Do
 
 The goal is to get everything except the current task out of your head
@@ -66,8 +70,7 @@ def parse_configuration(configfile='gtd.yaml'):
     with open(configfile, 'r') as config_yaml:
         logging.info('Loading configuration properties...')
         properties = yaml.safe_load(config_yaml)
-        if validate_config(properties):
-            return properties
+        return validate_config(properties)
 
 
 def validate_config(config):
@@ -78,11 +81,11 @@ def validate_config(config):
         config['trello']['oauth_token']
         config['board_name']
         config['list_names']['incoming']
-        return True
+        return config
     except KeyError as e:
-        print('A required property in your configuration was not found!')
-        print(e)
+        print('A required property {0} in your configuration was not found!'.format(e))
         return False
+
 
 def initialize_trello(config):
     '''Initializes our connection to the trello API
@@ -217,16 +220,11 @@ def getch():
 
 
 def quickmove(iterable):
-    '''a faster selection interface: get the terminal width and draw options
-    in a table squashed to the width of the terminal. Assign a unique one-char
-    identifier to each option, and read only one character from stdin. Match that
-    one character against the options, and return the one that matches. Give users
-    an error if they try to use a nonexistent char
-    We have 26 + 10 alphanumeric chars we can easily use, so there's a practical
-    limit of 36 options to this method
+    '''a faster selection interface
+    Assign a unique one-char identifier to each option, and read only one
+    character from stdin. Match that one character against the options
+    Downside: you can only have 30ish options
     '''
-    #width, height = shutil.get_terminal_size()
-    #print(width, height)
     lookup = {}
     preferred_keys = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"]
     remainder = list(set(preferred_keys) - set(string.ascii_lowercase))
@@ -241,10 +239,18 @@ def quickmove(iterable):
 
 
 def review_card(card, label_lookup, list_lookup, inbound):
-    mandatory_choice_footer = '{0.blue}D{0.reset}elete, {0.blue}L{0.reset}abels, {0.blue}M{0.reset}ove, {0.blue}S{0.reset}kip, {0.blue}Q{0.reset}uit'.format(Colors)
+    '''present the user with an option-based interface to do every operation on
+    a single card'''
+    mandatory_choice_header = (
+        '{0.blue}D{0.reset}elete, '
+        '{0.blue}L{0.reset}abels, '
+        '{0.blue}M{0.reset}ove, '
+        '{0.blue}S{0.reset}kip, '
+        '{0.blue}Q{0.reset}uit'
+    ).format(Colors)
     choice = ''
     while choice != 'S' and choice != 'D':
-        print(mandatory_choice_footer)
+        print(mandatory_choice_header)
         choice = input('Input option character: ').strip().upper()
         if choice == 'D':
             card.delete()
@@ -256,13 +262,15 @@ def review_card(card, label_lookup, list_lookup, inbound):
             if move_to_list(card, list_lookup, inbound):
                 break
         elif choice == 'Q':
-            sys.exit(1)
+            raise KeyboardInterrupt
         else:
             pass
 
 
 def main():
     config_properties = parse_configuration()
+    if not config_properties:
+        sys.exit(1)
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
     p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
     p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
