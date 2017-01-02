@@ -25,7 +25,7 @@ import webbrowser
 import trello
 import yaml
 
-__version__ = '0.0.7'
+__version__ = '0.0.8'
 
 
 class Colors:
@@ -103,7 +103,7 @@ def initialize_trello(config):
 
 
 def _filter_by_name(iterable, name):
-    return [b for b in iterable if bytes(name, 'utf8') in b.name][0]
+    return [b for b in iterable if bytes(name.lower(), 'utf8') in b.name.lower()][0]
 
 
 def _colorize(lbl, msg, colorstring=Colors.blue):
@@ -178,17 +178,12 @@ def add_labels(card, lookup):
     return newlabels
 
 
-def move_to_list(card, lookup, current):
+def move_to_list(card, lookup):
     dest = quickmove(lookup.keys())
-    if lookup[dest].id == current.id:
-        logging.info('Did not want to move')
-        print('Staying in inbound')
-        return False
-    else:
-        destination_list = lookup[dest]
-        card.change_list(destination_list.id)
-        print('Moved to {0}'.format(destination_list.name.decode('utf8')))
-        return destination_list
+    destination_list = lookup[dest]
+    card.change_list(destination_list.id)
+    print('Moved to {0}'.format(destination_list.name.decode('utf8')))
+    return destination_list
 
 
 def make_name_lookup(object_grouping):
@@ -239,7 +234,7 @@ def quickmove(iterable):
     return list(iterable)[int(lookup.get(req, None))]
 
 
-def review_card(card, label_lookup, list_lookup, inbound):
+def review_card(card, label_lookup, list_lookup):
     '''present the user with an option-based interface to do every operation on
     a single card'''
     header = (
@@ -262,7 +257,7 @@ def review_card(card, label_lookup, list_lookup, inbound):
         elif choice == 'T':
             add_labels(card, label_lookup)
         elif choice == 'M':
-            if move_to_list(card, list_lookup, inbound):
+            if move_to_list(card, list_lookup):
                 break
         elif choice == 'Q':
             raise KeyboardInterrupt
@@ -328,7 +323,7 @@ def main():
             for card in cards:
                 display_card(card)
                 if prompt_for_confirmation('Want to move this one?', True):
-                    move_to_list(card, list_lookup, inbound_list)
+                    move_to_list(card, list_lookup)
         elif args.type == 'delete':
             for card in cards:
                 display_card(card)
@@ -347,7 +342,7 @@ def main():
         list_lookup = make_name_lookup(main_board.get_lists('open'))
         for card in cards:
             display_card(card)
-            review_card(card, label_lookup, list_lookup, inbound_list)
+            review_card(card, label_lookup, list_lookup)
         print('All done, have a great day!')
 
 
