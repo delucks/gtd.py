@@ -267,7 +267,7 @@ def main():
     commands.add_parser('help')
     commands.add_parser('workflow')
     batch = commands.add_parser('batch')
-    batch.add_argument('type', choices=('tag', 'move'), default='move')
+    batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
     show = commands.add_parser('show')
     show.add_argument('type', choices=('lists', 'cards'), default='lists')
     review = commands.add_parser('review')
@@ -306,6 +306,12 @@ def main():
                 display_card(card)
                 if prompt_for_confirmation('Want to move this one? (Y/n)', True):
                     move_to_list(card, list_lookup, inbound_list)
+        elif args.type == 'delete':
+            for card in cards:
+                display_card(card)
+                if prompt_for_confirmation('Should we delete this card? (y/N)'):
+                    card.delete()
+                    print('Bye!')
         else: # args.type == 'tag'
             label_lookup = make_readable(main_board.get_labels())
             for card in cards:
