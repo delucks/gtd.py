@@ -144,7 +144,8 @@ def prompt_for_user_choice(iterable):
 
 def prompt_for_confirmation(message, default=False):
     while True:
-        print(message.strip(), end='', flush=True)
+        options = ' (Y/n)' if default else ' (y/N)'
+        print(message.strip() + options, end='', flush=True)
         choice = getch()
         print()
         if choice == 'y' or choice == 'n' or choice == '\r':
@@ -160,7 +161,7 @@ def add_labels(card, lookup):
     while not done:
         label_to_add = prompt_for_user_choice(lookup.keys())
         newlabels.extend([lookup[l] for l in label_to_add])
-        done = prompt_for_confirmation('Are you done adding labels? (Y/n) ', default=True)
+        done = prompt_for_confirmation('Are you done adding labels?', default=True)
     if newlabels:
         for label in newlabels:
             try:
@@ -304,19 +305,19 @@ def main():
             list_lookup = make_readable(main_board.get_lists('open'))
             for card in cards:
                 display_card(card)
-                if prompt_for_confirmation('Want to move this one? (Y/n)', True):
+                if prompt_for_confirmation('Want to move this one?', True):
                     move_to_list(card, list_lookup, inbound_list)
         elif args.type == 'delete':
             for card in cards:
                 display_card(card)
-                if prompt_for_confirmation('Should we delete this card? (y/N)'):
+                if prompt_for_confirmation('Should we delete this card?'):
                     card.delete()
                     print('Bye!')
         else: # args.type == 'tag'
             label_lookup = make_readable(main_board.get_labels())
             for card in cards:
                 display_card(card)
-                if prompt_for_confirmation('Want to tag this one? (y/N)'):
+                if prompt_for_confirmation('Want to tag this one?'):
                     add_labels(card, label_lookup)
         print('Batch completed')
     else: # args.command == 'review':
