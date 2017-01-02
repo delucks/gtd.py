@@ -1,31 +1,11 @@
 #!/usr/bin/env python3
 '''Incremental development is a thing dude
 TODOs:
-- Option to work on a list other than "Inbound"
 - "Daily review" mode where you review the active and blocked ones as well
-- Add a "batch mode" that allows you to only do one action (add labels, delete, ...) on all the cards at once
-
-< Pasted the rest of this comment in from the old script >
-functionality we want:
-    Some kind of prompted/scheduled review of all inbound and/or holding items
-    Easy categorization interface, preferrably with single button push decisions
-    Displaying the decision tree that I follow to operate the program correctly
-    Extensive documentation of what destinations things are going to, as well
-        as an audit trail of logging.
-    Ability to bookmark links that are in the incoming basket with an automatic title
-how will users interact with my program?
-    users? me. other people if they want.
-    interface?
-        ncurses
-            easy to navigate, can draw a kind of UI for myself
-            restricts the terminals this can work on
-            harder to program
-            could have cool things like certain list movements being triggered by a single keystroke
-        $EDITOR
-            take all card names and metadata, throw them into a temp file,
-            open it with $EDITOR and do all the rearrangement manually
-            read the new structure, take it as source of truth, and
-            update the API accordingly
+- Add an option to display the GTD process as a reminder (could just be a string)
+- Add an audit trail of logging or metrics emission so you can see where things are going
+- Ability to bookmark links that are in the incoming basket with an automatic title
+- "show" arg with a flexible argument scheme that also allows you to specify tag names and names of lists to dump
 '''
 import re
 import sys
@@ -55,7 +35,7 @@ class Colors:
 
 
 __version__ = '0.0.6'
-__banner__ = '''Welcome to{1.green}
+_banner = '''Welcome to{1.green}
 
   __|_ _| ._
  (_||_(_|o|_)\/
@@ -64,9 +44,20 @@ __banner__ = '''Welcome to{1.green}
 version {0}
 by delucks{1.reset}
 '''.format(__version__, Colors)
+_workflow_description = '''1. Collect absolutely everything that can take your attention into "Inbound"
+2. Filter:
+    Nonactionable -> Static Reference or Delete
+    Takes < 2 minutes -> Do now, then Delete
+    Not your responsibility -> "Holding" or "Blocked" with follow-up
+    Something to communicate -> messaging lists
+    Your responsibility -> Your lists
+3. Write "final" state of each task and "next" state of each task
+4. Categorize inbound items into lists based on action type required (call x, talk to x, meet x...)
+5. Daily / Weekly reviews
+6. Do
 
-_workflow_description = '''
-1. 
+The goal is to get everything except the current task out of your head
+and into this trusted system external to your mind.
 '''
 
 
@@ -142,8 +133,9 @@ def prompt_for_user_choice(iterable):
 
 def prompt_for_confirmation(message, default=False):
     while True:
-        print(message)
-        choice = getch() #input(message).strip().lower()
+        print(message.strip(), end='', flush=True)
+        choice = getch()
+        print()
         if choice == 'y' or choice == 'n' or choice == '\r':
             break
         else:
@@ -158,6 +150,12 @@ def add_labels(card, lookup):
         label_to_add = prompt_for_user_choice(lookup.keys())
         newlabels.extend([lookup[l] for l in label_to_add])
         done = prompt_for_confirmation('Are you done adding labels? (Y/n) ', default=True)
+    if newlabels:
+        for label in newlabels:
+            try:
+                card.add_label(label)
+            except trello.exceptions.ResourceUnavailable:
+                print('Label {0} is already present!'.format(label))
     return newlabels
 
 
@@ -165,9 +163,13 @@ def move_to_list(card, lookup, current):
     dest = quickmove(lookup.keys())
     if lookup[dest].id == current.id:
         logging.info('Did not want to move')
+        print('Staying in inbound')
         return False
     else:
-        return lookup[dest]
+        destination_list = lookup[dest]
+        card.change_list(destination_list.id)
+        print('Moved to {0}'.format(destination_list.name.decode('utf8')))
+        return destination_list
 
 
 def make_readable(object_grouping):
@@ -185,6 +187,7 @@ def apply_filters(cardlist, reverse=False, regex=None):
     else:
         return selected
 
+
 def getch():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
@@ -196,6 +199,7 @@ def getch():
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
+
 
 def quickmove(iterable):
     '''a faster selection interface: get the terminal width and draw options
@@ -232,21 +236,10 @@ def review_card(card, label_lookup, list_lookup, inbound):
             print('Card deleted')
             break
         elif choice == 'L':
-            labels = add_labels(card, label_lookup)
-            if labels:
-                for label in labels:
-                    try:
-                        card.add_label(label)
-                    except trello.exceptions.ResourceUnavailable:
-                        print('Label {0} is already present!'.format(label))
+            add_labels(card, label_lookup)
         elif choice == 'M':
-            destination = move_to_list(card, list_lookup, inbound)
-            if destination:
-                card.change_list(destination.id)
-                print('Moved to {0}'.format(destination.name.decode('utf8')))
-            else:
-                print('Staying in inbound')
-            break
+            if move_to_list(card, list_lookup, inbound):
+                break
         elif choice == 'Q':
             sys.exit(1)
         else:
@@ -261,6 +254,9 @@ def main():
     p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help')
+    commands.add_parser('workflow')
+    batch = commands.add_parser('batch')
+    batch.add_argument('type', choices=('tag', 'move'), default='move')
     show = commands.add_parser('show')
     show.add_argument('type', choices=('lists', 'cards'), default='lists')
     review = commands.add_parser('review')
@@ -271,13 +267,16 @@ def main():
     if args.command == 'help':
         p.print_help()
         return True
+    elif args.command == 'workflow':
+        print(_workflow_description)
+        return True
 
     trello = initialize_trello(config_properties)
     main_board = _filter_by_name(trello.list_boards(), config_properties['board_name'])
     inbound_list = _filter_by_name(main_board.get_lists('open'), args.list)
     cards = apply_filters(inbound_list.list_cards(), reverse=args.reverse, regex=args.match)
 
-    print(__banner__)
+    print(_banner)
     if args.command == 'show':
         if args.type == 'lists':
             for l in main_board.get_lists('open'):
@@ -289,6 +288,20 @@ def main():
         logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, inbound_list))
         returned = inbound_list.add_card(name=args.title, desc=args.message)
         print('Successfully added card {0}'.format(returned))
+    elif args.command == 'batch':
+        if args.type == 'move':
+            list_lookup = make_readable(main_board.get_lists('open'))
+            for card in cards:
+                display_card(card)
+                if prompt_for_confirmation('Want to move this one? (Y/n)', True):
+                    move_to_list(card, list_lookup, inbound_list)
+        else: # args.type == 'tag'
+            label_lookup = make_readable(main_board.get_labels())
+            for card in cards:
+                display_card(card)
+                if prompt_for_confirmation('Want to tag this one? (y/N)'):
+                    add_labels(card, label_lookup)
+        print('Batch completed')
     else: # args.command == 'review':
         label_lookup = make_readable(main_board.get_labels())
         list_lookup = make_readable(main_board.get_lists('open'))
