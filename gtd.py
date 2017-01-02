@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 '''Incremental development is a thing dude
+Notes:
+- This only works on Unix systems and has only been tested on Linux
+- This only works when your terminal supports colors via escape codes
 TODOs:
 - "Daily review" mode where you review the active and blocked ones as well
 - Add an option to display the GTD process as a reminder (could just be a string)
@@ -34,7 +37,7 @@ class Colors:
     reset = esc + '[0m'
 
 
-__version__ = '0.0.6'
+__version__ = '0.0.7'
 _banner = ''' __|_ _| ._     version {1.green}{0}{1.reset}
 (_||_(_|{1.green}o{1.reset}|_)\/  by {1.green}delucks{1.reset}
  _|      |  /
