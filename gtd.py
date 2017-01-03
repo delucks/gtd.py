@@ -25,7 +25,7 @@ import webbrowser
 import trello
 import yaml
 
-__version__ = '0.0.8'
+__version__ = '0.1.0'
 
 
 class Colors:
@@ -279,18 +279,18 @@ def main():
     p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
     p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
     commands = p.add_subparsers(dest='command')
-    commands.add_parser('help')
-    commands.add_parser('workflow')
-    grep = commands.add_parser('grep')
-    grep.add_argument('pattern', help='regex to search card titles for')
-    batch = commands.add_parser('batch')
-    batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
-    show = commands.add_parser('show')
-    show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
-    review = commands.add_parser('review')
-    add = commands.add_parser('add')  # TODO add argument for tags to add
+    commands.add_parser('help', help='display this message')
+    add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
     add.add_argument('title', help='title for the new card')
     add.add_argument('-m', '--message', help='description for the new card')
+    grep = commands.add_parser('grep', help='search through the titles of all cards on the board')
+    grep.add_argument('pattern', help='regex to search card titles for')
+    show = commands.add_parser('show', help='print all cards of one type')
+    show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
+    batch = commands.add_parser('batch', help='process a list of cards one action at a time')
+    batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
+    review = commands.add_parser('review', help='present a menu to interact with each card')
+    commands.add_parser('workflow', help='show the process for the GTD workflow')
     args = p.parse_args()
     if args.command == 'help':
         p.print_help()
