@@ -281,6 +281,8 @@ def main():
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help')
     commands.add_parser('workflow')
+    grep = commands.add_parser('grep')
+    grep.add_argument('pattern', help='regex to search card titles for')
     batch = commands.add_parser('batch')
     batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
     show = commands.add_parser('show')
@@ -288,7 +290,7 @@ def main():
     review = commands.add_parser('review')
     add = commands.add_parser('add')  # TODO add argument for tags to add
     add.add_argument('title', help='title for the new card')
-    add.add_argument('-m', '--message', help='append a description for the new card')
+    add.add_argument('-m', '--message', help='description for the new card')
     args = p.parse_args()
     if args.command == 'help':
         p.print_help()
@@ -313,6 +315,13 @@ def main():
         else: # args.type == 'tags':
             for t in main_board.get_labels():
                 print(t.name.decode('utf8'))
+    elif args.command == 'grep':
+        pattern = re.compile(args.pattern)
+        for cardlist in main_board.get_lists('open'):
+            for card in cardlist.list_cards():
+                if pattern.search(card.name.decode('utf8')):
+                    display_card(card)
+                    print(_colorize('List:', '{0}'.format(cardlist.name.decode('utf-8'))))
     elif args.command == 'add':
         logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, inbound_list))
         returned = inbound_list.add_card(name=args.title, desc=args.message)
