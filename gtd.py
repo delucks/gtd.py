@@ -103,28 +103,6 @@ def initialize_trello(config):
     return trello_client
 
 
-def _colorize(lbl, msg, colorstring=Colors.blue):
-    return '  {0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
-
-
-def display_card(card):
-    created = card.create_date
-    print('{1.red}Card {1.reset}{0}'.format(card.id, Colors))
-    print(_colorize('Name:', card.name.decode('utf8')))
-    print(_colorize('Created on:', '{0} ({1})'.format(created, created.timestamp())))
-    print(_colorize('Age:', datetime.datetime.now(datetime.timezone.utc) - created))
-    if card.labels:
-        print(_colorize('Tags:', ','.join([l.name.decode('utf8') for l in card.labels])))
-    if card.get_attachments():
-        print(_colorize('Attachments:', ','.join([a['name'] for a in card.get_attachments()])))
-    if card.due:
-        diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
-        if diff < datetime.timedelta(0):
-            display = Colors.red
-        else:
-            display = Colors.green
-        print(_colorize('Due:', card.due_date, display))
-        print(_colorize('Remaining:', diff, display))
 
 
 def prompt_for_user_choice(iterable):
@@ -251,6 +229,42 @@ def review_card(card, wrapper):
             pass
 
 
+class TextDisplay:
+    '''controls the coloration and detail of the output for a session duration'''
+    def __init__(self, use_color):
+        self.use_color = use_color
+
+    def _colorize(self, lbl, msg, colorstring):
+        return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
+
+    def _p(self, lbl, msg, colorstring=Colors.blue):
+        if self.use_color:
+            print(self._colorize(lbl, msg, colorstring))
+        else:
+            print('{0} {1}'.format(lbl, msg))
+
+    def show(self, card, show_list=False):
+        created = card.create_date
+        self._p('Card', card.id)
+        self._p('  Name:', card.name.decode('utf8'))
+        self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
+        self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
+        if card.labels:
+            self._p('  Tags:', ','.join([l.name.decode('utf8') for l in card.labels]))
+        if card.get_attachments():
+            self._p('  Attachments:', ','.join([a['name'] for a in card.get_attachments()]))
+        if card.due:
+            diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
+            if diff < datetime.timedelta(0):
+                display = Colors.red
+            else:
+                display = Colors.green
+            self._p('  Due:', card.due_date, display)
+            self._p('  Remaining:', diff, display)
+        if show_list:
+            self._p('  List:', '{0}'.format(card.get_list().name.decode('utf-8')))
+
+
 class TrelloWrapper:
     '''wraps the trello client to keep state important to the GTD implementation
     '''
@@ -272,7 +286,7 @@ class TrelloWrapper:
     def apply_filters(self, reverse=False, regex=None):
         cards = list(self.main_list.list_cards()) 
         if regex:
-            selected = [c for c in cardlist if re.search(regex, c.name.decode('utf8'))]
+            selected = [c for c in cards if re.search(regex, c.name.decode('utf8'))]
         else:
             selected = cards
         if reverse:
@@ -292,6 +306,7 @@ def main():
     p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
     p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
     p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
+    p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
     add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
@@ -312,18 +327,17 @@ def main():
     elif args.command == 'workflow':
         print(_workflow_description)
         return True
-
+    print(_banner)
     wrapper = TrelloWrapper(initialize_trello(config_properties), config_properties, args.list)
     cards = wrapper.get_cards(reverse=args.reverse, regex=args.match)
-
-    print(_banner)
+    display = TextDisplay(args.no_color)
     if args.command == 'show':
         if args.type == 'lists':
             for l in wrapper.main_board.get_lists('open'):
                 print(l.name.decode('utf8'))
         elif args.type == 'cards':
             for card in cards:
-                display_card(card)
+                display.show(card)
         else: # args.type == 'tags':
             for t in wrapper.main_board.get_labels():
                 print(t.name.decode('utf8'))
@@ -332,8 +346,7 @@ def main():
         for cardlist in wrapper.main_board.get_lists('open'):
             for card in cardlist.list_cards():
                 if pattern.search(card.name.decode('utf8')):
-                    display_card(card)
-                    print(_colorize('List:', '{0}'.format(cardlist.name.decode('utf-8'))))
+                    display.show(card, True)
     elif args.command == 'add':
         logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, inbound_list))
         returned = inbound_list.add_card(name=args.title, desc=args.message)
@@ -341,24 +354,24 @@ def main():
     elif args.command == 'batch':
         if args.type == 'move':
             for card in cards:
-                display_card(card)
+                display.show(card)
                 if prompt_for_confirmation('Want to move this one?', True):
                     move_to_list(card, wrapper)
         elif args.type == 'delete':
             for card in cards:
-                display_card(card)
+                display.show(card)
                 if prompt_for_confirmation('Should we delete this card?'):
                     card.delete()
                     print('Bye!')
         else: # args.type == 'tag'
             for card in cards:
-                display_card(card)
+                display.show(card)
                 if prompt_for_confirmation('Want to tag this one?'):
                     add_labels(card, wrapper)
         print('Batch completed')
     else: # args.command == 'review':
         for card in cards:
-            display_card(card)
+            display.show(card)
             review_card(card, wrapper)
         print('All done, have a great day!')
 
