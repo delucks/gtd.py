@@ -10,6 +10,7 @@ TODOs:
 - Translate #tag into adding that tag, then removing that part of the title
 - "show" arg with a flexible argument scheme that also allows you to specify tag names and names of lists to dump
 - Method entirely for filtering the list of cards down to the user selection- we shouldn't be doing that in main()
+- Top-level arguments to suppress color output and banner printing
 '''
 import re
 import sys
@@ -102,10 +103,6 @@ def initialize_trello(config):
     return trello_client
 
 
-def _filter_by_name(iterable, name):
-    return [b for b in iterable if bytes(name.lower(), 'utf8') in b.name.lower()][0]
-
-
 def _colorize(lbl, msg, colorstring=Colors.blue):
     return '  {0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
 
@@ -162,12 +159,12 @@ def prompt_for_confirmation(message, default=False):
     return choice == 'y' if choice != '\r' else default
 
 
-def add_labels(card, lookup):
+def add_labels(card, wrapper):
     done = False
     newlabels = []
     while not done:
-        label_to_add = prompt_for_user_choice(lookup.keys())
-        newlabels.extend([lookup[l] for l in label_to_add])
+        label_to_add = prompt_for_user_choice(wrapper.label_lookup.keys())
+        newlabels.extend([wrapper.label_lookup[l] for l in label_to_add])
         done = prompt_for_confirmation('Are you done tagging?', default=True)
     if newlabels:
         for label in newlabels:
@@ -178,28 +175,12 @@ def add_labels(card, lookup):
     return newlabels
 
 
-def move_to_list(card, lookup):
-    dest = quickmove(lookup.keys())
-    destination_list = lookup[dest]
+def move_to_list(card, wrapper):
+    dest = quickmove(wrapper.list_lookup.keys())
+    destination_list = wrapper.list_lookup[dest]
     card.change_list(destination_list.id)
     print('Moved to {0}'.format(destination_list.name.decode('utf8')))
     return destination_list
-
-
-def make_name_lookup(object_grouping):
-    return {o.name: o for o in object_grouping}
-
-
-def apply_filters(cardlist, reverse=False, regex=None):
-    cards = list(cardlist) 
-    if regex:
-        selected = [c for c in cardlist if re.search(regex, c.name.decode('utf8'))]
-    else:
-        selected = cards
-    if reverse:
-        return reversed(selected)
-    else:
-        return selected
 
 
 def getch():
@@ -234,7 +215,7 @@ def quickmove(iterable):
     return list(iterable)[int(lookup.get(req, None))]
 
 
-def review_card(card, label_lookup, list_lookup):
+def review_card(card, wrapper):
     '''present the user with an option-based interface to do every operation on
     a single card'''
     header = (
@@ -255,9 +236,9 @@ def review_card(card, label_lookup, list_lookup):
             print('Card deleted')
             break
         elif choice == 'T':
-            add_labels(card, label_lookup)
+            add_labels(card, wrapper)
         elif choice == 'M':
-            if move_to_list(card, list_lookup):
+            if move_to_list(card, wrapper):
                 break
         elif choice == 'Q':
             raise KeyboardInterrupt
@@ -268,6 +249,39 @@ def review_card(card, label_lookup, list_lookup):
                 webbrowser.open([a['name'] for a in card.get_attachments()][0])
         else:
             pass
+
+
+class TrelloWrapper:
+    '''wraps the trello client to keep state important to the GTD implementation
+    '''
+    def __init__(self, trello_api_connection, configuration, primary_list=None):
+        self.trello = trello_api_connection
+        self.config = configuration
+        primary_list_name = primary_list or self.config['list_names']['incoming']
+        self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
+        self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
+        self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
+        self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
+
+    def _filter_by_name(self, iterable, name):
+        return [b for b in iterable if bytes(name.lower(), 'utf8') in b.name.lower()][0]
+
+    def _make_name_lookup(self, object_grouping):
+        return {o.name: o for o in object_grouping}
+
+    def apply_filters(self, reverse=False, regex=None):
+        cards = list(self.main_list.list_cards()) 
+        if regex:
+            selected = [c for c in cardlist if re.search(regex, c.name.decode('utf8'))]
+        else:
+            selected = cards
+        if reverse:
+            return reversed(selected)
+        else:
+            return selected
+
+    def get_cards(self, reverse, regex):
+        return self.apply_filters(reverse=reverse, regex=regex)
 
 
 def main():
@@ -299,25 +313,23 @@ def main():
         print(_workflow_description)
         return True
 
-    trello = initialize_trello(config_properties)
-    main_board = _filter_by_name(trello.list_boards(), config_properties['board_name'])
-    inbound_list = _filter_by_name(main_board.get_lists('open'), args.list)
-    cards = apply_filters(inbound_list.list_cards(), reverse=args.reverse, regex=args.match)
+    wrapper = TrelloWrapper(initialize_trello(config_properties), config_properties, args.list)
+    cards = wrapper.get_cards(reverse=args.reverse, regex=args.match)
 
     print(_banner)
     if args.command == 'show':
         if args.type == 'lists':
-            for l in main_board.get_lists('open'):
+            for l in wrapper.main_board.get_lists('open'):
                 print(l.name.decode('utf8'))
         elif args.type == 'cards':
             for card in cards:
                 display_card(card)
         else: # args.type == 'tags':
-            for t in main_board.get_labels():
+            for t in wrapper.main_board.get_labels():
                 print(t.name.decode('utf8'))
     elif args.command == 'grep':
         pattern = re.compile(args.pattern)
-        for cardlist in main_board.get_lists('open'):
+        for cardlist in wrapper.main_board.get_lists('open'):
             for card in cardlist.list_cards():
                 if pattern.search(card.name.decode('utf8')):
                     display_card(card)
@@ -328,11 +340,10 @@ def main():
         print('Successfully added card {0}'.format(returned))
     elif args.command == 'batch':
         if args.type == 'move':
-            list_lookup = make_name_lookup(main_board.get_lists('open'))
             for card in cards:
                 display_card(card)
                 if prompt_for_confirmation('Want to move this one?', True):
-                    move_to_list(card, list_lookup)
+                    move_to_list(card, wrapper)
         elif args.type == 'delete':
             for card in cards:
                 display_card(card)
@@ -340,18 +351,15 @@ def main():
                     card.delete()
                     print('Bye!')
         else: # args.type == 'tag'
-            label_lookup = make_name_lookup(main_board.get_labels())
             for card in cards:
                 display_card(card)
                 if prompt_for_confirmation('Want to tag this one?'):
-                    add_labels(card, label_lookup)
+                    add_labels(card, wrapper)
         print('Batch completed')
     else: # args.command == 'review':
-        label_lookup = make_name_lookup(main_board.get_labels())
-        list_lookup = make_name_lookup(main_board.get_lists('open'))
         for card in cards:
             display_card(card)
-            review_card(card, label_lookup, list_lookup)
+            review_card(card, wrapper)
         print('All done, have a great day!')
 
 
