@@ -25,7 +25,7 @@ import webbrowser
 import trello
 import yaml
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 
 class Colors:
@@ -214,7 +214,7 @@ def review_card(card, wrapper):
         elif choice == 'Q':
             raise KeyboardInterrupt
         elif choice == 'O':
-            if not 'link' in header:
+            if 'link' not in header:
                 print('This card does not have an attachment!')
             else:
                 webbrowser.open([a['name'] for a in card.get_attachments()][0])
@@ -302,7 +302,7 @@ class TrelloWrapper:
 def perform_command(args):
     config_properties = parse_configuration()
     if not config_properties:
-        sys.exit(1)
+        return False
     wrapper = TrelloWrapper(initialize_trello(config_properties), config_properties, args.list)
     cards = wrapper.get_cards(reverse=args.reverse, regex=args.match)
     display = TextDisplay(args.no_color)
@@ -315,7 +315,7 @@ def perform_command(args):
         elif args.type == 'cards':
             for card in cards:
                 display.show(card)
-        else: # args.type == 'tags':
+        else:
             for t in wrapper.main_board.get_labels():
                 print(t.name.decode('utf8'))
     elif args.command == 'grep':
@@ -325,8 +325,8 @@ def perform_command(args):
                 if pattern.search(card.name.decode('utf8')):
                     display.show(card, True)
     elif args.command == 'add':
-        logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, inbound_list))
-        returned = inbound_list.add_card(name=args.title, desc=args.message)
+        logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
+        returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
         print('Successfully added card {0}'.format(returned))
     elif args.command == 'batch':
         if args.type == 'move':
@@ -340,13 +340,13 @@ def perform_command(args):
                 if prompt_for_confirmation('Should we delete this card?'):
                     card.delete()
                     print('Bye!')
-        else: # args.type == 'tag'
+        else:
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Want to tag this one?'):
                     add_labels(card, wrapper)
         print('Batch completed')
-    else: # args.command == 'review':
+    else:
         for card in cards:
             display.show(card)
             review_card(card, wrapper)
@@ -357,7 +357,7 @@ def main():
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
     p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
     p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
-    p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
+    p.add_argument('-l', '--list', help='list name to use', default='Inbound')
     p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
     commands = p.add_subparsers(dest='command')
@@ -371,7 +371,7 @@ def main():
     show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
     batch = commands.add_parser('batch', help='process a list of cards one action at a time')
     batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
-    review = commands.add_parser('review', help='present a menu to interact with each card')
+    commands.add_parser('review', help='present a menu to interact with each card')
     commands.add_parser('workflow', help='show the process for the GTD workflow')
     args = p.parse_args()
     if args.command == 'help':
