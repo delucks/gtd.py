@@ -10,7 +10,6 @@ TODOs:
 - Translate #tag into adding that tag, then removing that part of the title
 - "show" arg with a flexible argument scheme that also allows you to specify tag names and names of lists to dump
 - Method entirely for filtering the list of cards down to the user selection- we shouldn't be doing that in main()
-- Top-level arguments to suppress color output and banner printing
 '''
 import re
 import sys
@@ -42,10 +41,6 @@ class Colors:
     reset = esc + '[0m'
 
 
-_banner = ''' __|_ _| ._     version {1.green}{0}{1.reset}
-(_||_(_|{1.green}o{1.reset}|_)\/  by {1.green}delucks{1.reset}
- _|      |  /
-'''.format(__version__, Colors)
 _workflow_description = '''1. Collect absolutely everything that can take your attention into "Inbound"
 2. Filter:
     Nonactionable -> Static Reference or Delete
@@ -101,8 +96,6 @@ def initialize_trello(config):
     )
     logging.info('Connected to Trello.')
     return trello_client
-
-
 
 
 def prompt_for_user_choice(iterable):
@@ -243,6 +236,14 @@ class TextDisplay:
         else:
             print('{0} {1}'.format(lbl, msg))
 
+    def banner(self):
+        on = Colors.green if self.use_color else ''
+        off = Colors.reset
+        banner = (' __|_ _| ._     version {on}{0}{off}\n'
+        '(_||_(_|{on}o{off}|_)\/  by {on}delucks{off}\n'
+        ' _|      |  /\n').format(__version__, on=on, off=off)
+        print(banner)
+
     def show(self, card, show_list=False):
         created = card.create_date
         self._p('Card', card.id)
@@ -298,39 +299,15 @@ class TrelloWrapper:
         return self.apply_filters(reverse=reverse, regex=regex)
 
 
-def main():
+def perform_command(args):
     config_properties = parse_configuration()
     if not config_properties:
         sys.exit(1)
-    p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
-    p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
-    p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
-    p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
-    p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
-    commands = p.add_subparsers(dest='command')
-    commands.add_parser('help', help='display this message')
-    add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
-    add.add_argument('title', help='title for the new card')
-    add.add_argument('-m', '--message', help='description for the new card')
-    grep = commands.add_parser('grep', help='search through the titles of all cards on the board')
-    grep.add_argument('pattern', help='regex to search card titles for')
-    show = commands.add_parser('show', help='print all cards of one type')
-    show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
-    batch = commands.add_parser('batch', help='process a list of cards one action at a time')
-    batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
-    review = commands.add_parser('review', help='present a menu to interact with each card')
-    commands.add_parser('workflow', help='show the process for the GTD workflow')
-    args = p.parse_args()
-    if args.command == 'help':
-        p.print_help()
-        return True
-    elif args.command == 'workflow':
-        print(_workflow_description)
-        return True
-    print(_banner)
     wrapper = TrelloWrapper(initialize_trello(config_properties), config_properties, args.list)
     cards = wrapper.get_cards(reverse=args.reverse, regex=args.match)
     display = TextDisplay(args.no_color)
+    if args.no_banner:
+        display.banner()
     if args.command == 'show':
         if args.type == 'lists':
             for l in wrapper.main_board.get_lists('open'):
@@ -374,6 +351,35 @@ def main():
             display.show(card)
             review_card(card, wrapper)
         print('All done, have a great day!')
+
+
+def main():
+    p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
+    p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
+    p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
+    p.add_argument('-l', '--list', help='list name to use', default=config_properties['list_names']['incoming'])
+    p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
+    p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
+    commands = p.add_subparsers(dest='command')
+    commands.add_parser('help', help='display this message')
+    add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
+    add.add_argument('title', help='title for the new card')
+    add.add_argument('-m', '--message', help='description for the new card')
+    grep = commands.add_parser('grep', help='search through the titles of all cards on the board')
+    grep.add_argument('pattern', help='regex to search card titles for')
+    show = commands.add_parser('show', help='print all cards of one type')
+    show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
+    batch = commands.add_parser('batch', help='process a list of cards one action at a time')
+    batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
+    review = commands.add_parser('review', help='present a menu to interact with each card')
+    commands.add_parser('workflow', help='show the process for the GTD workflow')
+    args = p.parse_args()
+    if args.command == 'help':
+        p.print_help()
+    elif args.command == 'workflow':
+        print(_workflow_description)
+    else:
+        perform_command(args)
 
 
 if __name__ == '__main__':
