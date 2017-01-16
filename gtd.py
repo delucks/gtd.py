@@ -3,7 +3,6 @@
 Notes:
 - This only works on Unix systems and has only been tested on Linux
 TODOs:
-- "Daily review" mode where you review the active and blocked ones as well
 - Add an audit trail of logging or metrics emission so you can see where things are going
 - Ability to bookmark links that are in the incoming basket with an automatic title
 - Translate #tag into adding that tag, then removing that part of the title
@@ -21,11 +20,12 @@ import readline  # noqa
 import datetime
 import argparse
 import webbrowser
+from functools import partial
 
 import trello
 import yaml
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 _workflow_description = '''1. Collect absolutely everything that can take your attention into "Inbound"
 2. Filter:
     Nonactionable -> Static Reference or Delete
@@ -99,43 +99,122 @@ class TextDisplay:
             self._p('  Due:', card.due_date, display)
             self._p('  Remaining:', diff, display)
         if show_list:
-            self._p('  List:', '{0}'.format(card.get_list().name.decode('utf-8')))
+            self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
 
 
 class TrelloWrapper:
     '''wraps the trello client to keep state important to the GTD implementation
     '''
-    def __init__(self, trello_api_connection, configuration, primary_list=None):
-        self.trello = trello_api_connection
+    def __init__(self, configuration, primary_list=None, reverse=False, regex=None):
+        self.trello = self.initialize_trello(configuration)
         self.config = configuration
         primary_list_name = primary_list or self.config['list_names']['incoming']
         self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
         self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
+        self.reverse = reverse
+        self.regex = regex
+
+
+    def initialize_trello(self, config):
+        '''Initializes our connection to the trello API
+        '''
+        logging.info('Connecting to the Trello API...')
+        trello_client = trello.TrelloClient(
+            api_key=config['trello']['api_key'],
+            api_secret=config['trello']['api_secret'],
+            token=config['trello']['oauth_token'],
+            token_secret=config['trello']['oauth_token_secret']
+        )
+        logging.info('Connected to Trello.')
+        return trello_client
 
     def _filter_by_name(self, iterable, name):
         try:
-            return set(b for b in iterable if name.lower() in b.name.decode('utf-8').lower()).pop()
+            return set(b for b in iterable if name.lower() in b.name.decode('utf8').lower()).pop()
         except KeyError:
             return []
 
     def _make_name_lookup(self, object_grouping):
         return {o.name: o for o in object_grouping}
 
-    def apply_filters(self, reverse=False, regex=None):
-        cards = list(self.main_list.list_cards()) 
-        if regex:
-            selected = [c for c in cards if re.search(regex, c.name.decode('utf8'))]
+    def get_cards(self, target_list=None):
+        target_list = target_list or self.main_list
+        cards = list(target_list.list_cards()) 
+        if self.regex:
+            selected = [c for c in cards if re.search(self.regex, c.name.decode('utf8'))]
         else:
             selected = cards
-        if reverse:
+        if self.reverse:
             return reversed(selected)
         else:
             return selected
 
-    def get_cards(self, reverse, regex):
-        return self.apply_filters(reverse=reverse, regex=regex)
+    def get_list(self, name):
+        return self.list_lookup.get(bytes(name, 'utf8'), None)
+
+    def add_labels(self, card):
+        done = False
+        newlabels = []
+        while not done:
+            label_to_add = prompt_for_user_choice(self.label_lookup.keys())
+            newlabels.extend([self.label_lookup[l] for l in label_to_add])
+            done = prompt_for_confirmation('Are you done tagging?', default=True)
+        if newlabels:
+            for label in newlabels:
+                try:
+                    card.add_label(label)
+                except trello.exceptions.ResourceUnavailable:
+                    print('Tag {0} is already present!'.format(label))
+        return newlabels
+
+    def move_to_list(self, card):
+        dest = quickmove(self.list_lookup.keys())
+        destination_list = self.list_lookup[dest]
+        card.change_list(destination_list.id)
+        print('Moved to {0}'.format(destination_list.name.decode('utf8')))
+        return destination_list
+
+    def review_card(self, card):
+        '''present the user with an option-based interface to do every operation on
+        a single card'''
+        header = (
+            '{0.blue}D{0.reset}elete, '
+            '{0.blue}T{0.reset}ag, '
+            '{0.blue}M{0.reset}ove, '
+            '{0.blue}S{0.reset}kip, '
+            '{0.blue}Q{0.reset}uit'
+        ).format(Colors)
+        if card.get_attachments():
+            header = '{0.blue}O{0.reset}pen link, '.format(Colors) + header
+        choice = ''
+        while choice != 'S' and choice != 'D':
+            print(header)
+            choice = input('Input option character: ').strip().upper()
+            if choice == 'D':
+                card.delete()
+                print('Card deleted')
+                break
+            elif choice == 'T':
+                self.add_labels(card)
+            elif choice == 'M':
+                if self.move_to_list(card):
+                    break
+            elif choice == 'Q':
+                raise KeyboardInterrupt
+            elif choice == 'O':
+                if 'link' not in header:
+                    print('This card does not have an attachment!')
+                else:
+                    webbrowser.open([a['name'] for a in card.get_attachments()][0])
+            else:
+                pass
+
+    def review_list(self, cardlist, display_function):
+        for card in self.get_cards(cardlist):
+            display_function(card)
+            self.review_card(card)
 
 
 def parse_configuration(configfile='gtd.yaml'):
@@ -161,19 +240,6 @@ def validate_config(config):
         print('A required property {0} in your configuration was not found!'.format(e))
         return False
 
-
-def initialize_trello(config):
-    '''Initializes our connection to the trello API
-    '''
-    logging.info('Connecting to the Trello API...')
-    trello_client = trello.TrelloClient(
-        api_key=config['trello']['api_key'],
-        api_secret=config['trello']['api_secret'],
-        token=config['trello']['oauth_token'],
-        token_secret=config['trello']['oauth_token_secret']
-    )
-    logging.info('Connected to Trello.')
-    return trello_client
 
 
 def prompt_for_user_choice(iterable):
@@ -208,30 +274,6 @@ def prompt_for_confirmation(message, default=False):
     return choice == 'y' if choice != '\r' else default
 
 
-def add_labels(card, wrapper):
-    done = False
-    newlabels = []
-    while not done:
-        label_to_add = prompt_for_user_choice(wrapper.label_lookup.keys())
-        newlabels.extend([wrapper.label_lookup[l] for l in label_to_add])
-        done = prompt_for_confirmation('Are you done tagging?', default=True)
-    if newlabels:
-        for label in newlabels:
-            try:
-                card.add_label(label)
-            except trello.exceptions.ResourceUnavailable:
-                print('Tag {0} is already present!'.format(label))
-    return newlabels
-
-
-def move_to_list(card, wrapper):
-    dest = quickmove(wrapper.list_lookup.keys())
-    destination_list = wrapper.list_lookup[dest]
-    card.change_list(destination_list.id)
-    print('Moved to {0}'.format(destination_list.name.decode('utf8')))
-    return destination_list
-
-
 def getch():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
@@ -264,48 +306,13 @@ def quickmove(iterable):
     return list(iterable)[int(lookup.get(req, None))]
 
 
-def review_card(card, wrapper):
-    '''present the user with an option-based interface to do every operation on
-    a single card'''
-    header = (
-        '{0.blue}D{0.reset}elete, '
-        '{0.blue}T{0.reset}ag, '
-        '{0.blue}M{0.reset}ove, '
-        '{0.blue}S{0.reset}kip, '
-        '{0.blue}Q{0.reset}uit'
-    ).format(Colors)
-    if card.get_attachments():
-        header = '{0.blue}O{0.reset}pen link, '.format(Colors) + header
-    choice = ''
-    while choice != 'S' and choice != 'D':
-        print(header)
-        choice = input('Input option character: ').strip().upper()
-        if choice == 'D':
-            card.delete()
-            print('Card deleted')
-            break
-        elif choice == 'T':
-            add_labels(card, wrapper)
-        elif choice == 'M':
-            if move_to_list(card, wrapper):
-                break
-        elif choice == 'Q':
-            raise KeyboardInterrupt
-        elif choice == 'O':
-            if 'link' not in header:
-                print('This card does not have an attachment!')
-            else:
-                webbrowser.open([a['name'] for a in card.get_attachments()][0])
-        else:
-            pass
-
-
 def perform_command(args):
     config_properties = parse_configuration()
-    if not config_properties:
+    if config_properties:
+        wrapper = TrelloWrapper(config_properties, args.list, args.reverse, args.match)
+    else:
         return False
-    wrapper = TrelloWrapper(initialize_trello(config_properties), config_properties, args.list)
-    cards = wrapper.get_cards(reverse=args.reverse, regex=args.match)
+    cards = wrapper.get_cards()
     display = TextDisplay(args.no_color)
     if args.no_banner:
         display.banner()
@@ -334,7 +341,7 @@ def perform_command(args):
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Want to move this one?', True):
-                    move_to_list(card, wrapper)
+                    wrapper.move_to_list(card)
         elif args.type == 'delete':
             for card in cards:
                 display.show(card)
@@ -345,12 +352,22 @@ def perform_command(args):
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Want to tag this one?'):
-                    add_labels(card, wrapper)
+                    wrapper.add_labels(card)
         print('Batch completed')
     else:
-        for card in cards:
-            display.show(card)
-            review_card(card, wrapper)
+        if args.daily:
+            df = partial(display.show, show_list=True)
+            print('Welcome to daily review mode!\n\nStarting with "Doing":')
+            for doing_name in ['Doing Today', 'Doing this Week', 'Doing this Month']:
+                doing = wrapper.get_list(doing_name)
+                wrapper.review_list(doing, df)
+            print('Moving on to "Holding":\n')
+            holding = wrapper.get_list(wrapper.config['list_names']['holding'])
+            wrapper.review_list(holding, df)
+            print('Finally, "Inbound":\n')
+            wrapper.review_list(wrapper.main_list, df)
+        else:
+            wrapper.review_list(wrapper.main_list, display.show)
         print('All done, have a great day!')
 
 
@@ -373,7 +390,8 @@ def main():
     show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
     batch = commands.add_parser('batch', help='process a list of cards one action at a time')
     batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
-    commands.add_parser('review', help='present a menu to interact with each card')
+    review = commands.add_parser('review', help='present a menu to interact with each card')
+    review.add_argument('-d', '--daily', help='start a daily review mode, which goes through several lists at once', action='store_true')
     commands.add_parser('workflow', help='show the process for the GTD workflow')
     args = p.parse_args()
     if args.command == 'help':
