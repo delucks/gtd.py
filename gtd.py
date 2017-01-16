@@ -105,9 +105,9 @@ class TextDisplay:
 class TrelloWrapper:
     '''wraps the trello client to keep state important to the GTD implementation
     '''
-    def __init__(self, configuration, primary_list=None, reverse=False, regex=None):
-        self.trello = self.initialize_trello(configuration)
-        self.config = configuration
+    def __init__(self, primary_list=None, reverse=False, regex=None):
+        self.config = self.parse_configuration()
+        self.trello = self.initialize_trello(self.config)
         primary_list_name = primary_list or self.config['list_names']['incoming']
         self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
         self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
@@ -115,7 +115,6 @@ class TrelloWrapper:
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
         self.reverse = reverse
         self.regex = regex
-
 
     def initialize_trello(self, config):
         '''Initializes our connection to the trello API
@@ -129,6 +128,27 @@ class TrelloWrapper:
         )
         logging.info('Connected to Trello.')
         return trello_client
+
+    def parse_configuration(self, configfile='gtd.yaml'):
+        '''load user-defined configuration for what boards and lists to use
+        '''
+        logging.info('Opening configuration file...')
+        with open(configfile, 'r') as config_yaml:
+            logging.info('Loading configuration properties...')
+            properties = yaml.safe_load(config_yaml)
+            return self._validate_config(properties)
+
+    def _validate_config(self, config):
+        try:
+            config['trello']['api_key']
+            config['trello']['api_secret']
+            config['trello']['oauth_token_secret']
+            config['trello']['oauth_token']
+            config['board_name']
+            config['list_names']['incoming']
+            return config
+        except KeyError as e:
+            raise Exception('A required property {0} in your configuration was not found!'.format(e))
 
     def _filter_by_name(self, iterable, name):
         try:
@@ -217,31 +237,6 @@ class TrelloWrapper:
             self.review_card(card)
 
 
-def parse_configuration(configfile='gtd.yaml'):
-    '''load user-defined configuration for what boards and lists to use
-    '''
-    logging.info('Opening configuration file...')
-    with open(configfile, 'r') as config_yaml:
-        logging.info('Loading configuration properties...')
-        properties = yaml.safe_load(config_yaml)
-        return validate_config(properties)
-
-
-def validate_config(config):
-    try:
-        config['trello']['api_key']
-        config['trello']['api_secret']
-        config['trello']['oauth_token_secret']
-        config['trello']['oauth_token']
-        config['board_name']
-        config['list_names']['incoming']
-        return config
-    except KeyError as e:
-        print('A required property {0} in your configuration was not found!'.format(e))
-        return False
-
-
-
 def prompt_for_user_choice(iterable):
     listed = list(iterable)
     for index, item in enumerate(listed):
@@ -307,11 +302,7 @@ def quickmove(iterable):
 
 
 def perform_command(args):
-    config_properties = parse_configuration()
-    if config_properties:
-        wrapper = TrelloWrapper(config_properties, args.list, args.reverse, args.match)
-    else:
-        return False
+    wrapper = TrelloWrapper(args.list, args.reverse, args.match)
     cards = wrapper.get_cards()
     display = TextDisplay(args.no_color)
     if args.no_banner:
