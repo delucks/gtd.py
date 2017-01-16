@@ -2,7 +2,6 @@
 '''Incremental development is a thing dude
 Notes:
 - This only works on Unix systems and has only been tested on Linux
-- This only works when your terminal supports colors via escape codes
 TODOs:
 - "Daily review" mode where you review the active and blocked ones as well
 - Add an audit trail of logging or metrics emission so you can see where things are going
@@ -10,6 +9,7 @@ TODOs:
 - Translate #tag into adding that tag, then removing that part of the title
 - "show" arg with a flexible argument scheme that also allows you to specify tag names and names of lists to dump
 - Method entirely for filtering the list of cards down to the user selection- we shouldn't be doing that in main()
+- Method to set the due date of the "weekly"/"Monthly" lists all at once
 '''
 import re
 import sys
@@ -25,22 +25,7 @@ import webbrowser
 import trello
 import yaml
 
-__version__ = '0.1.2'
-
-
-class Colors:
-    esc = '\033'
-    black = esc + '[0;30m'
-    red = esc + '[0;31m'
-    green = esc + '[0;32m'
-    yellow = esc + '[0;33m'
-    blue = esc + '[0;34m'
-    purple = esc + '[0;35m'
-    cyan = esc + '[0;36m'
-    white = esc + '[0;37m'
-    reset = esc + '[0m'
-
-
+__version__ = '0.1.3'
 _workflow_description = '''1. Collect absolutely everything that can take your attention into "Inbound"
 2. Filter:
     Nonactionable -> Static Reference or Delete
@@ -58,6 +43,99 @@ _workflow_description = '''1. Collect absolutely everything that can take your a
 The goal is to get everything except the current task out of your head
 and into this trusted system external to your mind.
 '''
+
+
+class Colors:
+    esc = '\033'
+    black = esc + '[0;30m'
+    red = esc + '[0;31m'
+    green = esc + '[0;32m'
+    yellow = esc + '[0;33m'
+    blue = esc + '[0;34m'
+    purple = esc + '[0;35m'
+    cyan = esc + '[0;36m'
+    white = esc + '[0;37m'
+    reset = esc + '[0m'
+
+
+class TextDisplay:
+    '''controls the coloration and detail of the output for a session duration'''
+    def __init__(self, use_color):
+        self.use_color = use_color
+
+    def _colorize(self, lbl, msg, colorstring):
+        return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
+
+    def _p(self, lbl, msg, colorstring=Colors.blue):
+        if self.use_color:
+            print(self._colorize(lbl, msg, colorstring))
+        else:
+            print('{0} {1}'.format(lbl, msg))
+
+    def banner(self):
+        on = Colors.green if self.use_color else ''
+        off = Colors.reset
+        banner = (' __|_ _| ._     version {on}{0}{off}\n'
+        '(_||_(_|{on}o{off}|_)\/  by {on}delucks{off}\n'
+        ' _|      |  /\n').format(__version__, on=on, off=off)
+        print(banner)
+
+    def show(self, card, show_list=False):
+        created = card.create_date
+        self._p('Card', card.id)
+        self._p('  Name:', card.name.decode('utf8'))
+        self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
+        self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
+        if card.list_labels:
+            self._p('  Tags:', ','.join([l.name.decode('utf8') for l in card.list_labels]))
+        if card.get_attachments():
+            self._p('  Attachments:', ','.join([a['name'] for a in card.get_attachments()]))
+        if card.due:
+            diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
+            if diff < datetime.timedelta(0):
+                display = Colors.red
+            else:
+                display = Colors.green
+            self._p('  Due:', card.due_date, display)
+            self._p('  Remaining:', diff, display)
+        if show_list:
+            self._p('  List:', '{0}'.format(card.get_list().name.decode('utf-8')))
+
+
+class TrelloWrapper:
+    '''wraps the trello client to keep state important to the GTD implementation
+    '''
+    def __init__(self, trello_api_connection, configuration, primary_list=None):
+        self.trello = trello_api_connection
+        self.config = configuration
+        primary_list_name = primary_list or self.config['list_names']['incoming']
+        self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
+        self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
+        self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
+        self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
+
+    def _filter_by_name(self, iterable, name):
+        try:
+            return set(b for b in iterable if name.lower() in b.name.decode('utf-8').lower()).pop()
+        except KeyError:
+            return []
+
+    def _make_name_lookup(self, object_grouping):
+        return {o.name: o for o in object_grouping}
+
+    def apply_filters(self, reverse=False, regex=None):
+        cards = list(self.main_list.list_cards()) 
+        if regex:
+            selected = [c for c in cards if re.search(regex, c.name.decode('utf8'))]
+        else:
+            selected = cards
+        if reverse:
+            return reversed(selected)
+        else:
+            return selected
+
+    def get_cards(self, reverse, regex):
+        return self.apply_filters(reverse=reverse, regex=regex)
 
 
 def parse_configuration(configfile='gtd.yaml'):
@@ -222,83 +300,6 @@ def review_card(card, wrapper):
             pass
 
 
-class TextDisplay:
-    '''controls the coloration and detail of the output for a session duration'''
-    def __init__(self, use_color):
-        self.use_color = use_color
-
-    def _colorize(self, lbl, msg, colorstring):
-        return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
-
-    def _p(self, lbl, msg, colorstring=Colors.blue):
-        if self.use_color:
-            print(self._colorize(lbl, msg, colorstring))
-        else:
-            print('{0} {1}'.format(lbl, msg))
-
-    def banner(self):
-        on = Colors.green if self.use_color else ''
-        off = Colors.reset
-        banner = (' __|_ _| ._     version {on}{0}{off}\n'
-        '(_||_(_|{on}o{off}|_)\/  by {on}delucks{off}\n'
-        ' _|      |  /\n').format(__version__, on=on, off=off)
-        print(banner)
-
-    def show(self, card, show_list=False):
-        created = card.create_date
-        self._p('Card', card.id)
-        self._p('  Name:', card.name.decode('utf8'))
-        self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
-        self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
-        if card.labels:
-            self._p('  Tags:', ','.join([l.name.decode('utf8') for l in card.labels]))
-        if card.get_attachments():
-            self._p('  Attachments:', ','.join([a['name'] for a in card.get_attachments()]))
-        if card.due:
-            diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
-            if diff < datetime.timedelta(0):
-                display = Colors.red
-            else:
-                display = Colors.green
-            self._p('  Due:', card.due_date, display)
-            self._p('  Remaining:', diff, display)
-        if show_list:
-            self._p('  List:', '{0}'.format(card.get_list().name.decode('utf-8')))
-
-
-class TrelloWrapper:
-    '''wraps the trello client to keep state important to the GTD implementation
-    '''
-    def __init__(self, trello_api_connection, configuration, primary_list=None):
-        self.trello = trello_api_connection
-        self.config = configuration
-        primary_list_name = primary_list or self.config['list_names']['incoming']
-        self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
-        self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
-        self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
-        self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
-
-    def _filter_by_name(self, iterable, name):
-        return [b for b in iterable if bytes(name.lower(), 'utf8') in b.name.lower()][0]
-
-    def _make_name_lookup(self, object_grouping):
-        return {o.name: o for o in object_grouping}
-
-    def apply_filters(self, reverse=False, regex=None):
-        cards = list(self.main_list.list_cards()) 
-        if regex:
-            selected = [c for c in cards if re.search(regex, c.name.decode('utf8'))]
-        else:
-            selected = cards
-        if reverse:
-            return reversed(selected)
-        else:
-            return selected
-
-    def get_cards(self, reverse, regex):
-        return self.apply_filters(reverse=reverse, regex=regex)
-
-
 def perform_command(args):
     config_properties = parse_configuration()
     if not config_properties:
@@ -319,7 +320,7 @@ def perform_command(args):
             for t in wrapper.main_board.get_labels():
                 print(t.name.decode('utf8'))
     elif args.command == 'grep':
-        pattern = re.compile(args.pattern)
+        pattern = re.compile(args.pattern or '.*')
         for cardlist in wrapper.main_board.get_lists('open'):
             for card in cardlist.list_cards():
                 if pattern.search(card.name.decode('utf8')):
@@ -356,17 +357,18 @@ def perform_command(args):
 def main():
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
     p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
-    p.add_argument('-m', '--match', help='provide a regex to filter the card names on', default=None)
-    p.add_argument('-l', '--list', help='list name to use', default='Inbound')
     p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
+    p.add_argument('-m', '--match', metavar='PCRE', help='provide a regex to filter the card names on', default=None)
+    p.add_argument('-l', '--list', metavar='NAME', help='list name to use', default='Inbound')
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
     add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
     add.add_argument('title', help='title for the new card')
     add.add_argument('-m', '--message', help='description for the new card')
     grep = commands.add_parser('grep', help='search through the titles of all cards on the board')
-    grep.add_argument('pattern', help='regex to search card titles for')
+    grep.add_argument('pattern', help='regex to search card titles for', nargs='?')
+    #grep.add_argument('-t', '--tag', help='select a tag to grep through')
     show = commands.add_parser('show', help='print all cards of one type')
     show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
     batch = commands.add_parser('batch', help='process a list of cards one action at a time')
