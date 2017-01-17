@@ -6,9 +6,8 @@ TODOs:
 - Add an audit trail of logging or metrics emission so you can see where things are going
 - Ability to bookmark links that are in the incoming basket with an automatic title
 - Translate #tag into adding that tag, then removing that part of the title
-- "show" arg with a flexible argument scheme that also allows you to specify tag names and names of lists to dump
-- Method entirely for filtering the list of cards down to the user selection- we shouldn't be doing that in main()
 - Method to set the due date of the "weekly"/"Monthly" lists all at once
+- Argument that can select multiple list names to filter
 '''
 import re
 import sys
@@ -25,24 +24,7 @@ from functools import partial
 import trello
 import yaml
 
-__version__ = '0.1.4'
-_workflow_description = '''1. Collect absolutely everything that can take your attention into "Inbound"
-2. Filter:
-    Nonactionable -> Static Reference or Delete
-    Takes < 2 minutes -> Do now, then Delete
-    Not your responsibility -> "Holding" or "Blocked" with follow-up
-    Something to communicate -> messaging lists
-    Your responsibility -> Your lists
-3. Write "final" state of each task and "next" state of each task
-4. Categorize inbound items into lists based on action type required (call x, talk to x, meet x...)
-5. Reviews:
-    Daily -> Go through "Inbound" and "Doing"
-    Weekly -> Additionally, go through "Holding", "Blocked", and messaging lists
-6. Do
-
-The goal is to get everything except the current task out of your head
-and into this trusted system external to your mind.
-'''
+__version__ = '0.1.5'
 
 
 class Colors:
@@ -103,9 +85,11 @@ class TextDisplay:
 
 
 class TrelloWrapper:
-    '''wraps the trello client to keep state important to the GTD implementation
+    '''wraps the trello client, holds state, and provides convenience methods
+    for doing certain repeatable tasks on the main board and lists described
+    by the configuration properties
     '''
-    def __init__(self, primary_list=None, reverse=False, regex=None):
+    def __init__(self, primary_list=None):
         self.config = self.parse_configuration()
         self.trello = self.initialize_trello(self.config)
         primary_list_name = primary_list or self.config['list_names']['incoming']
@@ -113,8 +97,6 @@ class TrelloWrapper:
         self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
-        self.reverse = reverse
-        self.regex = regex
 
     def initialize_trello(self, config):
         '''Initializes our connection to the trello API
@@ -159,17 +141,31 @@ class TrelloWrapper:
     def _make_name_lookup(self, object_grouping):
         return {o.name: o for o in object_grouping}
 
-    def get_cards(self, target_list=None):
-        target_list = target_list or self.main_list
-        cards = list(target_list.list_cards()) 
-        if self.regex:
-            selected = [c for c in cards if re.search(self.regex, c.name.decode('utf8'))]
-        else:
-            selected = cards
-        if self.reverse:
-            return reversed(selected)
-        else:
-            return selected
+    def _cardpipe(self, target_lists):
+        '''I wish their API had a "search" feature so this doesn't have to be
+        N^2'''
+        for cardlist in target_lists:
+            for card in cardlist.list_cards():
+                yield card
+
+    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None):
+        '''Find cards on the main board that match our filters, hand them back
+        as a generator'''
+        target_lists = target_lists or self.main_board.get_lists('open')
+        filters = []
+        if tag:
+            filters.append(partial(filter_card_by_tag, tag=tag))
+        if title_regex:
+            filters.append(lambda c: re.search(title_regex, c.name.decode('utf8')))
+        if filterspec and callable(filterspec):
+            filters.append(filterspec)
+        for card in self._cardpipe(target_lists):
+            keep = True
+            for f in filters:
+                if not f(card):
+                    keep = False
+            if keep:
+                yield card
 
     def get_list(self, name):
         return self.list_lookup.get(bytes(name, 'utf8'), None)
@@ -200,14 +196,14 @@ class TrelloWrapper:
         '''present the user with an option-based interface to do every operation on
         a single card'''
         header = (
-            '{0.blue}D{0.reset}elete, '
-            '{0.blue}T{0.reset}ag, '
-            '{0.blue}M{0.reset}ove, '
-            '{0.blue}S{0.reset}kip, '
-            '{0.blue}Q{0.reset}uit'
+            '{0.red}D{0.reset}elete, '
+            '{0.red}T{0.reset}ag, '
+            '{0.red}M{0.reset}ove, '
+            '{0.red}S{0.reset}kip, '
+            '{0.red}Q{0.reset}uit'
         ).format(Colors)
         if card.get_attachments():
-            header = '{0.blue}O{0.reset}pen link, '.format(Colors) + header
+            header = '{0.red}O{0.reset}pen link, '.format(Colors) + header
         choice = ''
         while choice != 'S' and choice != 'D':
             print(header)
@@ -231,18 +227,23 @@ class TrelloWrapper:
             else:
                 pass
 
-    def review_list(self, cardlist, display_function):
-        for card in self.get_cards(cardlist):
+    def review_list(self, cards, display_function):
+        for card in cards:
             display_function(card)
             self.review_card(card)
 
+
+def filter_card_by_tag(card, tag):
+    if card.list_labels:
+        return tag in [l.name.decode('utf8') for l in card.list_labels]
+    else:
+        return False
 
 def prompt_for_user_choice(iterable):
     listed = list(iterable)
     for index, item in enumerate(listed):
         print('  [{0}] {1}'.format(index, item.decode('utf8')))
-    broken = False
-    while not broken:
+    while True:
         usersel = input('Input the numeric ID or IDs of the item(s) you want: ').strip()
         try:
             if ',' in usersel or ' ' in usersel:
@@ -250,7 +251,7 @@ def prompt_for_user_choice(iterable):
                 indicies = [int(i) for i in usersel.split(delimiter)]
             else:
                 indicies = [int(usersel)]
-            broken = True
+            break
         except ValueError:
             print('You gave a malformed input!')
     return [listed[i] for i in indicies]
@@ -302,8 +303,9 @@ def quickmove(iterable):
 
 
 def perform_command(args):
-    wrapper = TrelloWrapper(args.list, args.reverse, args.match)
-    cards = wrapper.get_cards()
+    wrapper = TrelloWrapper(args.list)
+    target_lists = [wrapper.main_list] if args.list else []
+    cards = wrapper.get_cards(target_lists=target_lists, tag=args.tag, title_regex=args.match)
     display = TextDisplay(args.no_color)
     if args.no_banner:
         display.banner()
@@ -311,22 +313,20 @@ def perform_command(args):
         if args.type == 'lists':
             for l in wrapper.main_board.get_lists('open'):
                 print(l.name.decode('utf8'))
-        elif args.type == 'cards':
-            for card in cards:
-                display.show(card)
-        else:
+        elif args.type == 'tags':
             for t in wrapper.main_board.get_labels():
                 print(t.name.decode('utf8'))
+        else:
+            for card in cards:
+                display.show(card, True)
     elif args.command == 'grep':
-        pattern = re.compile(args.pattern or '.*')
-        for cardlist in wrapper.main_board.get_lists('open'):
-            for card in cardlist.list_cards():
-                if pattern.search(card.name.decode('utf8')):
-                    display.show(card, True)
+        pattern = args.pattern or '.*'
+        for card in wrapper.get_cards(title_regex=pattern):
+            display.show(card, True)
     elif args.command == 'add':
         logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
         returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
-        print('Successfully added card {0}'.format(returned))
+        print('Successfully added card {0}!'.format(returned))
     elif args.command == 'batch':
         if args.type == 'move':
             for card in cards:
@@ -338,37 +338,32 @@ def perform_command(args):
                 display.show(card)
                 if prompt_for_confirmation('Should we delete this card?'):
                     card.delete()
-                    print('Bye!')
+                    print('Card deleted!')
         else:
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Want to tag this one?'):
                     wrapper.add_labels(card)
-        print('Batch completed')
+        print('Batch completed, have a great day!')
     else:
+        df = partial(display.show, show_list=True)
         if args.daily:
-            df = partial(display.show, show_list=True)
-            print('Welcome to daily review mode!\n\nStarting with "Doing":')
-            for doing_name in ['Doing Today', 'Doing this Week', 'Doing this Month']:
-                doing = wrapper.get_list(doing_name)
-                wrapper.review_list(doing, df)
-            print('Moving on to "Holding":\n')
+            print('Welcome to daily review mode!\nThis combines all "Doing", "Holding", and "Inbound" lists into one big review.\n')
+            doing_lists = [wrapper.get_list(l) for l in ['Doing Today', 'Doing this Week', 'Doing this Month']]
             holding = wrapper.get_list(wrapper.config['list_names']['holding'])
-            wrapper.review_list(holding, df)
-            print('Finally, "Inbound":\n')
-            wrapper.review_list(wrapper.main_list, df)
-        else:
-            wrapper.review_list(wrapper.main_list, display.show)
+            interested_lists = doing_lists + [holding, wrapper.main_list]
+            cards = wrapper.get_cards(target_lists=interested_lists, tag=args.tag, title_regex=args.match)
+        wrapper.review_list(cards, df)
         print('All done, have a great day!')
 
 
 def main():
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
-    p.add_argument('-r', '--reverse', help='process the list of cards in reverse', action='store_true')
     p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
-    p.add_argument('-m', '--match', metavar='PCRE', help='provide a regex to filter the card names on', default=None)
-    p.add_argument('-l', '--list', metavar='NAME', help='list name to use', default='Inbound')
+    p.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
+    p.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
+    p.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
     add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
@@ -388,7 +383,24 @@ def main():
     if args.command == 'help':
         p.print_help()
     elif args.command == 'workflow':
-        print(_workflow_description)
+        print(
+        '1. Collect absolutely everything that can take your attention into "Inbound"\n'
+        '2. Filter:\n'
+        '    Nonactionable -> Static Reference or Delete\n'
+        '    Takes < 2 minutes -> Do now, then Delete\n'
+        '    Not your responsibility -> "Holding" or "Blocked" with follow-up\n'
+        '    Something to communicate -> messaging lists\n'
+        '    Your responsibility -> Your lists\n'
+        '3. Write "final" state of each task and "next" state of each task\n'
+        '4. Categorize inbound items into lists based on action type required (call x, talk to x, meet x...)\n'
+        '5. Reviews:\n'
+        '    Daily -> Go through "Inbound" and "Doing"\n'
+        '    Weekly -> Additionally, go through "Holding", "Blocked", and messaging lists\n'
+        '6. Do\n'
+        '\n'
+        'The goal is to get everything except the current task out of your head\n'
+        'and into this trusted system external to your mind.'
+        )
     else:
         perform_command(args)
 
