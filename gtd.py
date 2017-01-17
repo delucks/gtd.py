@@ -321,7 +321,7 @@ def perform_command(args):
                 display.show(card, True)
     elif args.command == 'grep':
         pattern = args.pattern or '.*'
-        for card in wrapper.get_cards(title_regex=pattern):
+        for card in wrapper.get_cards(title_regex=pattern, tag=args.tag):
             display.show(card, True)
     elif args.command == 'add':
         logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
@@ -358,25 +358,25 @@ def perform_command(args):
 
 
 def main():
-    p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__))
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
+    common.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
+    common.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
+    p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__), parents=[common])
     p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
-    p.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
-    p.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
-    p.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
     add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
     add.add_argument('title', help='title for the new card')
     add.add_argument('-m', '--message', help='description for the new card')
-    grep = commands.add_parser('grep', help='search through the titles of all cards on the board')
+    grep = commands.add_parser('grep', help='search through the titles of all cards on the board', parents=[common])
     grep.add_argument('pattern', help='regex to search card titles for', nargs='?')
-    #grep.add_argument('-t', '--tag', help='select a tag to grep through')
-    show = commands.add_parser('show', help='print all cards of one type')
+    show = commands.add_parser('show', help='print all cards of one type', parents=[common])
     show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
-    batch = commands.add_parser('batch', help='process a list of cards one action at a time')
+    batch = commands.add_parser('batch', help='process a list of cards one action at a time', parents=[common])
     batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
-    review = commands.add_parser('review', help='present a menu to interact with each card')
+    review = commands.add_parser('review', help='present a menu to interact with each card', parents=[common])
     review.add_argument('-d', '--daily', help='start a daily review mode, which goes through several lists at once', action='store_true')
     commands.add_parser('workflow', help='show the process for the GTD workflow')
     args = p.parse_args()
@@ -399,7 +399,7 @@ def main():
         '6. Do\n'
         '\n'
         'The goal is to get everything except the current task out of your head\n'
-        'and into this trusted system external to your mind.'
+        'and into a trusted system external to your mind.'
         )
     else:
         perform_command(args)
