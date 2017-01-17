@@ -62,7 +62,7 @@ class TextDisplay:
         ' _|      |  /\n').format(__version__, on=on, off=off)
         print(banner)
 
-    def show(self, card, show_list=False):
+    def show(self, card, show_list=True):
         created = card.create_date
         self._p('Card', card.id)
         self._p('  Name:', card.name.decode('utf8'))
@@ -324,9 +324,13 @@ def perform_command(args):
         for card in wrapper.get_cards(title_regex=pattern, tag=args.tag):
             display.show(card, True)
     elif args.command == 'add':
-        logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
-        returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
-        print('Successfully added card {0}!'.format(returned))
+        if args.tag:
+            label = wrapper.main_board.add_label(args.title, 'black')
+            print('Successfully added tag {0}!'.format(label))
+        else:
+            logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
+            returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
+            print('Successfully added card {0}!'.format(returned))
     elif args.command == 'batch':
         if args.type == 'move':
             for card in cards:
@@ -367,9 +371,12 @@ def main():
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
-    add = commands.add_parser('add', help='create a new card')  # TODO add argument for tags to add
-    add.add_argument('title', help='title for the new card')
-    add.add_argument('-m', '--message', help='description for the new card')
+    add = commands.add_parser('add', help='create a new card or tag')
+    add.add_argument('title', help='title for the new card/tag')
+    add.add_argument('-m', '--message', help='description for a new card')
+    destination_type = add.add_mutually_exclusive_group(required=True)
+    destination_type.add_argument('--tag', help='create a tag with this command instead', action='store_true')
+    destination_type.add_argument('--card', help='create a card', action='store_true')
     grep = commands.add_parser('grep', help='search through the titles of all cards on the board', parents=[common])
     grep.add_argument('pattern', help='regex to search card titles for', nargs='?')
     show = commands.add_parser('show', help='print all cards of one type', parents=[common])
