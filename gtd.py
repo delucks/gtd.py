@@ -4,8 +4,8 @@ Notes:
 - This only works on Unix systems and has only been tested on Linux
 TODOs:
 - Add an audit trail of logging or metrics emission so you can see where things are going
-- Ability to bookmark links that are in the incoming basket with an automatic title
 - Translate #tag into adding that tag, then removing that part of the title
+- Method to "reflow" a link-titled card into an attachment with a title obtained by hitting the http resource
 - Method to set the due date of the "weekly"/"Monthly" lists all at once
 - Argument that can select multiple list names to filter
 '''
