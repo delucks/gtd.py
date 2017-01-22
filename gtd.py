@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-'''Incremental development is a thing dude
+'''gtd.py
+
+A tool that interacts with Trello to quickly sort my todo list and present an
+organization interface vaguely inspired by the "Getting Things Done" process
+
 Notes:
 - This only works on Unix systems and has only been tested on Linux
+
 TODOs:
 - Add an audit trail of logging or metrics emission so you can see where things are going
 - Translate #tag into adding that tag, then removing that part of the title
@@ -24,7 +29,7 @@ from functools import partial
 import trello
 import yaml
 
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 
 
 class Colors:
@@ -324,7 +329,7 @@ def perform_command(args):
         for card in wrapper.get_cards(title_regex=pattern, tag=args.tag):
             display.show(card, True)
     elif args.command == 'add':
-        if args.tag:
+        if args.destination == 'tag':
             label = wrapper.main_board.add_label(args.title, 'black')
             print('Successfully added tag {0}!'.format(label))
         else:
@@ -372,11 +377,9 @@ def main():
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
     add = commands.add_parser('add', help='create a new card or tag')
+    add.add_argument('destination', choices=('tag', 'card'), help='type of thing to create')
     add.add_argument('title', help='title for the new card/tag')
     add.add_argument('-m', '--message', help='description for a new card')
-    destination_type = add.add_mutually_exclusive_group(required=True)
-    destination_type.add_argument('--tag', help='create a tag with this command instead', action='store_true')
-    destination_type.add_argument('--card', help='create a card', action='store_true')
     grep = commands.add_parser('grep', help='search through the titles of all cards on the board', parents=[common])
     grep.add_argument('pattern', help='regex to search card titles for', nargs='?')
     show = commands.add_parser('show', help='print all cards of one type', parents=[common])
@@ -416,5 +419,5 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        print('Quitting!')
+        print('Recieved Ctrl+C, quitting!')
         sys.exit(0)
