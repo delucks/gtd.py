@@ -102,6 +102,7 @@ class TrelloWrapper:
         self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
+        self.magic_value = 'NOTAG'
 
     def initialize_trello(self, config):
         '''Initializes our connection to the trello API
@@ -158,7 +159,9 @@ class TrelloWrapper:
         as a generator'''
         target_lists = target_lists or self.main_board.get_lists('open')
         filters = []
-        if tag:
+        if tag == self.magic_value:
+            filters.append(lambda c: not c.list_labels)
+        elif tag:
             filters.append(partial(filter_card_by_tag, tag=tag))
         if title_regex:
             filters.append(lambda c: re.search(title_regex, c.name.decode('utf8')))
@@ -310,7 +313,8 @@ def quickmove(iterable):
 def perform_command(args):
     wrapper = TrelloWrapper(args.list)
     target_lists = [wrapper.main_list] if args.list else []
-    cards = wrapper.get_cards(target_lists=target_lists, tag=args.tag, title_regex=args.match)
+    tag = wrapper.magic_value if args.no_tag else args.tag if args.tag else None
+    cards = wrapper.get_cards(target_lists=target_lists, tag=tag, title_regex=args.match)
     display = TextDisplay(args.no_color)
     if args.no_banner:
         display.banner()
@@ -326,7 +330,7 @@ def perform_command(args):
                 display.show(card, True)
     elif args.command == 'grep':
         pattern = args.pattern or '.*'
-        for card in wrapper.get_cards(title_regex=pattern, tag=args.tag):
+        for card in wrapper.get_cards(title_regex=pattern, tag=tag):
             display.show(card, True)
     elif args.command == 'add':
         if args.destination == 'tag':
@@ -361,7 +365,7 @@ def perform_command(args):
             doing_lists = [wrapper.get_list(l) for l in ['Doing Today', 'Doing this Week', 'Doing this Month']]
             holding = wrapper.get_list(wrapper.config['list_names']['holding'])
             interested_lists = doing_lists + [holding, wrapper.main_list]
-            cards = wrapper.get_cards(target_lists=interested_lists, tag=args.tag, title_regex=args.match)
+            cards = wrapper.get_cards(target_lists=interested_lists, tag=tag, title_regex=args.match)
         wrapper.review_list(cards, df)
         print('All done, have a great day!')
 
@@ -370,15 +374,17 @@ def main():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
     common.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
-    common.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
+    tag_group = common.add_mutually_exclusive_group(required=False)
+    tag_group.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
+    tag_group.add_argument('--no-tag', help='only select cards without a tag', action='store_true')
     p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__), parents=[common])
     p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
     add = commands.add_parser('add', help='create a new card or tag')
-    add.add_argument('destination', choices=('tag', 'card'), help='type of thing to create')
-    add.add_argument('title', help='title for the new card/tag')
+    add.add_argument('destination', choices=('tag', 'card'), help='type of item to create')
+    add.add_argument('title', help='title for the new item')
     add.add_argument('-m', '--message', help='description for a new card')
     grep = commands.add_parser('grep', help='search through the titles of all cards on the board', parents=[common])
     grep.add_argument('pattern', help='regex to search card titles for', nargs='?')
