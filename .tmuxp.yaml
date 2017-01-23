@@ -1,0 +1,22 @@
+session_name: gtd
+start_directory: ./ # load session relative to config location (project root).
+windows:
+- window_name: run
+  focus: True
+  layout: tiled
+  shell_command_before:
+    - 'source bin/activate'
+  panes:
+  - shell_command:
+    - python gtd.py help
+- window_name: try
+  shell_command_before:
+    - 'source bin/activate'
+  panes:
+  - shell_command:
+    - ipython
+- window_name: dev
+  layout: tiled
+  panes:
+  - shell_command:
+    - vim -S
