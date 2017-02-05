@@ -157,7 +157,7 @@ class TrelloWrapper:
     def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None):
         '''Find cards on the main board that match our filters, hand them back
         as a generator'''
-        target_lists = target_lists or self.main_board.get_lists('open')
+        cardsource = self._cardpipe(target_lists) if target_lists else self.main_board.get_cards('open')
         filters = []
         if tag == self.magic_value:
             filters.append(lambda c: not c.list_labels)
@@ -167,7 +167,7 @@ class TrelloWrapper:
             filters.append(lambda c: re.search(title_regex, c.name.decode('utf8')))
         if filterspec and callable(filterspec):
             filters.append(filterspec)
-        for card in self._cardpipe(target_lists):
+        for card in cardsource:
             keep = True
             for f in filters:
                 if not f(card):
@@ -336,6 +336,9 @@ def perform_command(args):
         if args.destination == 'tag':
             label = wrapper.main_board.add_label(args.title, 'black')
             print('Successfully added tag {0}!'.format(label))
+        elif args.destination == 'list':
+            l = wrapper.main_board.add_list(args.title)
+            print('Successfully added list {0}!'.format(l))
         else:
             logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
             returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
@@ -382,8 +385,8 @@ def main():
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
     commands = p.add_subparsers(dest='command')
     commands.add_parser('help', help='display this message')
-    add = commands.add_parser('add', help='create a new card or tag')
-    add.add_argument('destination', choices=('tag', 'card'), help='type of item to create')
+    add = commands.add_parser('add', help='create a new card, tag, or list')
+    add.add_argument('destination', choices=('tag', 'card', 'list'), help='type of item to create')
     add.add_argument('title', help='title for the new item')
     add.add_argument('-m', '--message', help='description for a new card')
     grep = commands.add_parser('grep', help='search through the titles of all cards on the board', parents=[common])
