@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 '''gtd.py
 
 A tool that interacts with Trello to quickly sort my todo list and present an
@@ -342,7 +342,11 @@ def perform_command(args):
         else:
             logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
             returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
-            print('Successfully added card {0}!'.format(returned))
+            if args.edit:
+                display.show(returned)
+                wrapper.review_card(returned)
+            else:
+                print('Successfully added card {0}!'.format(returned))
     elif args.command == 'batch':
         if args.type == 'move':
             for card in cards:
@@ -389,6 +393,7 @@ def main():
     add.add_argument('destination', choices=('tag', 'card', 'list'), help='type of item to create')
     add.add_argument('title', help='title for the new item')
     add.add_argument('-m', '--message', help='description for a new card')
+    add.add_argument('--edit', help='review the card right after creating it', action='store_true')
     grep = commands.add_parser('grep', help='search through the titles of all cards on the board', parents=[common])
     grep.add_argument('pattern', help='regex to search card titles for', nargs='?')
     show = commands.add_parser('show', help='print all cards of one type', parents=[common])
