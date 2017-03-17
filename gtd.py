@@ -13,12 +13,12 @@ TODOs:
 - Method to "reflow" a link-titled card into an attachment with a title obtained by hitting the http resource
 - Method to set the due date of the "weekly"/"Monthly" lists all at once
 - Argument that can select multiple list names to filter
+- Argument to "show cards" that dumps the card in JSON
 '''
 import re
 import sys
 import tty
 import string
-import logging
 import termios
 import readline  # noqa
 import datetime
@@ -28,8 +28,9 @@ from functools import partial
 
 import trello
 import yaml
+import requests
 
-__version__ = '0.1.6'
+__version__ = '0.1.7'
 
 
 class Colors:
@@ -98,7 +99,12 @@ class TrelloWrapper:
         self.config = self.parse_configuration()
         self.trello = self.initialize_trello(self.config)
         primary_list_name = primary_list or self.config['list_names']['incoming']
-        self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
+        try:
+            # This is the first connection to the API made by the client
+            self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
+        except requests.exceptions.ConnectionError:
+            print('[FATAL] Could not connect to the Trello API!')
+            sys.exit(1)
         self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
@@ -107,22 +113,18 @@ class TrelloWrapper:
     def initialize_trello(self, config):
         '''Initializes our connection to the trello API
         '''
-        logging.info('Connecting to the Trello API...')
         trello_client = trello.TrelloClient(
             api_key=config['trello']['api_key'],
             api_secret=config['trello']['api_secret'],
             token=config['trello']['oauth_token'],
             token_secret=config['trello']['oauth_token_secret']
         )
-        logging.info('Connected to Trello.')
         return trello_client
 
     def parse_configuration(self, configfile='gtd.yaml'):
         '''load user-defined configuration for what boards and lists to use
         '''
-        logging.info('Opening configuration file...')
         with open(configfile, 'r') as config_yaml:
-            logging.info('Loading configuration properties...')
             properties = yaml.safe_load(config_yaml)
             return self._validate_config(properties)
 
@@ -340,7 +342,6 @@ def perform_command(args):
             l = wrapper.main_board.add_list(args.title)
             print('Successfully added list {0}!'.format(l))
         else:
-            logging.info('Adding new card with title {0} and description {1} to list {2}'.format(args.title, args.message, wrapper.main_list))
             returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
             if args.edit:
                 display.show(returned)
