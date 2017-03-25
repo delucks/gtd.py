@@ -205,7 +205,7 @@ class TrelloWrapper:
             for card in cardlist.list_cards():
                 yield card
 
-    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None):
+    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None, has_attachments=None):
         '''Find cards on the main board that match our filters, hand them back
         as a generator'''
         cardsource = self._cardpipe(target_lists) if target_lists else self.main_board.get_cards('open')
@@ -218,6 +218,8 @@ class TrelloWrapper:
             filters.append(lambda c: re.search(title_regex, c.name.decode('utf8')))
         if filterspec and callable(filterspec):
             filters.append(filterspec)
+        if has_attachments:
+            filters.append(lambda c: has_attachments and c.get_attachments())
         for card in cardsource:
             keep = True
             for f in filters:
@@ -244,6 +246,23 @@ class TrelloWrapper:
                     print('Tag {0} is already present!'.format(label))
         return newlabels
 
+    def title_to_link(self, card):
+        # assumes card.name is the link you want
+        links = [n for n in card.name.decode('utf8').split() if 'http' in n]
+        for l in links:
+            card.attach(url=l)
+        self.rename(card)
+
+    def rename(self, card, default=None):
+        newname = input('Input new name for this card (blank for the existing one): ').strip()
+        if newname:
+            card.set_name(newname)
+            # FIXME this hacks around a bug in the pytrello library, contribute it upstream
+            card.name = bytes(newname, 'utf8')
+        else:
+            if default:
+                card.name = bytes(default, 'utf8')
+
     def move_to_list(self, card):
         dest = quickmove(self.list_lookup.keys())
         destination_list = self.list_lookup[dest]
@@ -251,19 +270,23 @@ class TrelloWrapper:
         print('Moved to {0}'.format(destination_list.name.decode('utf8')))
         return destination_list
 
-    def review_card(self, card):
+    def review_card(self, card, display_function):
         '''present the user with an option-based interface to do every operation on
         a single card'''
         header = (
-            '{0.red}D{0.reset}elete, '
-            '{0.red}T{0.reset}ag, '
-            '{0.red}M{0.reset}ove, '
-            '{0.red}S{0.reset}kip, '
-            '{0.red}Q{0.reset}uit'
+            '{0.green}D{0.reset}elete, '
+            '{0.green}T{0.reset}ag, '
+            '{0.green}A{0.reset}ttach Title, '
+            '{0.green}P{0.reset}rint Card, '
+            '{0.green}R{0.reset}ename, '
+            '{0.green}M{0.reset}ove, '
+            '{0.green}S{0.reset}kip, '
+            '{0.green}Q{0.reset}uit'
         ).format(Colors)
         if card.get_attachments():
-            header = '{0.red}O{0.reset}pen link, '.format(Colors) + header
+            header = '{0.red}O{0.reset}pen attachment, '.format(Colors) + header
         choice = ''
+        display_function(card)
         while choice != 'S' and choice != 'D':
             print(header)
             choice = input('Input option character: ').strip().upper()
@@ -273,23 +296,29 @@ class TrelloWrapper:
                 break
             elif choice == 'T':
                 self.add_labels(card)
+            elif choice == 'L':
+                self.title_to_link(card)
+            elif choice == 'P':
+                display_function(card)
+            elif choice == 'R':
+                self.rename(card)
             elif choice == 'M':
                 if self.move_to_list(card):
                     break
             elif choice == 'Q':
-                raise KeyboardInterrupt
+                raise GTDException()
             elif choice == 'O':
                 if 'link' not in header:
                     print('This card does not have an attachment!')
                 else:
-                    webbrowser.open([a['name'] for a in card.get_attachments()][0])
+                    for l in [a['name'] for a in card.get_attachments()]:
+                        webbrowser.open(l)
             else:
                 pass
 
     def review_list(self, cards, display_function):
         for card in cards:
-            display_function(card)
-            self.review_card(card)
+            self.review_card(card, display_function)
 
 
 def filter_card_by_tag(card, tag):
@@ -356,7 +385,7 @@ def quickmove(iterable):
         assigned = all_keys[idx]
         lookup[assigned] = idx
         print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
-    print('Press the character for the desired option. Selection will happen immediately upon keystroke')
+    print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+C to cancel')
     req = getch()
     return list(iterable)[int(lookup.get(req, None))]
 
@@ -365,7 +394,7 @@ def perform_command(args):
     wrapper = TrelloWrapper(args.list)
     target_lists = [wrapper.main_list] if args.list else []
     tag = wrapper.magic_value if args.no_tag else args.tag if args.tag else None
-    cards = wrapper.get_cards(target_lists=target_lists, tag=tag, title_regex=args.match)
+    cards = wrapper.get_cards(target_lists=target_lists, tag=tag, title_regex=args.match, has_attachments=args.attachments)
     # some modes require a TextDisplay
     if args.json and args.command in ['show', 'grep']:
         display = JSONDisplay()
@@ -399,8 +428,7 @@ def perform_command(args):
         else:
             returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
             if args.edit:
-                display.show(returned)
-                wrapper.review_card(returned)
+                wrapper.review_card(returned, display.show)
             else:
                 print('Successfully added card {0}!'.format(returned))
     elif args.command == 'batch':
@@ -438,6 +466,7 @@ def main():
     common.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
     common.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
     common.add_argument('-j', '--json', action='store_true', help='display results as a JSON list')
+    common.add_argument('-a', '--attachments', action='store_true', help='select cards which have attachments')
     tag_group = common.add_mutually_exclusive_group(required=False)
     tag_group.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
     tag_group.add_argument('--no-tag', help='only select cards without a tag', action='store_true')
