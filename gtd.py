@@ -150,7 +150,7 @@ class TrelloWrapper:
     for doing certain repeatable tasks on the main board and lists described
     by the configuration properties
     '''
-    def __init__(self, primary_list=None, config_file='gtd.yaml', autoconnect=False):
+    def __init__(self, primary_list=None, config_file='gtd.yaml', autoconnect=True):
         self.config = self.parse_configuration(config_file)
         self.trello = self.initialize_trello(self.config)
         self.primary_list_name = primary_list or self.config['list_names']['incoming']
@@ -164,7 +164,7 @@ class TrelloWrapper:
         except requests.exceptions.ConnectionError:
             print('[FATAL] Could not connect to the Trello API!')
             raise GTDException()
-        main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
+        main_list = self._filter_by_name(self.main_board.get_lists('open'), self.primary_list_name)
         if main_list:
             self.main_list = main_list
         else:
