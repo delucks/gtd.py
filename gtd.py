@@ -1,21 +1,5 @@
 #!/usr/bin/env python
-'''gtd.py
-
-A tool that interacts with Trello to quickly sort my todo list and present an
-organization interface vaguely inspired by the "Getting Things Done" process
-
-Notes:
-- This only works on Unix systems and has only been tested on Linux
-
-TODOs:
-- Add an audit trail of logging or metrics emission so you can see where things are going
-- Translate #tag into adding that tag, then removing that part of the title
-- Method to "reflow" a link-titled card into an attachment with a title obtained by hitting the http resource
-- Method to set the due date of the "weekly"/"Monthly" lists all at once
-- Argument that can select multiple list names to filter
-- README with this header
-- Tests
-'''
+'''gtd.py'''
 import re
 import sys
 import tty
@@ -457,7 +441,7 @@ def main():
     tag_group = common.add_mutually_exclusive_group(required=False)
     tag_group.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
     tag_group.add_argument('--no-tag', help='only select cards without a tag', action='store_true')
-    p = argparse.ArgumentParser(description='gtd.py version {0}'.format(__version__), parents=[common])
+    p = argparse.ArgumentParser(description='{0} version {1}'.format(__doc__, __version__), parents=[common])
     p.add_argument('-c', '--no-color', help='disable colorized output using ANSI escape codes', action='store_false')
     p.add_argument('-b', '--no-banner', help='do not print a banner', action='store_false')
     commands = p.add_subparsers(dest='command')

@@ -68,3 +68,6 @@ def test_filter_by_name(unconnected_wrapper):
     assert unconnected_wrapper._filter_by_name(ex_iter, 'Nonse') == Trello_Like_Object('Nonsense1')
     assert unconnected_wrapper._filter_by_name(ex_iter, 'trash') == Trello_Like_Object('Heap of trash')
     assert unconnected_wrapper._filter_by_name(ex_iter, 'dung') == Trello_Like_Object('Mountain of dung')
+
+def test_with_connection():
+    assert TrelloWrapper('Inbound'), 'No connection'
