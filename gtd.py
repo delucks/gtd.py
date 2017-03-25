@@ -18,6 +18,7 @@ TODOs:
 import re
 import sys
 import tty
+import json
 import string
 import termios
 import readline  # noqa
@@ -50,6 +51,12 @@ class TextDisplay:
     '''controls the coloration and detail of the output for a session duration'''
     def __init__(self, use_color):
         self.use_color = use_color
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, evalue, tb):
+        pass
 
     def _colorize(self, lbl, msg, colorstring):
         return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
@@ -88,6 +95,50 @@ class TextDisplay:
             self._p('  Remaining:', diff, display)
         if show_list:
             self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
+
+
+class JSONDisplay:
+    '''collects all returned objects into an array then dumps them to json'''
+    def __init__(self):
+        self.items = []
+
+    def __enter__(self):
+        return self
+
+    def _normalize(self, for_json):
+        '''force things to be json-serializable by name only'''
+        if isinstance(for_json, trello.List):
+            return for_json.name.decode('utf8')
+        elif isinstance(for_json, trello.Label):
+            return for_json.name.decode('utf8')
+        elif isinstance(for_json, trello.Board):
+            return for_json.name.decode('utf8')
+        elif isinstance(for_json, bytes):
+            return for_json.decode('utf8')
+        elif isinstance(for_json, list):
+            return list(map(self._normalize, for_json))
+        elif isinstance(for_json, datetime.datetime):
+            return str(for_json)
+        else:
+            return for_json
+
+    def __exit__(self, etype, evalue, tb):
+        items = self.items[0] if len(self.items) == 1 else self.items
+        try:
+            print(json.dumps(items))
+        except TypeError:
+            print(items)
+            raise
+
+    def banner(self):
+        pass
+
+    def show(self, card, _=None):
+        result = {}
+        for k, v in card.__dict__.items():
+            if k != 'client':
+                result[k] = self._normalize(v)
+        self.items.append(result)
 
 
 class TrelloWrapper:
@@ -317,7 +368,11 @@ def perform_command(args):
     target_lists = [wrapper.main_list] if args.list else []
     tag = wrapper.magic_value if args.no_tag else args.tag if args.tag else None
     cards = wrapper.get_cards(target_lists=target_lists, tag=tag, title_regex=args.match)
-    display = TextDisplay(args.no_color)
+    # some modes require a TextDisplay
+    if args.json and args.command in ['show', 'grep']:
+        display = JSONDisplay()
+    else:
+        display = TextDisplay(args.no_color)
     if args.no_banner:
         display.banner()
     if args.command == 'show':
@@ -328,12 +383,14 @@ def perform_command(args):
             for t in wrapper.main_board.get_labels():
                 print(t.name.decode('utf8'))
         else:
-            for card in cards:
-                display.show(card, True)
+            with display:
+                for card in cards:
+                    display.show(card, True)
     elif args.command == 'grep':
         pattern = args.pattern or '.*'
-        for card in wrapper.get_cards(title_regex=pattern, tag=tag):
-            display.show(card, True)
+        with display:
+            for card in wrapper.get_cards(title_regex=pattern, tag=tag):
+                display.show(card, True)
     elif args.command == 'add':
         if args.destination == 'tag':
             label = wrapper.main_board.add_label(args.title, 'black')
@@ -382,6 +439,7 @@ def main():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
     common.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
+    common.add_argument('-j', '--json', action='store_true', help='display results as a JSON list')
     tag_group = common.add_mutually_exclusive_group(required=False)
     tag_group.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
     tag_group.add_argument('--no-tag', help='only select cards without a tag', action='store_true')
