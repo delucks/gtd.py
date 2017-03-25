@@ -13,7 +13,6 @@ TODOs:
 - Method to "reflow" a link-titled card into an attachment with a title obtained by hitting the http resource
 - Method to set the due date of the "weekly"/"Monthly" lists all at once
 - Argument that can select multiple list names to filter
-- Argument to "show cards" that dumps the card in JSON
 '''
 import re
 import sys
@@ -31,7 +30,7 @@ import trello
 import yaml
 import requests
 
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 
 
 class Colors:
@@ -156,7 +155,12 @@ class TrelloWrapper:
         except requests.exceptions.ConnectionError:
             print('[FATAL] Could not connect to the Trello API!')
             sys.exit(1)
-        self.main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
+        main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
+        if main_list:
+            self.main_list = main_list
+        else:
+            print('[FATAL] The provided list name did not match any lists in {0}!'.format(self.main_board.name.decode('utf8')))
+            sys.exit(1)
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
         self.magic_value = 'NOTAG'
