@@ -13,6 +13,8 @@ TODOs:
 - Method to "reflow" a link-titled card into an attachment with a title obtained by hitting the http resource
 - Method to set the due date of the "weekly"/"Monthly" lists all at once
 - Argument that can select multiple list names to filter
+- README with this header
+- Tests
 '''
 import re
 import sys
@@ -30,7 +32,7 @@ import trello
 import yaml
 import requests
 
-__version__ = '0.1.8'
+__version__ = '0.1.9'
 
 
 class Colors:
@@ -44,6 +46,9 @@ class Colors:
     cyan = esc + '[0;36m'
     white = esc + '[0;37m'
     reset = esc + '[0m'
+
+
+class GTDException(Exception): pass
 
 
 class TextDisplay:
@@ -145,22 +150,26 @@ class TrelloWrapper:
     for doing certain repeatable tasks on the main board and lists described
     by the configuration properties
     '''
-    def __init__(self, primary_list=None):
-        self.config = self.parse_configuration()
+    def __init__(self, primary_list=None, config_file='gtd.yaml', autoconnect=False):
+        self.config = self.parse_configuration(config_file)
         self.trello = self.initialize_trello(self.config)
-        primary_list_name = primary_list or self.config['list_names']['incoming']
+        self.primary_list_name = primary_list or self.config['list_names']['incoming']
+        if autoconnect:
+            self.__connect()
+
+    def __connect(self):
         try:
             # This is the first connection to the API made by the client
             self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
         except requests.exceptions.ConnectionError:
             print('[FATAL] Could not connect to the Trello API!')
-            sys.exit(1)
+            raise GTDException()
         main_list = self._filter_by_name(self.main_board.get_lists('open'), primary_list_name)
         if main_list:
             self.main_list = main_list
         else:
             print('[FATAL] The provided list name did not match any lists in {0}!'.format(self.main_board.name.decode('utf8')))
-            sys.exit(1)
+            raise GTDException()
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
         self.magic_value = 'NOTAG'
@@ -193,7 +202,8 @@ class TrelloWrapper:
             config['list_names']['incoming']
             return config
         except KeyError as e:
-            raise Exception('A required property {0} in your configuration was not found!'.format(e))
+            print('A required property {0} in your configuration was not found!'.format(e))
+            raise GTDException()
 
     def _filter_by_name(self, iterable, name):
         try:
@@ -498,3 +508,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('Recieved Ctrl+C, quitting!')
         sys.exit(0)
+    except GTDException:
+        print('Quitting due to error')
+        sys.exit(1)
