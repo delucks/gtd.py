@@ -16,7 +16,8 @@ import trello
 import yaml
 import requests
 
-__version__ = '0.1.9'
+__version__ = '0.1.11'
+__author__  = 'delucks'
 
 
 class Colors:
@@ -59,8 +60,8 @@ class TextDisplay:
         on = Colors.green if self.use_color else ''
         off = Colors.reset
         banner = (' __|_ _| ._     version {on}{0}{off}\n'
-        '(_||_(_|{on}o{off}|_)\/  by {on}delucks{off}\n'
-        ' _|      |  /\n').format(__version__, on=on, off=off)
+        '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
+        ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
         print(banner)
 
     def show(self, card, show_list=True):
@@ -74,13 +75,17 @@ class TextDisplay:
         if card.get_attachments():
             self._p('  Attachments:', ','.join([a['name'] for a in card.get_attachments()]))
         if card.due:
-            diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
-            if diff < datetime.timedelta(0):
-                display = Colors.red
-            else:
-                display = Colors.green
-            self._p('  Due:', card.due_date, display)
-            self._p('  Remaining:', diff, display)
+            self._p('  Due:', card.due_date)
+            try:
+                diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
+                if diff < datetime.timedelta(0):
+                    display = Colors.red
+                else:
+                    display = Colors.green
+                self._p('  Remaining:', diff, display)
+            except TypeError:
+                # fucking datetime throws exceptions about bullshit
+                pass
         if show_list:
             self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
 
@@ -133,6 +138,7 @@ class TrelloWrapper:
     '''wraps the trello client, holds state, and provides convenience methods
     for doing certain repeatable tasks on the main board and lists described
     by the configuration properties
+    Note that this will break if you have a tag in your Board named NOTAG
     '''
     def __init__(self, primary_list=None, config_file='gtd.yaml', autoconnect=True):
         self.config = self.parse_configuration(config_file)
@@ -160,6 +166,8 @@ class TrelloWrapper:
 
     def initialize_trello(self, config):
         '''Initializes our connection to the trello API
+        :param dict config: parsed configuration from the yaml file
+        :returns: trello.TrelloClient client
         '''
         trello_client = trello.TrelloClient(
             api_key=config['trello']['api_key'],
@@ -246,6 +254,16 @@ class TrelloWrapper:
                     print('Tag {0} is already present!'.format(label))
         return newlabels
 
+    def set_due_date(self, card):
+        # prompt for the date
+        input_date = ''
+        while not re.match('^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$', input_date):
+            input_date = input('Input a due date in the format of DD/MM/YYYY, May 1st = 01/05/2017: ').strip()
+        date_args = [int(x) for x in input_date.split('/')[::-1]]
+        input_datetime = datetime.datetime(*date_args, tzinfo=datetime.timezone.utc)
+        card.set_due(input_datetime)
+        return input_datetime
+
     def title_to_link(self, card):
         # assumes card.name is the link you want
         links = [n for n in card.name.decode('utf8').split() if 'http' in n]
@@ -279,6 +297,7 @@ class TrelloWrapper:
             '{0.green}A{0.reset}ttach Title, '
             '{0.green}P{0.reset}rint Card, '
             '{0.green}R{0.reset}ename, '
+            'd{0.green}U{0.reset}e Date, '
             '{0.green}M{0.reset}ove, '
             '{0.green}S{0.reset}kip, '
             '{0.green}Q{0.reset}uit'
@@ -302,6 +321,8 @@ class TrelloWrapper:
                 display_function(card)
             elif choice == 'R':
                 self.rename(card)
+            elif choice == 'U':
+                self.set_due_date(card)
             elif choice == 'M':
                 if self.move_to_list(card):
                     break
@@ -443,6 +464,11 @@ def perform_command(args):
                 if prompt_for_confirmation('Should we delete this card?'):
                     card.delete()
                     print('Card deleted!')
+        elif args.type == 'due':
+            for card in cards:
+                display.show(card)
+                if prompt_for_confirmation('Set due date?'):
+                    wrapper.set_due_date(card)
         else:
             for card in cards:
                 display.show(card)
@@ -484,11 +510,11 @@ def main():
     grep.add_argument('pattern', help='regex to search card titles for', nargs='?')
     show = commands.add_parser('show', help='print all cards of one type', parents=[common])
     show.add_argument('type', choices=('lists', 'cards', 'tags'), default='lists')
-    batch = commands.add_parser('batch', help='process a list of cards one action at a time', parents=[common])
-    batch.add_argument('type', choices=('tag', 'move', 'delete'), default='move')
-    review = commands.add_parser('review', help='present a menu to interact with each card', parents=[common])
+    batch = commands.add_parser('batch', help='process cards quickly using only one action: tag, move, or delete', parents=[common])
+    batch.add_argument('type', choices=('tag', 'move', 'delete', 'due'), default='move')
+    review = commands.add_parser('review', help='process cards with a rich menu interface', parents=[common])
     review.add_argument('-d', '--daily', help='start a daily review mode, which goes through several lists at once', action='store_true')
-    commands.add_parser('workflow', help='show the process for the GTD workflow')
+    commands.add_parser('workflow', help='show the GTD process')
     args = p.parse_args()
     if args.command == 'help':
         p.print_help()
