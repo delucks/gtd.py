@@ -16,7 +16,7 @@ import trello
 import yaml
 import requests
 
-__version__ = '0.1.11'
+__version__ = '0.1.12'
 __author__  = 'delucks'
 
 
@@ -80,9 +80,11 @@ class TextDisplay:
                 diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
                 if diff < datetime.timedelta(0):
                     display = Colors.red
+                elif diff < datetime.timedelta(weeks=2):
+                    display = Colors.yellow
                 else:
                     display = Colors.green
-                self._p('  Remaining:', diff, display)
+                print('  {0}Remaining: {1}{2}'.format(display, diff, Colors.reset))
             except TypeError:
                 # fucking datetime throws exceptions about bullshit
                 pass
@@ -213,7 +215,7 @@ class TrelloWrapper:
             for card in cardlist.list_cards():
                 yield card
 
-    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None, has_attachments=None):
+    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None, has_attachments=None, has_due_date=None):
         '''Find cards on the main board that match our filters, hand them back
         as a generator'''
         cardsource = self._cardpipe(target_lists) if target_lists else self.main_board.get_cards('open')
@@ -228,6 +230,8 @@ class TrelloWrapper:
             filters.append(filterspec)
         if has_attachments:
             filters.append(lambda c: has_attachments and c.get_attachments())
+        if has_due_date:
+            filters.append(lambda c: c.due_date)
         for card in cardsource:
             keep = True
             for f in filters:
@@ -264,15 +268,26 @@ class TrelloWrapper:
         card.set_due(input_datetime)
         return input_datetime
 
+    def _get_title_of_webpage(self, url):
+        headers = {'User-Agent': 'gtd.py version ' + __version__}
+        resp = requests.get(url, headers=headers)
+        as_text = resp.text
+        return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
+
     def title_to_link(self, card):
         # assumes card.name is the link you want
         links = [n for n in card.name.decode('utf8').split() if 'http' in n]
         for l in links:
             card.attach(url=l)
-        self.rename(card)
+        # attempt to get the title of the link
+        possible_title = self._get_title_of_webpage(links[0])
+        if possible_title:
+            self.rename(card, default=possible_title)
+        else:
+            self.rename(card)
 
     def rename(self, card, default=None):
-        newname = input('Input new name for this card (blank for the existing one): ').strip()
+        newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name.decode('utf8'))).strip()
         if newname:
             card.set_name(newname)
             # FIXME this hacks around a bug in the pytrello library, contribute it upstream
@@ -291,6 +306,7 @@ class TrelloWrapper:
     def review_card(self, card, display_function):
         '''present the user with an option-based interface to do every operation on
         a single card'''
+        # FIXME have the color of the options be configurable
         header = (
             '{0.green}D{0.reset}elete, '
             '{0.green}T{0.reset}ag, '
@@ -303,7 +319,7 @@ class TrelloWrapper:
             '{0.green}Q{0.reset}uit'
         ).format(Colors)
         if card.get_attachments():
-            header = '{0.red}O{0.reset}pen attachment, '.format(Colors) + header
+            header = '{0.green}O{0.reset}pen attachment, '.format(Colors) + header
         choice = ''
         display_function(card)
         while choice != 'S' and choice != 'D':
@@ -315,7 +331,7 @@ class TrelloWrapper:
                 break
             elif choice == 'T':
                 self.add_labels(card)
-            elif choice == 'L':
+            elif choice == 'A':
                 self.title_to_link(card)
             elif choice == 'P':
                 display_function(card)
@@ -328,6 +344,8 @@ class TrelloWrapper:
                     break
             elif choice == 'Q':
                 raise GTDException()
+            elif choice == 'S':
+                pass
             elif choice == 'O':
                 if 'link' not in header:
                     print('This card does not have an attachment!')
@@ -335,7 +353,7 @@ class TrelloWrapper:
                     for l in [a['name'] for a in card.get_attachments()]:
                         webbrowser.open(l)
             else:
-                pass
+                print('Invalid option {0}'.format(choice))
 
     def review_list(self, cards, display_function):
         for card in cards:
@@ -415,7 +433,7 @@ def perform_command(args):
     wrapper = TrelloWrapper(args.list)
     target_lists = [wrapper.main_list] if args.list else []
     tag = wrapper.magic_value if args.no_tag else args.tag if args.tag else None
-    cards = wrapper.get_cards(target_lists=target_lists, tag=tag, title_regex=args.match, has_attachments=args.attachments)
+    cards = wrapper.get_cards(target_lists=target_lists, tag=tag, title_regex=args.match, has_attachments=args.attachments, has_due_date=args.has_due)
     # some modes require a TextDisplay
     if args.json and args.command in ['show', 'grep']:
         display = JSONDisplay()
@@ -493,6 +511,7 @@ def main():
     common.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
     common.add_argument('-j', '--json', action='store_true', help='display results as a JSON list')
     common.add_argument('-a', '--attachments', action='store_true', help='select cards which have attachments')
+    common.add_argument('-dd', '--has-due', action='store_true', help='select cards which have due dates')
     tag_group = common.add_mutually_exclusive_group(required=False)
     tag_group.add_argument('-t', '--tag', metavar='NAME', help='filter cards to this tag', default=None)
     tag_group.add_argument('--no-tag', help='only select cards without a tag', action='store_true')
