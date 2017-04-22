@@ -58,7 +58,7 @@ class TextDisplay:
 
     def banner(self):
         on = Colors.green if self.use_color else ''
-        off = Colors.reset
+        off = Colors.reset if self.use_color else ''
         banner = (' __|_ _| ._     version {on}{0}{off}\n'
         '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
         ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
@@ -277,8 +277,10 @@ class TrelloWrapper:
     def title_to_link(self, card):
         # assumes card.name is the link you want
         links = [n for n in card.name.decode('utf8').split() if 'http' in n]
+        existing_attachments = [a['name'] for a in card.get_attachments()]
         for l in links:
-            card.attach(url=l)
+            if l not in existing_attachments:
+                card.attach(url=l)
         # attempt to get the title of the link
         possible_title = self._get_title_of_webpage(links[0])
         if possible_title:
@@ -294,6 +296,7 @@ class TrelloWrapper:
             card.name = bytes(newname, 'utf8')
         else:
             if default:
+                card.set_name(default)
                 card.name = bytes(default, 'utf8')
 
     def move_to_list(self, card):
