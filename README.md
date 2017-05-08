@@ -25,9 +25,7 @@ TODO
 
 * Add an audit trail of logging or metrics emission so you can see where things are going
 * Translate #tag into adding that tag, then removing that part of the title
-* Method to "reflow" a link-titled card into an attachment with a title obtained by hitting the http resource
 * Method to set the due date of the "weekly"/"Monthly" lists all at once
 * Argument that can select multiple list names to filter
 * Abstraction layer for the todo list provider so this can be used with sites other than Trello
-* README with this header
 * Tests

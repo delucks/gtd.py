@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from gtd import TrelloWrapper, GTDException
 
+import os
 import trello
 import yaml
 import pytest
@@ -44,6 +45,7 @@ def test_parse_configuration(unconnected_wrapper):
         }))
     with pytest.raises(GTDException):
         bad_wrapper = TrelloWrapper(config_file=name, autoconnect=False)
+    os.remove(name)
 
 class Trello_Like_Object:
     def __init__(self, name):

@@ -301,10 +301,14 @@ class TrelloWrapper:
 
     def move_to_list(self, card):
         dest = quickmove(self.list_lookup.keys())
-        destination_list = self.list_lookup[dest]
-        card.change_list(destination_list.id)
-        print('Moved to {0}'.format(destination_list.name.decode('utf8')))
-        return destination_list
+        if dest:
+            destination_list = self.list_lookup[dest]
+            card.change_list(destination_list.id)
+            print('Moved to {0}'.format(destination_list.name.decode('utf8')))
+            return destination_list
+        else:
+            print('Skipping!')
+            return None
 
     def review_card(self, card, display_function):
         '''present the user with an option-based interface to do every operation on
@@ -428,8 +432,11 @@ def quickmove(iterable):
         lookup[assigned] = idx
         print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
     print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+C to cancel')
-    req = getch()
-    return list(iterable)[int(lookup.get(req, None))]
+    result = lookup.get(getch(), None)
+    if result:
+        return list(iterable)[int(result)]
+    else:
+        return None
 
 
 def perform_command(args):

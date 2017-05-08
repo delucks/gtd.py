@@ -6,3 +6,5 @@ pip-selfcheck.json
 *.swp
 *.pyc
 __pycache__
+share/*
+.cache/*
