@@ -16,7 +16,7 @@ import trello
 import yaml
 import requests
 
-__version__ = '0.1.12'
+__version__ = '0.1.13'
 __author__  = 'delucks'
 
 
@@ -33,7 +33,9 @@ class Colors:
     reset = esc + '[0m'
 
 
-class GTDException(Exception): pass
+class GTDException(Exception):
+    def __init__(self, errno):
+        self.errno = errno
 
 
 class TextDisplay:
@@ -90,6 +92,64 @@ class TextDisplay:
                 pass
         if show_list:
             self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
+
+    def review_card(self, card, wrapper):
+        '''present the user with an option-based interface to do every operation on
+        a single card'''
+        # FIXME have the color of the options be configurable
+        header = (
+            '{0.green}D{0.reset}elete, '
+            '{0.green}T{0.reset}ag, '
+            '{0.green}A{0.reset}ttach Title, '
+            '{0.green}P{0.reset}rint Card, '
+            '{0.green}R{0.reset}ename, '
+            'd{0.green}U{0.reset}e Date, '
+            '{0.green}M{0.reset}ove, '
+            '{0.green}S{0.reset}kip, '
+            '{0.green}Q{0.reset}uit'
+        ).format(Colors)
+        if card.get_attachments():
+            header = '{0.green}O{0.reset}pen attachment, '.format(Colors) + header
+        choice = ''
+        self.show(card, True)
+        while choice != 'S' and choice != 'D':
+            print(header)
+            choice = input('Input option character: ').strip().upper()
+            if choice == 'D':
+                card.delete()
+                print('Card deleted')
+                break
+            elif choice == 'T':
+                wrapper.add_labels(card)
+            elif choice == 'A':
+                wrapper.title_to_link(card)
+            elif choice == 'P':
+                self.show(card, True)
+            elif choice == 'R':
+                wrapper.rename(card)
+            elif choice == 'U':
+                wrapper.set_due_date(card)
+            elif choice == 'M':
+                if wrapper.move_to_list(card):
+                    break
+            elif choice == 'Q':
+                raise GTDException(0)
+            elif choice == 'S':
+                pass
+            elif choice == 'O':
+                if 'link' not in header:
+                    print('This card does not have an attachment!')
+                else:
+                    for l in [a['name'] for a in card.get_attachments()]:
+                        webbrowser.open(l)
+            else:
+                print('Invalid option {0}'.format(choice))
+
+    def review_list(self, cards, wrapper):
+        for card in cards:
+            self.review_card(card, wrapper)
+
+
 
 
 class JSONDisplay:
@@ -155,13 +215,13 @@ class TrelloWrapper:
             self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
         except requests.exceptions.ConnectionError:
             print('[FATAL] Could not connect to the Trello API!')
-            raise GTDException()
+            raise GTDException(1)
         main_list = self._filter_by_name(self.main_board.get_lists('open'), self.primary_list_name)
         if main_list:
             self.main_list = main_list
         else:
             print('[FATAL] The provided list name did not match any lists in {0}!'.format(self.main_board.name.decode('utf8')))
-            raise GTDException()
+            raise GTDException(1)
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
         self.magic_value = 'NOTAG'
@@ -197,7 +257,7 @@ class TrelloWrapper:
             return config
         except KeyError as e:
             print('A required property {0} in your configuration was not found!'.format(e))
-            raise GTDException()
+            raise GTDException(1)
 
     def _filter_by_name(self, iterable, name):
         try:
@@ -310,63 +370,6 @@ class TrelloWrapper:
             print('Skipping!')
             return None
 
-    def review_card(self, card, display_function):
-        '''present the user with an option-based interface to do every operation on
-        a single card'''
-        # FIXME have the color of the options be configurable
-        header = (
-            '{0.green}D{0.reset}elete, '
-            '{0.green}T{0.reset}ag, '
-            '{0.green}A{0.reset}ttach Title, '
-            '{0.green}P{0.reset}rint Card, '
-            '{0.green}R{0.reset}ename, '
-            'd{0.green}U{0.reset}e Date, '
-            '{0.green}M{0.reset}ove, '
-            '{0.green}S{0.reset}kip, '
-            '{0.green}Q{0.reset}uit'
-        ).format(Colors)
-        if card.get_attachments():
-            header = '{0.green}O{0.reset}pen attachment, '.format(Colors) + header
-        choice = ''
-        display_function(card)
-        while choice != 'S' and choice != 'D':
-            print(header)
-            choice = input('Input option character: ').strip().upper()
-            if choice == 'D':
-                card.delete()
-                print('Card deleted')
-                break
-            elif choice == 'T':
-                self.add_labels(card)
-            elif choice == 'A':
-                self.title_to_link(card)
-            elif choice == 'P':
-                display_function(card)
-            elif choice == 'R':
-                self.rename(card)
-            elif choice == 'U':
-                self.set_due_date(card)
-            elif choice == 'M':
-                if self.move_to_list(card):
-                    break
-            elif choice == 'Q':
-                raise GTDException()
-            elif choice == 'S':
-                pass
-            elif choice == 'O':
-                if 'link' not in header:
-                    print('This card does not have an attachment!')
-                else:
-                    for l in [a['name'] for a in card.get_attachments()]:
-                        webbrowser.open(l)
-            else:
-                print('Invalid option {0}'.format(choice))
-
-    def review_list(self, cards, display_function):
-        for card in cards:
-            self.review_card(card, display_function)
-
-
 def filter_card_by_tag(card, tag):
     if card.list_labels:
         return tag in [l.name.decode('utf8') for l in card.list_labels]
@@ -477,7 +480,7 @@ def perform_command(args):
         else:
             returned = wrapper.main_list.add_card(name=args.title, desc=args.message)
             if args.edit:
-                wrapper.review_card(returned, display.show)
+                display.review_card(returned, wrapper)
             else:
                 print('Successfully added card {0}!'.format(returned))
     elif args.command == 'batch':
@@ -504,14 +507,13 @@ def perform_command(args):
                     wrapper.add_labels(card)
         print('Batch completed, have a great day!')
     else:
-        df = partial(display.show, show_list=True)
         if args.daily:
             print('Welcome to daily review mode!\nThis combines all "Doing", "Holding", and "Inbound" lists into one big review.\n')
             doing_lists = [wrapper.get_list(l) for l in ['Doing Today', 'Doing this Week', 'Doing this Month']]
             holding = wrapper.get_list(wrapper.config['list_names']['holding'])
             interested_lists = doing_lists + [holding, wrapper.main_list]
             cards = wrapper.get_cards(target_lists=interested_lists, tag=tag, title_regex=args.match)
-        wrapper.review_list(cards, df)
+        display.review_list(cards, wrapper)
         print('All done, have a great day!')
 
 
@@ -576,6 +578,9 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('Recieved Ctrl+C, quitting!')
         sys.exit(0)
-    except GTDException:
-        print('Quitting due to error')
-        sys.exit(1)
+    except GTDException as e:
+        if e.errno == 0:
+            sys.exit(0)
+        else:
+            print('Quitting due to error')
+            sys.exit(1)
