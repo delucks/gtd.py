@@ -1,199 +1,21 @@
 #!/usr/bin/env python
-'''gtd.py'''
+'''entrypoint of gtd.py'''
 import re
 import sys
-import tty
-import json
-import string
-import termios
 import readline  # noqa
 import datetime
 import argparse
-import webbrowser
 from functools import partial
 
 import trello
 import yaml
 import requests
 
-__version__ = '0.1.13'
-__author__  = 'delucks'
-
-
-class Colors:
-    esc = '\033'
-    black = esc + '[0;30m'
-    red = esc + '[0;31m'
-    green = esc + '[0;32m'
-    yellow = esc + '[0;33m'
-    blue = esc + '[0;34m'
-    purple = esc + '[0;35m'
-    cyan = esc + '[0;36m'
-    white = esc + '[0;37m'
-    reset = esc + '[0m'
-
-
-class GTDException(Exception):
-    def __init__(self, errno):
-        self.errno = errno
-
-
-class TextDisplay:
-    '''controls the coloration and detail of the output for a session duration'''
-    def __init__(self, use_color):
-        self.use_color = use_color
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, etype, evalue, tb):
-        pass
-
-    def _colorize(self, lbl, msg, colorstring):
-        return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
-
-    def _p(self, lbl, msg, colorstring=Colors.blue):
-        if self.use_color:
-            print(self._colorize(lbl, msg, colorstring))
-        else:
-            print('{0} {1}'.format(lbl, msg))
-
-    def banner(self):
-        on = Colors.green if self.use_color else ''
-        off = Colors.reset if self.use_color else ''
-        banner = (' __|_ _| ._     version {on}{0}{off}\n'
-        '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
-        ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
-        print(banner)
-
-    def show(self, card, show_list=True):
-        created = card.create_date
-        self._p('Card', card.id)
-        self._p('  Name:', card.name.decode('utf8'))
-        self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
-        self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
-        if card.list_labels:
-            self._p('  Tags:', ','.join([l.name.decode('utf8') for l in card.list_labels]))
-        if card.get_attachments():
-            self._p('  Attachments:', ','.join([a['name'] for a in card.get_attachments()]))
-        if card.due:
-            self._p('  Due:', card.due_date)
-            try:
-                diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
-                if diff < datetime.timedelta(0):
-                    display = Colors.red
-                elif diff < datetime.timedelta(weeks=2):
-                    display = Colors.yellow
-                else:
-                    display = Colors.green
-                print('  {0}Remaining: {1}{2}'.format(display, diff, Colors.reset))
-            except TypeError:
-                # fucking datetime throws exceptions about bullshit
-                pass
-        if show_list:
-            self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
-
-    def review_card(self, card, wrapper):
-        '''present the user with an option-based interface to do every operation on
-        a single card'''
-        # FIXME have the color of the options be configurable
-        header = (
-            '{0.green}D{0.reset}elete, '
-            '{0.green}T{0.reset}ag, '
-            '{0.green}A{0.reset}ttach Title, '
-            '{0.green}P{0.reset}rint Card, '
-            '{0.green}R{0.reset}ename, '
-            'd{0.green}U{0.reset}e Date, '
-            '{0.green}M{0.reset}ove, '
-            '{0.green}S{0.reset}kip, '
-            '{0.green}Q{0.reset}uit'
-        ).format(Colors)
-        if card.get_attachments():
-            header = '{0.green}O{0.reset}pen attachment, '.format(Colors) + header
-        choice = ''
-        self.show(card, True)
-        while choice != 'S' and choice != 'D':
-            print(header)
-            choice = input('Input option character: ').strip().upper()
-            if choice == 'D':
-                card.delete()
-                print('Card deleted')
-                break
-            elif choice == 'T':
-                wrapper.add_labels(card)
-            elif choice == 'A':
-                wrapper.title_to_link(card)
-            elif choice == 'P':
-                self.show(card, True)
-            elif choice == 'R':
-                wrapper.rename(card)
-            elif choice == 'U':
-                wrapper.set_due_date(card)
-            elif choice == 'M':
-                if wrapper.move_to_list(card):
-                    break
-            elif choice == 'Q':
-                raise GTDException(0)
-            elif choice == 'S':
-                pass
-            elif choice == 'O':
-                if 'link' not in header:
-                    print('This card does not have an attachment!')
-                else:
-                    for l in [a['name'] for a in card.get_attachments()]:
-                        webbrowser.open(l)
-            else:
-                print('Invalid option {0}'.format(choice))
-
-    def review_list(self, cards, wrapper):
-        for card in cards:
-            self.review_card(card, wrapper)
-
-
-
-
-class JSONDisplay:
-    '''collects all returned objects into an array then dumps them to json'''
-    def __init__(self):
-        self.items = []
-
-    def __enter__(self):
-        return self
-
-    def _normalize(self, for_json):
-        '''force things to be json-serializable by name only'''
-        if isinstance(for_json, trello.List):
-            return for_json.name.decode('utf8')
-        elif isinstance(for_json, trello.Label):
-            return for_json.name.decode('utf8')
-        elif isinstance(for_json, trello.Board):
-            return for_json.name.decode('utf8')
-        elif isinstance(for_json, bytes):
-            return for_json.decode('utf8')
-        elif isinstance(for_json, list):
-            return list(map(self._normalize, for_json))
-        elif isinstance(for_json, datetime.datetime):
-            return str(for_json)
-        else:
-            return for_json
-
-    def __exit__(self, etype, evalue, tb):
-        items = self.items[0] if len(self.items) == 1 else self.items
-        try:
-            print(json.dumps(items))
-        except TypeError:
-            print(items)
-            raise
-
-    def banner(self):
-        pass
-
-    def show(self, card, _=None):
-        result = {}
-        for k, v in card.__dict__.items():
-            if k != 'client':
-                result[k] = self._normalize(v)
-        self.items.append(result)
+from gtd.input import prompt_for_confirmation, prompt_for_user_choice, quickmove
+from gtd.display import JSONDisplay, TextDisplay
+from gtd.exceptions import GTDException
+from gtd.misc import filter_card_by_tag
+from gtd import __version__
 
 
 class TrelloWrapper:
@@ -369,78 +191,6 @@ class TrelloWrapper:
         else:
             print('Skipping!')
             return None
-
-def filter_card_by_tag(card, tag):
-    if card.list_labels:
-        return tag in [l.name.decode('utf8') for l in card.list_labels]
-    else:
-        return False
-
-def prompt_for_user_choice(iterable):
-    listed = list(iterable)
-    for index, item in enumerate(listed):
-        print('  [{0}] {1}'.format(index, item.decode('utf8')))
-    while True:
-        usersel = input('Input the numeric ID or IDs of the item(s) you want: ').strip()
-        try:
-            if ',' in usersel or ' ' in usersel:
-                delimiter = ',' if ',' in usersel else ' '
-                indicies = [int(i) for i in usersel.split(delimiter)]
-            else:
-                indicies = [int(usersel)]
-            break
-        except ValueError:
-            print('You gave a malformed input!')
-    return [listed[i] for i in indicies]
-
-
-def prompt_for_confirmation(message, default=False):
-    while True:
-        options = ' (Y/n)' if default else ' (y/N)'
-        print(message.strip() + options, end='', flush=True)
-        choice = getch()
-        print()
-        if choice == 'y' or choice == 'n' or choice == '\r':
-            break
-        else:
-            print('Input was not y, nor was it n. Enter is OK')
-    return choice == 'y' if choice != '\r' else default
-
-
-def getch():
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        if ch == '\x03':
-            raise KeyboardInterrupt
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    return ch
-
-
-def quickmove(iterable):
-    '''a faster selection interface
-    Assign a unique one-char identifier to each option, and read only one
-    character from stdin. Match that one character against the options
-    Downside: you can only have 30ish options
-    '''
-    lookup = {}
-    preferred_keys = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"]
-    remainder = list(set(preferred_keys) - set(string.ascii_lowercase))
-    all_keys = preferred_keys + remainder
-    for idx, chunk in enumerate(iterable):
-        assigned = all_keys[idx]
-        lookup[assigned] = idx
-        print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
-    print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+C to cancel')
-    result = lookup.get(getch(), None)
-    if result:
-        return list(iterable)[int(result)]
-    else:
-        return None
-
 
 def perform_command(args):
     wrapper = TrelloWrapper(args.list)
