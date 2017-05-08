@@ -1,7 +1,12 @@
 gtd.py
 ======
 
-A cli tool that interacts with Trello to quickly sort my TODO list in a process vaguely inspired by "Getting Things Done".
+This is a commandline tool that enables rapid interaction with a kanban-type task organization system. It enables, but does not require, the task tracking methodolgy called "getting things done", thus the name. It uses Trello as the backend for the program, you will require an API key in order to use this program.
+
+Setup
+-----
+
+Go to [the trello developer page](https://trello.com/app-key) to get your API key for this program. Put it in a yaml file named "gtd.yaml" in the root directory with a layout like "gtd.yaml.example".
 
 Modes
 -----
