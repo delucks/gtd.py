@@ -9,8 +9,9 @@ from gtd.exceptions import GTDException
 
 class TextDisplay:
     '''controls the coloration and detail of the output for a session duration'''
-    def __init__(self, use_color):
+    def __init__(self, use_color, primary=Colors.green):
         self.use_color = use_color
+        self.primary = primary
 
     def __enter__(self):
         return self
@@ -28,7 +29,7 @@ class TextDisplay:
             print('{0} {1}'.format(lbl, msg))
 
     def banner(self):
-        on = Colors.green if self.use_color else ''
+        on = self.primary if self.use_color else ''
         off = Colors.reset if self.use_color else ''
         banner = (' __|_ _| ._     version {on}{0}{off}\n'
         '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
@@ -54,7 +55,7 @@ class TextDisplay:
                 elif diff < datetime.timedelta(weeks=2):
                     display = Colors.yellow
                 else:
-                    display = Colors.green
+                    display = self.primary
                 print('  {0}Remaining: {1}{2}'.format(display, diff, Colors.reset))
             except TypeError:
                 # fucking datetime throws exceptions about bullshit
@@ -65,20 +66,21 @@ class TextDisplay:
     def review_card(self, card, wrapper):
         '''present the user with an option-based interface to do every operation on
         a single card'''
-        # FIXME have the color of the options be configurable
+        on = self.primary if self.use_color else '',
+        off = Colors.reset if self.use_color else ''
         header = (
-            '{0.green}D{0.reset}elete, '
-            '{0.green}T{0.reset}ag, '
-            '{0.green}A{0.reset}ttach Title, '
-            '{0.green}P{0.reset}rint Card, '
-            '{0.green}R{0.reset}ename, '
-            'd{0.green}U{0.reset}e Date, '
-            '{0.green}M{0.reset}ove, '
-            '{0.green}S{0.reset}kip, '
-            '{0.green}Q{0.reset}uit'
-        ).format(Colors)
+            '{on}D{off}elete, '
+            '{on}T{off}ag, '
+            '{on}A{off}ttach Title, '
+            '{on}P{off}rint Card, '
+            '{on}R{off}ename, '
+            'd{on}U{off}e Date, '
+            '{on}M{off}ove, '
+            '{on}S{off}kip, '
+            '{on}Q{off}uit'
+        ).format(on=on, off=off)
         if card.get_attachments():
-            header = '{0.green}O{0.reset}pen attachment, '.format(Colors) + header
+            header = '{on}O{off}pen attachment, '.format(on=on, off=off) + header
         choice = ''
         self.show(card, True)
         while choice != 'S' and choice != 'D':
