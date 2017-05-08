@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from gtd import TrelloWrapper, GTDException
+from todo import TrelloWrapper
+from gtd.exceptions import GTDException
 
 import os
 import trello
