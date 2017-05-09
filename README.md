@@ -34,3 +34,10 @@ TODO
 * Argument that can select multiple list names to filter
 * Abstraction layer for the todo list provider so this can be used with sites other than Trello
 * Tests
+
+License
+-------
+
+BSD. There is a copy included with the software as LICENSE.txt
+
+Copyright 2017 Jamie Luck (delucks)

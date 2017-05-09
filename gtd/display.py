@@ -1,4 +1,5 @@
 import json
+import trello
 import datetime
 import webbrowser
 
@@ -7,10 +8,35 @@ from gtd.misc import Colors
 from gtd.exceptions import GTDException
 
 
-class TextDisplay:
-    '''controls the coloration and detail of the output for a session duration'''
-    def __init__(self, use_color, primary=Colors.green):
-        self.use_color = use_color
+class Display:
+    '''base class for different card display modes
+
+    :param bool coloration: use color for the output of this session
+    '''
+    def __init__(self, coloration, *kwargs):
+        self.coloration = coloration
+
+    def banner(self):
+        '''display a banner for the beginning of program run, if supported'''
+        raise NotImplemented()
+
+    def show(self, card, *kwargs):
+        '''output the state for a single card
+
+        :param trello.Card card: card to display
+        '''
+        raise NotImplemented()
+
+
+class TextDisplay(Display):
+    '''controls the color and output detail for an interactive
+    session of gtd.py
+
+    :param bool coloration: use color for the output of this session
+    :param str primary: unix escape for the primary accent color
+    '''
+    def __init__(self, coloration, primary=Colors.green):
+        super(TextDisplay, self).__init__(coloration)
         self.primary = primary
 
     def __enter__(self):
@@ -23,14 +49,14 @@ class TextDisplay:
         return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
 
     def _p(self, lbl, msg, colorstring=Colors.blue):
-        if self.use_color:
+        if self.coloration:
             print(self._colorize(lbl, msg, colorstring))
         else:
             print('{0} {1}'.format(lbl, msg))
 
     def banner(self):
-        on = self.primary if self.use_color else ''
-        off = Colors.reset if self.use_color else ''
+        on = self.primary if self.coloration else ''
+        off = Colors.reset if self.coloration else ''
         banner = (' __|_ _| ._     version {on}{0}{off}\n'
         '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
         ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
@@ -66,8 +92,8 @@ class TextDisplay:
     def review_card(self, card, wrapper):
         '''present the user with an option-based interface to do every operation on
         a single card'''
-        on = self.primary if self.use_color else '',
-        off = Colors.reset if self.use_color else ''
+        on = self.primary if self.coloration else '',
+        off = Colors.reset if self.coloration else ''
         header = (
             '{on}D{off}elete, '
             '{on}T{off}ag, '
@@ -121,9 +147,13 @@ class TextDisplay:
             self.review_card(card, wrapper)
 
 
-class JSONDisplay:
-    '''collects all returned objects into an array then dumps them to json'''
-    def __init__(self):
+class JSONDisplay(Display):
+    '''collects all returned objects into an array then dumps them to json
+
+    :param bool coloration: unused
+    '''
+    def __init__(self, coloration=False):
+        super(JSONDisplay, self).__init__(coloration)
         self.items = []
 
     def __enter__(self):
