@@ -34,6 +34,8 @@ TODO
 * Argument that can select multiple list names to filter
 * Abstraction layer for the todo list provider so this can be used with sites other than Trello
 * Tests
+* Making review interface into a fully fledged cli, with numeric indexes for inspecting elements recently outputted
+* Connection retry logic in TrelloConnection
 
 License
 -------

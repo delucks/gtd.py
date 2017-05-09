@@ -92,9 +92,9 @@ class TextDisplay(Display):
     def review_card(self, card, wrapper):
         '''present the user with an option-based interface to do every operation on
         a single card'''
-        on = self.primary if self.coloration else '',
+        on = self.primary if self.coloration else ''
         off = Colors.reset if self.coloration else ''
-        header = (
+        header = ''.join([
             '{on}D{off}elete, '
             '{on}T{off}ag, '
             '{on}A{off}ttach Title, '
@@ -104,7 +104,7 @@ class TextDisplay(Display):
             '{on}M{off}ove, '
             '{on}S{off}kip, '
             '{on}Q{off}uit'
-        ).format(on=on, off=off)
+        ]).format(on=on, off=off)
         if card.get_attachments():
             header = '{on}O{off}pen attachment, '.format(on=on, off=off) + header
         choice = ''

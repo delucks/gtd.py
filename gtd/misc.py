@@ -11,6 +11,11 @@ class Colors:
     reset = esc + '[0m'
 
 
+class AttrDict(dict):
+    def __init__(self):
+        self.__dict__ = self
+
+
 def filter_card_by_tag(card, tag):
     if card.list_labels:
         return tag in [l.name.decode('utf8') for l in card.list_labels]

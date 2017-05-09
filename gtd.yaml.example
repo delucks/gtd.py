@@ -1,8 +1,7 @@
-trello:
-  api_key: your-api-key
-  api_secret: your-api-secret
-  oauth_token: your-oauth-token
-  oauth_token_secret: your-oauth-secret
+api_key: your-api-key
+api_secret: your-api-secret
+oauth_token: your-oauth-token
+oauth_token_secret: your-oauth-secret
 board_name: GTD
 testing_board_name: Unused
 list_names:
