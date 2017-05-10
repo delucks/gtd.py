@@ -27,17 +27,19 @@ class TrelloConnection:
     '''
     def __init__(self, config, autoconnect=True):
         self.autoconnect = autoconnect
-        if autoconnect:
-            self.trello = self.__connect(config)
+        self.trello = self.__connect(config) if autoconnect else None
 
     def __connect(self, config):
-        trello = self.initialize_trello(config)
+        trello_client = self.initialize_trello(config)
         try:
             # This is the first connection to the API made by the client
-            self.boards = trello.list_boards()
-            return trello
+            self.boards = trello_client.list_boards()
+            return trello_client
         except requests.exceptions.ConnectionError:
             print('[FATAL] Could not connect to the Trello API!')
+            raise GTDException(1)
+        except trello.exceptions.Unauthorized:
+            print('[FATAL] Trello API credentials are invalid')
             raise GTDException(1)
 
     def initialize_trello(self, config):
@@ -66,7 +68,8 @@ class BoardTool:
         self.trello = trello
         self.config = config
         self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
-        main_list = self._filter_by_name(self.main_board.get_lists('open'), self.config['list_names']['incoming'])
+        list_name = config.list or config['list_names']['incoming']
+        main_list = self._filter_by_name(self.main_board.get_lists('open'), list_name)
         if main_list:
             self.main_list = main_list
         else:
@@ -191,7 +194,7 @@ def main():
     config = ConfigParser().config
     connection = TrelloConnection(config)
     wrapper = BoardTool(connection.trello, config)
-    target_lists = [wrapper.main_list] if config.list else []
+    target_lists = [wrapper.main_list] if config.list else []  # TODO make the conversion from str -> trello.List here more clear
     tag = wrapper.magic_value if config.no_tag else config.tag if config.tag else None
     cards = wrapper.get_cards(target_lists=target_lists, tag=tag, title_regex=config.match, has_attachments=config.attachments, has_due_date=config.has_due)
     # some modes require a TextDisplay

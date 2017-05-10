@@ -134,11 +134,8 @@ class TextDisplay(Display):
             elif choice == 'S':
                 pass
             elif choice == 'O':
-                if 'link' not in header:
-                    print('This card does not have an attachment!')
-                else:
-                    for l in [a['name'] for a in card.get_attachments()]:
-                        webbrowser.open(l)
+                for l in [a['name'] for a in card.get_attachments()]:
+                    webbrowser.open(l)
             else:
                 print('Invalid option {0}'.format(choice))
 
