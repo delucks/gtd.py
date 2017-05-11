@@ -202,6 +202,29 @@ def main():
         display = JSONDisplay(config.no_color)
     else:
         display = TextDisplay(config.no_color)
+    if config.command == 'help':
+        config.argparser.print_help()
+        raise GTDException(0)
+    elif config.command == 'workflow':
+        print(
+        '1. Collect absolutely everything that can take your attention into "Inbound"\n'
+        '2. Filter:\n'
+        '    Nonactionable -> Static Reference or Delete\n'
+        '    Takes < 2 minutes -> Do now, then Delete\n'
+        '    Not your responsibility -> "Holding" or "Blocked" with follow-up\n'
+        '    Something to communicate -> messaging lists\n'
+        '    Your responsibility -> Your lists\n'
+        '3. Write "final" state of each task and "next" state of each task\n'
+        '4. Categorize inbound items into lists based on action type required (call x, talk to x, meet x...)\n'
+        '5. Reviews:\n'
+        '    Daily -> Go through "Inbound" and "Doing"\n'
+        '    Weekly -> Additionally, go through "Holding", "Blocked", and messaging lists\n'
+        '6. Do\n'
+        '\n'
+        'The goal is to get everything except the current task out of your head\n'
+        'and into a trusted system external to your mind.'
+        )
+        raise GTDException(0)
     if config.no_banner:
         display.banner()
     if config.command == 'show':

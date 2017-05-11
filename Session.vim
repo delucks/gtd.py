@@ -1,2 +1,2 @@
-args gtd/*.py *.py README.md
+args gtd/*.py *.py tests/*.py README.md
 edit todo.py

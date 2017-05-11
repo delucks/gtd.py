@@ -1,4 +1,5 @@
 import os
+import sys
 import yaml
 import argparse
 
@@ -12,22 +13,16 @@ class ConfigParser:
     as well as argument parsing for an interactive session. it should intelligently merge all of those
     settings, giving preference to runtime options over configuration settings when possible
 
-    :param bool parse_args: collect commandline arguments
+    :param bool parse_args: collect commandline arguments?
+    :param list args: list of arguments to parse. Defaults to sys.argv
     :param str config_file: path to the yaml configuration file for this program
     '''
-    def __init__(self, parse_args=True, config_file='gtd.yaml'):
+    def __init__(self, parse_args=True, args=sys.argv[1:], config_file='gtd.yaml'):
         self.required_properties = ['api_key', 'api_secret', 'oauth_token', 'oauth_token_secret']
-        self.parse_args = parse_args
         # try to get configuration from the command line
-        if parse_args:
-            interactive_args = self.__argument_parser()
-        else:
-            interactive_args = None
+        interactive_args = self.__argument_parser(args) if parse_args else None
         # try to get configuration from yaml config file
-        if os.path.isfile(config_file):
-            yaml_config = self.__parse_yaml(config_file)
-        else:
-            yaml_config = None
+        yaml_config = self.__parse_yaml(config_file) if os.path.isfile(config_file) else None
         # this performs implicit validation of the configuration
         self.config = self.__merge_config(interactive_args, yaml_config)
 
@@ -78,7 +73,7 @@ class ConfigParser:
             print('A required property {0} in your configuration was not found!'.format(e))
             raise GTDException(1)
 
-    def __argument_parser(self):
+    def __argument_parser(self, arguments):
         selection_opts = argparse.ArgumentParser(add_help=False)
         selection_opts.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
         selection_opts.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
@@ -114,29 +109,5 @@ class ConfigParser:
         commands.add_parser('workflow', help='show the GTD process')
         # this is needed to allow no args to execute the "review" command
         common.set_defaults(command='review', daily=False)
-        args = common.parse_args()
-        if args.command == 'help':
-            common.print_help()
-            raise GTDException(0)
-        elif args.command == 'workflow':
-            print(
-            '1. Collect absolutely everything that can take your attention into "Inbound"\n'
-            '2. Filter:\n'
-            '    Nonactionable -> Static Reference or Delete\n'
-            '    Takes < 2 minutes -> Do now, then Delete\n'
-            '    Not your responsibility -> "Holding" or "Blocked" with follow-up\n'
-            '    Something to communicate -> messaging lists\n'
-            '    Your responsibility -> Your lists\n'
-            '3. Write "final" state of each task and "next" state of each task\n'
-            '4. Categorize inbound items into lists based on action type required (call x, talk to x, meet x...)\n'
-            '5. Reviews:\n'
-            '    Daily -> Go through "Inbound" and "Doing"\n'
-            '    Weekly -> Additionally, go through "Holding", "Blocked", and messaging lists\n'
-            '6. Do\n'
-            '\n'
-            'The goal is to get everything except the current task out of your head\n'
-            'and into a trusted system external to your mind.'
-            )
-            raise GTDException(0)
-        else:
-            return args
+        self.argparser = common
+        return common.parse_args(arguments)
