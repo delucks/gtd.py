@@ -36,6 +36,7 @@ TODO
 * Tests
 * Making review interface into a fully fledged cli, with numeric indexes for inspecting elements recently outputted
 * Connection retry logic in TrelloConnection
+* Make column display mode work with Review mode
 
 License
 -------

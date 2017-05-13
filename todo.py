@@ -4,8 +4,7 @@ import sys
 import readline  # noqa
 
 from gtd.input import prompt_for_confirmation, BoardTool
-from gtd.display import JSONDisplay, TextDisplay
-from gtd.misc import filter_card_by_tag
+from gtd.display import JSONDisplay, TextDisplay, TableDisplay
 from gtd.exceptions import GTDException
 from gtd.connection import TrelloConnection
 from gtd.config import ConfigParser
@@ -22,6 +21,10 @@ def main():
     # some modes require a TextDisplay
     if config.json and config.command in ['show', 'grep']:
         display = JSONDisplay(config.no_color)
+    elif config.table and config.command != 'review':
+        max_list_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')], key=len))
+        max_label_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_labels()], key=len))
+        display = TableDisplay(config.no_color, max_list_len, max_label_len)
     else:
         display = TextDisplay(config.no_color)
     if config.command == 'help':

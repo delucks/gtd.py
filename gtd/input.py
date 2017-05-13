@@ -8,7 +8,7 @@ import datetime
 from functools import partial
 
 
-def prompt_for_user_choice(iterable):
+def multiple_select(iterable):
     listed = list(iterable)
     for index, item in enumerate(listed):
         print('  [{0}] {1}'.format(index, item.decode('utf8')))
@@ -40,6 +40,7 @@ def prompt_for_confirmation(message, default=False):
 
 
 def getch():
+    '''override terminal settings to read a single character from stdin'''
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
@@ -52,24 +53,26 @@ def getch():
     return ch
 
 
-def quickmove(iterable):
-    '''a faster selection interface
-    Assign a unique one-char identifier to each option, and read only one
-    character from stdin. Match that one character against the options
+def single_select(options):
+    '''A faster selection interface.
+    Assigns a one-char identifier to each option and reads only one
+    character from stdin. Return the option assigned to that identifier.
     Downside: you can only have 30ish options
+
+    :param iterable options: choices you want the user to select between
     '''
     lookup = {}
     preferred_keys = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"]
     remainder = list(set(preferred_keys) - set(string.ascii_lowercase))
     all_keys = preferred_keys + remainder
-    for idx, chunk in enumerate(iterable):
+    for idx, chunk in enumerate(options):
         assigned = all_keys[idx]
         lookup[assigned] = idx
         print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
     print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+C to cancel')
     result = lookup.get(getch(), None)
     if result:
-        return list(iterable)[int(result)]
+        return list(options)[int(result)]
     else:
         return None
 
@@ -152,7 +155,7 @@ class BoardTool:
         done = False
         newlabels = []
         while not done:
-            label_to_add = prompt_for_user_choice(self.label_lookup.keys())
+            label_to_add = multiple_select(self.label_lookup.keys())
             newlabels.extend([self.label_lookup[l] for l in label_to_add])
             done = prompt_for_confirmation('Are you done tagging?', default=True)
         if newlabels:
@@ -205,7 +208,7 @@ class BoardTool:
                 card.name = bytes(default, 'utf8')
 
     def move_to_list(self, card):
-        dest = quickmove(self.list_lookup.keys())
+        dest = single_select(self.list_lookup.keys())
         if dest:
             destination_list = self.list_lookup[dest]
             card.change_list(destination_list.id)
@@ -214,5 +217,3 @@ class BoardTool:
         else:
             print('Skipping!')
             return None
-
-

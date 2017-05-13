@@ -1,6 +1,8 @@
 import json
+import shutil
 import trello
 import datetime
+import itertools
 import webbrowser
 
 from gtd import __version__, __author__
@@ -16,6 +18,12 @@ class Display:
     def __init__(self, coloration, *kwargs):
         self.coloration = coloration
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, evalue, tb):
+        pass
+
     def banner(self):
         '''display a banner for the beginning of program run, if supported'''
         raise NotImplemented()
@@ -28,6 +36,122 @@ class Display:
         raise NotImplemented()
 
 
+class TableDisplay(Display):
+    '''outputs cards in a terminal-width optimized manner
+    Column Layout:
+
+    | Name | List | Create Date | Due Date | Tags | Attachments |
+
+    All column widths should be precomputed so we can output each card consistently
+    '''
+    def __init__(self, coloration, max_list_length=10, max_label_length=10, per_row_divider=False, size_override=None):
+        super(TableDisplay, self).__init__(coloration)
+        if isinstance(size_override, tuple) and all(isinstance(x, int) for x in size_override):
+            self.width, self.height = size_override
+        else:
+            self.width, self.height = shutil.get_terminal_size()
+        num_columns = 5
+        self.sz_list = max_list_length
+        self.sz_label = max_label_length
+        # TODO detect this from binding the format string to self
+        self.sz_due = self.sz_created = 14  # size of the format string used to output the dates
+        self.primary = Colors.green
+        total = self.sz_created + self.sz_due + self.sz_label + self.sz_list + 3*num_columns
+        self.sz_name = self.width - total
+        self.per_row_divider = per_row_divider
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, evalue, tb):
+        self.__show_divider()
+
+    def __show_divider(self):
+        print('+{0}+{1}+{2}+{3}+{4}+'.format(
+            '-'*(self.sz_name+2),
+            '-'*(self.sz_list+2),
+            '-'*(self.sz_created+2),
+            '-'*(self.sz_due+2),
+            '-'*(self.sz_label+1)
+        ))
+
+    def banner(self):
+        on = self.primary if self.coloration else ''
+        off = Colors.reset if self.coloration else ''
+        banner = (
+            '+-+-+-+-+-+-+\n'
+            '|{on}g{off}|{on}t{off}|{on}d{off}|{on}.{off}|{on}p{off}|{on}y{off}|\n'
+            '+-+-+-+-+-+-+\n'
+        ).format(on=on, off=off)
+        print(banner)
+        self.__show_divider()
+        print('| {name: <{sz_name}} | {listname: <{sz_list}} | {ctime: <{sz_created}} | {cdue: <{sz_due}} | {tags: <{sz_tags}}|'.format(
+            name='Name', sz_name = self.sz_name,
+            listname='List', sz_list=self.sz_list,
+            ctime='Creation', sz_created = self.sz_created,
+            cdue='Due Date', sz_due = self.sz_due,
+            tags='Tags', sz_tags=self.sz_label
+        ))
+        if not self.per_row_divider:
+            self.__show_divider()
+
+    def _wrap_long_string(self, towrap, maxwidth):
+        '''turn a string of length greater than a column width into
+        a list of multiple substrings, optimistically split by word'''
+        result = []
+        current = ''
+        for chunk in towrap.split():
+            if len(chunk) > maxwidth:
+                # split a long word up into multiple words
+                if current:
+                    result.append(current)
+                # split it the first time
+                result.append(chunk[:maxwidth])
+                new = chunk[maxwidth:]
+                while len(new) > maxwidth:
+                    # if we still have more to do...
+                    result.append(new[:maxwidth])
+                    new = new[maxwidth:]
+                current = new
+            elif (len(chunk) + len(current) + 1) > maxwidth:
+                result.append(current)
+                current = chunk
+            else:
+                # our current word plus the current unwrapped one does not exceed the max length
+                if current:
+                    current = current + ' ' + chunk
+                else:
+                    current = chunk
+        result.append(current)  # final chunk
+        return result
+
+    def show(self, card, *kwargs):
+        '''Perform the logic to split a card's fields up into multiple columns, showing them side by side.
+        If there is not anything to be printed in one of the columns, print ' '*width
+        '''
+        if self.per_row_divider:
+            self.__show_divider()
+        # Set up lists of the contents of each column
+        rawname = card.name.decode('utf8')
+        if len(rawname) > self.sz_name:
+            name = self._wrap_long_string(rawname, self.sz_name)
+        else:
+            name = [rawname]
+        create = [card.create_date.strftime('%d/%m/%y %H:%M')]
+        tags = [l.name.decode('utf8') for l in card.list_labels] if card.list_labels else []
+        due = [card.due_date.strftime('%d/%m/%y %H:%M')] if card.due else []
+        listname = [card.get_list().name.decode('utf8')]
+        # Take one element at a time each column's contents, print it
+        for group in itertools.zip_longest(name, listname, create, due, tags, fillvalue=''):
+            print('| {name: <{sz_name}} | {listname: <{sz_list}} | {ctime: <{sz_created}} | {cdue: <{sz_due}} | {tags: <{sz_tags}}|'.format(
+                name=group[0], sz_name = self.sz_name,
+                listname=group[1], sz_list=self.sz_list,
+                ctime=group[2], sz_created = self.sz_created,
+                cdue=group[3], sz_due = self.sz_due,
+                tags=group[4], sz_tags=self.sz_label
+            ))
+
+
 class TextDisplay(Display):
     '''controls the color and output detail for an interactive
     session of gtd.py
@@ -38,12 +162,6 @@ class TextDisplay(Display):
     def __init__(self, coloration, primary=Colors.green):
         super(TextDisplay, self).__init__(coloration)
         self.primary = primary
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, etype, evalue, tb):
-        pass
 
     def _colorize(self, lbl, msg, colorstring):
         return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)

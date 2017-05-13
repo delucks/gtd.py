@@ -78,6 +78,7 @@ class ConfigParser:
         selection_opts.add_argument('-m', '--match', metavar='PCRE', help='filter cards to this regex on their title', default=None)
         selection_opts.add_argument('-l', '--list', metavar='NAME', help='filter cards to this list', default=None)
         selection_opts.add_argument('-j', '--json', action='store_true', help='display results as a JSON list')
+        selection_opts.add_argument('--table', action='store_true', help='display results in a table the width of the terminal')
         selection_opts.add_argument('-a', '--attachments', action='store_true', help='select cards which have attachments')
         selection_opts.add_argument('-dd', '--has-due', action='store_true', help='select cards which have due dates')
         tag_group = selection_opts.add_mutually_exclusive_group(required=False)

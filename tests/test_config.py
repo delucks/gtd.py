@@ -41,9 +41,3 @@ def test_yaml_parser():
     with pytest.raises(GTDException):
         ConfigParser(False, None, config_file=name)
     os.remove(name)
-
-def test_arg_parser():
-    a_help = ['help', '-h', '--help']
-    for a in a_help:
-        c = ConfigParser(parse_args=True, args=[a], config_file='/tmp/nonexistent')
-        assert c.config.command == 'help', c.config
