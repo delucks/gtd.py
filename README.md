@@ -37,6 +37,7 @@ TODO
 * Making review interface into a fully fledged cli, with numeric indexes for inspecting elements recently outputted
 * Connection retry logic in TrelloConnection
 * Make column display mode work with Review mode
+* Move banner-display logic to its own function that randomly selects a banner among a group to show (would be entertaining)
 
 License
 -------

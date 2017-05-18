@@ -44,23 +44,37 @@ class TableDisplay(Display):
 
     All column widths should be precomputed so we can output each card consistently
     '''
-    def __init__(self, coloration, max_list_length=10, max_label_length=10, per_row_divider=False, size_override=None):
+    def __init__(self, coloration, max_list_length=10, max_label_length=10, per_row_divider=True, size_override=None):
         super(TableDisplay, self).__init__(coloration)
         if isinstance(size_override, tuple) and all(isinstance(x, int) for x in size_override):
             self.width, self.height = size_override
         else:
             self.width, self.height = shutil.get_terminal_size()
         num_columns = 5
+        self.time_format_string = '%d/%m/%y %H:%M'
         self.sz_list = max_list_length
         self.sz_label = max_label_length
-        # TODO detect this from binding the format string to self
-        self.sz_due = self.sz_created = 14  # size of the format string used to output the dates
+        self.sz_due = self.sz_created = len(self.time_format_string)
         self.primary = Colors.green
-        total = self.sz_created + self.sz_due + self.sz_label + self.sz_list + 3*num_columns
+        total = self.sz_created + self.sz_due + self.sz_label + self.sz_list + 3*num_columns + 1
         self.sz_name = self.width - total
         self.per_row_divider = per_row_divider
+        self.fmt_str = '| {on}{name: <{sz_name}}{off} | {on}{listname: <{sz_list}}{off} | {on}{ctime: <{sz_created}}{off} | {on}{tags: <{sz_tags}}{off} | {on}{cdue: <{sz_due}}{off} |'
 
     def __enter__(self):
+        on = self.primary if self.coloration else ''
+        off = Colors.reset if self.coloration else ''
+        self.__show_divider()
+        print(self.fmt_str.format(
+            name='Name', sz_name = self.sz_name,
+            listname='List', sz_list=self.sz_list,
+            ctime='Creation', sz_created = self.sz_created,
+            cdue='Due Date', sz_due = self.sz_due,
+            tags='Tags', sz_tags=self.sz_label,
+            on=on, off=off
+        ))
+        if not self.per_row_divider:
+            self.__show_divider()
         return self
 
     def __exit__(self, etype, evalue, tb):
@@ -71,8 +85,8 @@ class TableDisplay(Display):
             '-'*(self.sz_name+2),
             '-'*(self.sz_list+2),
             '-'*(self.sz_created+2),
-            '-'*(self.sz_due+2),
-            '-'*(self.sz_label+1)
+            '-'*(self.sz_label+2),
+            '-'*(self.sz_due+2)
         ))
 
     def banner(self):
@@ -84,16 +98,6 @@ class TableDisplay(Display):
             '+-+-+-+-+-+-+\n'
         ).format(on=on, off=off)
         print(banner)
-        self.__show_divider()
-        print('| {name: <{sz_name}} | {listname: <{sz_list}} | {ctime: <{sz_created}} | {cdue: <{sz_due}} | {tags: <{sz_tags}}|'.format(
-            name='Name', sz_name = self.sz_name,
-            listname='List', sz_list=self.sz_list,
-            ctime='Creation', sz_created = self.sz_created,
-            cdue='Due Date', sz_due = self.sz_due,
-            tags='Tags', sz_tags=self.sz_label
-        ))
-        if not self.per_row_divider:
-            self.__show_divider()
 
     def _wrap_long_string(self, towrap, maxwidth):
         '''turn a string of length greater than a column width into
@@ -137,18 +141,19 @@ class TableDisplay(Display):
             name = self._wrap_long_string(rawname, self.sz_name)
         else:
             name = [rawname]
-        create = [card.create_date.strftime('%d/%m/%y %H:%M')]
+        create = [card.create_date.strftime(self.time_format_string)]
         tags = [l.name.decode('utf8') for l in card.list_labels] if card.list_labels else []
-        due = [card.due_date.strftime('%d/%m/%y %H:%M')] if card.due else []
+        due = [card.due_date.strftime(self.time_format_string)] if card.due else []
         listname = [card.get_list().name.decode('utf8')]
         # Take one element at a time each column's contents, print it
-        for group in itertools.zip_longest(name, listname, create, due, tags, fillvalue=''):
-            print('| {name: <{sz_name}} | {listname: <{sz_list}} | {ctime: <{sz_created}} | {cdue: <{sz_due}} | {tags: <{sz_tags}}|'.format(
+        for group in itertools.zip_longest(name, listname, create, tags, due, fillvalue=''):
+            print(self.fmt_str.format(
                 name=group[0], sz_name = self.sz_name,
                 listname=group[1], sz_list=self.sz_list,
                 ctime=group[2], sz_created = self.sz_created,
-                cdue=group[3], sz_due = self.sz_due,
-                tags=group[4], sz_tags=self.sz_label
+                tags=group[3], sz_tags=self.sz_label,
+                cdue=group[4], sz_due = self.sz_due,
+                on='', off=''
             ))
 
 
@@ -220,20 +225,19 @@ class TextDisplay(Display):
             '{on}R{off}ename, '
             'd{on}U{off}e Date, '
             '{on}M{off}ove, '
-            '{on}S{off}kip, '
+            '{on}N{off}ext, '
             '{on}Q{off}uit'
         ]).format(on=on, off=off)
         if card.get_attachments():
             header = '{on}O{off}pen attachment, '.format(on=on, off=off) + header
         choice = ''
         self.show(card, True)
-        while choice != 'S' and choice != 'D':
+        while choice != 'N' and choice != 'D':
             print(header)
             choice = input('Input option character: ').strip().upper()
             if choice == 'D':
                 card.delete()
                 print('Card deleted')
-                break
             elif choice == 'T':
                 wrapper.add_labels(card)
             elif choice == 'A':
@@ -249,7 +253,7 @@ class TextDisplay(Display):
                     break
             elif choice == 'Q':
                 raise GTDException(0)
-            elif choice == 'S':
+            elif choice == 'N':
                 pass
             elif choice == 'O':
                 for l in [a['name'] for a in card.get_attachments()]:

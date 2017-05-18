@@ -5,7 +5,9 @@ import tty
 import string
 import termios
 import datetime
+import requests
 from functools import partial
+from gtd import __version__
 
 
 def multiple_select(iterable):
