@@ -35,14 +35,14 @@ class ConfigParser:
                 # do not copy required properties that are unset into the configuration struct
                 if param in self.required_properties and val is None:
                     continue
-                new_config[param] = val 
+                new_config[param] = val
         if yaml_config:
             for param, val in yaml_config.items():
                 # skip properties already overridden on the command line
                 if param in self.required_properties:
                     if hasattr(new_config, param):
                         continue
-                new_config[param] = val 
+                new_config[param] = val
         return self._validate_config(new_config)
 
     def __parse_yaml(self, config_file):

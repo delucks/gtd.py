@@ -82,27 +82,28 @@ def main():
             else:
                 print('Successfully added card {0}!'.format(returned))
     elif config.command == 'batch':
-        if config.type == 'move':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Want to move this one?', True):
-                    wrapper.move_to_list(card)
-        elif config.type == 'delete':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Should we delete this card?'):
-                    card.delete()
-                    print('Card deleted!')
-        elif config.type == 'due':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Set due date?'):
-                    wrapper.set_due_date(card)
-        else:
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Want to tag this one?'):
-                    wrapper.add_labels(card)
+        with display:
+            if config.type == 'move':
+                for card in cards:
+                    display.show(card)
+                    if prompt_for_confirmation('Want to move this one?', True):
+                        wrapper.move_to_list(card)
+            elif config.type == 'delete':
+                for card in cards:
+                    display.show(card)
+                    if prompt_for_confirmation('Should we delete this card?'):
+                        card.delete()
+                        print('Card deleted!')
+            elif config.type == 'due':
+                for card in cards:
+                    display.show(card)
+                    if prompt_for_confirmation('Set due date?'):
+                        wrapper.set_due_date(card)
+            else:
+                for card in cards:
+                    display.show(card)
+                    if prompt_for_confirmation('Want to tag this one?'):
+                        wrapper.add_labels(card)
         print('Batch completed, have a great day!')
     else:
         if config.daily:

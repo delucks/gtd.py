@@ -141,7 +141,10 @@ class TableDisplay(Display):
             name = self._wrap_long_string(rawname, self.sz_name)
         else:
             name = [rawname]
-        create = [card.create_date.strftime(self.time_format_string)]
+        try:
+            create = [card.create_date.strftime(self.time_format_string)]
+        except IndexError:
+            create = ['Repeating']
         tags = [l.name.decode('utf8') for l in card.list_labels] if card.list_labels else []
         due = [card.due_date.strftime(self.time_format_string)] if card.due else []
         listname = [card.get_list().name.decode('utf8')]
@@ -186,11 +189,15 @@ class TextDisplay(Display):
         print(banner)
 
     def show(self, card, show_list=True):
-        created = card.create_date
         self._p('Card', card.id)
         self._p('  Name:', card.name.decode('utf8'))
-        self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
-        self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
+        try:
+            created = card.create_date
+            self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
+            self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
+        except IndexError:
+            # this happens when the card is created by the repeating cards trello power-up
+            print('  Repeating Creation Date')
         if card.list_labels:
             self._p('  Tags:', ','.join([l.name.decode('utf8') for l in card.list_labels]))
         if card.get_attachments():

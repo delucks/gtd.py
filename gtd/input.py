@@ -65,7 +65,7 @@ def single_select(options):
     '''
     lookup = {}
     preferred_keys = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'"]
-    remainder = list(set(preferred_keys) - set(string.ascii_lowercase))
+    remainder = list(set(string.ascii_lowercase) - set(preferred_keys))
     all_keys = preferred_keys + remainder
     for idx, chunk in enumerate(options):
         assigned = all_keys[idx]
@@ -73,7 +73,7 @@ def single_select(options):
         print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
     print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+C to cancel')
     result = lookup.get(getch(), None)
-    if result:
+    if result is not None:
         return list(options)[int(result)]
     else:
         return None
@@ -211,7 +211,7 @@ class BoardTool:
 
     def move_to_list(self, card):
         dest = single_select(self.list_lookup.keys())
-        if dest:
+        if dest is not None:
             destination_list = self.list_lookup[dest]
             card.change_list(destination_list.id)
             print('Moved to {0}'.format(destination_list.name.decode('utf8')))
