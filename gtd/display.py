@@ -26,7 +26,13 @@ class Display:
 
     def banner(self):
         '''display a banner for the beginning of program run, if supported'''
-        raise NotImplemented()
+        on = self.primary if self.coloration else ''
+        off = Colors.reset if self.coloration else ''
+        banner = (
+            ' __|_ _| ._     version {on}{0}{off}\n'
+            '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
+            ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
+        print(banner)
 
     def show(self, card, *kwargs):
         '''output the state for a single card
@@ -88,16 +94,6 @@ class TableDisplay(Display):
             '-'*(self.sz_label+2),
             '-'*(self.sz_due+2)
         ))
-
-    def banner(self):
-        on = self.primary if self.coloration else ''
-        off = Colors.reset if self.coloration else ''
-        banner = (
-            '+-+-+-+-+-+-+\n'
-            '|{on}g{off}|{on}t{off}|{on}d{off}|{on}.{off}|{on}p{off}|{on}y{off}|\n'
-            '+-+-+-+-+-+-+\n'
-        ).format(on=on, off=off)
-        print(banner)
 
     def _wrap_long_string(self, towrap, maxwidth):
         '''turn a string of length greater than a column width into
@@ -179,14 +175,6 @@ class TextDisplay(Display):
             print(self._colorize(lbl, msg, colorstring))
         else:
             print('{0} {1}'.format(lbl, msg))
-
-    def banner(self):
-        on = self.primary if self.coloration else ''
-        off = Colors.reset if self.coloration else ''
-        banner = (' __|_ _| ._     version {on}{0}{off}\n'
-        '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
-        ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
-        print(banner)
 
     def show(self, card, show_list=True):
         self._p('Card', card.id)
