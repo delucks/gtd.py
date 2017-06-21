@@ -3,6 +3,7 @@ import re
 import sys
 import tty
 import string
+import trello
 import termios
 import datetime
 import requests
@@ -180,9 +181,12 @@ class BoardTool:
 
     def _get_title_of_webpage(self, url):
         headers = {'User-Agent': 'gtd.py version ' + __version__}
-        resp = requests.get(url, headers=headers)
-        as_text = resp.text
-        return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
+        try:
+            resp = requests.get(url, headers=headers)
+            as_text = resp.text
+            return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
+        except requests.exceptions.ConnectionError:
+            return None
 
     def title_to_link(self, card):
         # assumes card.name is the link you want
