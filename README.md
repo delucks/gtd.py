@@ -42,6 +42,8 @@ TODO
 * Make column display mode work with Review mode
 * Move banner-display logic to its own function that randomly selects a banner among a group to show (would be entertaining)
 * Abstract the trello-specific logic into some kind of an API wrapper class, so we can support other (hopefully floss) systems
+* Have things like extracting links & tags from titles be prompted upon card selection, rather than being other menu options. This would reduce menu clutter & make an intuitive interface
+* Add an "onboard" command that will open up the trello api access page for new users
 
 I want to improve the review interface. Right now it's inspired by beets, which is a good tool
 The idea of having a command prompt to interact with the review interface is interesting to me, because it would

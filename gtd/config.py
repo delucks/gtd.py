@@ -67,7 +67,7 @@ class ConfigParser:
         and raise a GTDException otherwise'''
         try:
             config['board_name']
-            config['list_names']['incoming']
+            config['list']
             return config
         except KeyError as e:
             print('A required property {0} in your configuration was not found!'.format(e))

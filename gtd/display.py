@@ -41,6 +41,12 @@ class Display:
         '''
         raise NotImplemented()
 
+    def show_list(self, iterable):
+        '''output a normal list of strings in the display manner this class handles
+        '''
+        raise NotImplemented()
+
+
 
 class TableDisplay(Display):
     '''outputs cards in a terminal-width optimized manner
@@ -155,6 +161,10 @@ class TableDisplay(Display):
                 on='', off=''
             ))
 
+    def show_list(self, iterable):
+        for l in iterable:
+            print(l)
+
 
 class TextDisplay(Display):
     '''controls the color and output detail for an interactive
@@ -260,6 +270,10 @@ class TextDisplay(Display):
         for card in cards:
             self.review_card(card, wrapper)
 
+    def show_list(self, iterable):
+        for l in iterable:
+            print(l)
+
 
 class JSONDisplay(Display):
     '''collects all returned objects into an array then dumps them to json
@@ -307,3 +321,6 @@ class JSONDisplay(Display):
             if k != 'client':
                 result[k] = self._normalize(v)
         self.items.append(result)
+
+    def show_list(self, iterable):
+        self.items = list(iterable)
