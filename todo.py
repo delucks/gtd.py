@@ -122,9 +122,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('Recieved Ctrl+C, quitting!')
         sys.exit(0)
-    except GTDException as e:
-        if e.errno == 0:
-            sys.exit(0)
-        else:
-            print('Quitting due to error')
-            sys.exit(1)

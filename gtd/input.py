@@ -126,7 +126,7 @@ class BoardTool:
             for card in cardlist.list_cards():
                 yield card
 
-    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None, has_attachments=None, has_due_date=None):
+    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None, has_attachments=None, has_due_date=None, regex_flags=0):
         '''Find cards on the main board that match our filters, hand them back
         as a generator'''
         cardsource = self._cardpipe(target_lists) if target_lists else self.main_board.get_cards('open')
@@ -136,7 +136,7 @@ class BoardTool:
         elif tag:
             filters.append(partial(filter_card_by_tag, tag=tag))
         if title_regex:
-            filters.append(lambda c: re.search(title_regex, c.name.decode('utf8')))
+            filters.append(lambda c: re.search(title_regex, c.name.decode('utf8'), regex_flags))
         if filterspec and callable(filterspec):
             filters.append(filterspec)
         if has_attachments:

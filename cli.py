@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-'''rewritten using click'''
+'''entrypoint to gtd.py, written with click'''
+import re
 import sys
 import readline  # noqa
 
@@ -13,37 +14,36 @@ from gtd.config import ConfigParser
 from gtd import __version__
 
 
-@click.group(context_settings={'help_option_names':['-h','--help']}, invoke_without_command=True)
-@click.option('--tag', default=None)
-@click.option('--no-tag', is_flag=True, default=False)
-@click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
-@click.option('-l', '--list', help='filter cards to this list', default=None)
-@click.option('--attachments', is_flag=True, help='select cards which have attachments')
-@click.option('--has-due', is_flag=True, help='select cards which have due dates')
-@click.pass_context
-def cli(ctx, tag, no_tag, match, list, attachments, has_due):
-    '''todo.py'''
-    if ctx.invoked_subcommand is None:
-        click.echo(ctx.get_help())
-    elif ctx.invoked_subcommand in ['show', 'batch', 'review']:
-        config = ConfigParser().config
-        ctx.obj['config'] = config
-        conn = TrelloConnection(config)
-        ctx.obj['connection'] = conn
-        wrapper = BoardTool(conn)
-        ctx.obj['wrapper'] = wrapper
-        target_lists = [wrapper.main_list] if config.list else []  # TODO make the conversion from str -> trello.List here more clear
-        tag = wrapper.magic_value if no_tag else tag if tag else None
-        ctx.obj['tag'] = tag
-        ctx.obj['cards'] = wrapper.get_cards(
-            target_lists=target_lists,
-            tag=tag,
-            title_regex=match,
-            has_attachments=attachments,
-            has_due_date=has_due
+def init_and_filter(tag, no_tag, match, listname, attachments, has_due, flags=0):
+    '''set up the interaction backend and filter cards by the users' selected
+    flags'''
+    config = ConfigParser(parse_args=False).config
+    connection = TrelloConnection(config)
+    wrapper = BoardTool(connection)
+    if listname:
+        pattern = re.compile(listname, flags=re.I)
+        target_lists = filter(
+            lambda x: pattern.search(x.name.decode('utf8')),
+            wrapper.main_board.get_lists('open')
         )
     else:
-        print(ctx.invoked_subcommand)
+        target_lists = []
+    selected_tag = wrapper.magic_value if no_tag else tag if tag else None
+    cards = wrapper.get_cards(
+                target_lists=target_lists,
+                tag=selected_tag,
+                title_regex=match,
+                has_attachments=attachments,
+                has_due_date=has_due,
+                regex_flags=flags
+            )
+    return config, wrapper, cards
+
+
+@click.group(context_settings={'help_option_names':['-h','--help']})
+def cli():
+    '''gtd.py'''
+    pass
 
 
 @cli.command()
@@ -85,7 +85,7 @@ def workflow():
 @cli.command()
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
 @click.option('-j', '--json', is_flag=True, default=False, help='output as JSON')
-@click.option('--tag', default=None)
+@click.option('-t', '--tag', default=None)
 @click.option('--no-tag', is_flag=True, default=False)
 @click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
 @click.option('-l', '--list', help='filter cards to this list', default=None)
@@ -93,18 +93,7 @@ def workflow():
 @click.option('--has-due', is_flag=True, help='select cards which have due dates')
 def show(showtype, json, tag, no_tag, match, list, attachments, has_due):
     '''filter and display cards'''
-    config = ConfigParser(parse_args=False).config
-    connection = TrelloConnection(config)
-    wrapper = BoardTool(connection)
-    target_lists = [wrapper.main_list] if list else []
-    selected_tag = wrapper.magic_value if no_tag else tag if tag else None
-    cards = wrapper.get_cards(
-                target_lists=target_lists,
-                tag=selected_tag,
-                title_regex=match,
-                has_attachments=attachments,
-                has_due_date=has_due
-            )
+    config, wrapper, cards = init_and_filter(tag, no_tag, match, list, attachments, has_due)
     if json:
         display = JSONDisplay(config.color)
     else:
@@ -139,40 +128,45 @@ def add(add_type, title, message, edit):
     click.echo(add_type, title, message, edit)
     if add_type == 'tag':
         label = wrapper.main_board.add_label(title, 'black')
-        print('Successfully added tag {0}!'.format(label))
+        click.echo('Successfully added tag {0}!'.format(label))
     elif add_type == 'list':
         l = wrapper.main_board.add_list(title)
-        print('Successfully added list {0}!'.format(l))
+        click.echo('Successfully added list {0}!'.format(l))
     else:
         returned = wrapper.main_list.add_card(name=title, desc=message)
         if edit:
             display.review_card(returned, wrapper)
         else:
-            print('Successfully added card {0}!'.format(returned))
+            click.echo('Successfully added card {0}!'.format(returned))
 
 
 @cli.command()
 @click.argument('pattern')
-def grep(pattern):
-    '''search for a pattern through the titles of all cards on the board'''
-    config = ConfigParser(parse_args=False).config
-    connection = TrelloConnection(config)
-    wrapper = BoardTool(connection)
+@click.option('-i', '--insensitive', is_flag=True, help='ignore case')
+def grep(pattern, insensitive):
+    '''egrep through titles of cards'''
+    flags = re.I if insensitive else 0
+    config, wrapper, cards = init_and_filter([], None, pattern, None, None, None, flags)
     max_list_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')], key=len))
     max_label_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_labels()], key=len))
     display = TableDisplay(config.color, max_list_len, max_label_len)
     with display:
-        for card in wrapper.get_cards(title_regex=pattern):
+        for card in cards:
             display.show(card, True)
 
 
 @cli.command()
 @click.argument('batchtype')
-@click.pass_context
-def batch(batchtype, ctx):
-    display = TextDisplay(ctx['config'].color)
-    cards = ctx['cards']
-    wrapper = ctx['wrapper']
+@click.option('--tag', default=None)
+@click.option('--no-tag', is_flag=True, default=False)
+@click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
+@click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
+@click.option('--attachments', is_flag=True, help='select cards which have attachments')
+@click.option('--has-due', is_flag=True, help='select cards which have due dates')
+def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
+    '''perform one action on many cards'''
+    config, wrapper, cards = init_and_filter(tag, no_tag, match, listname, attachments, has_due)
+    display = TextDisplay(config.color)
     with display:
         if batchtype == 'move':
             for card in cards:
@@ -184,7 +178,7 @@ def batch(batchtype, ctx):
                 display.show(card)
                 if prompt_for_confirmation('Should we delete this card?'):
                     card.delete()
-                    print('Card deleted!')
+                    click.echo('Card deleted!')
         elif batchtype == 'due':
             for card in cards:
                 display.show(card)
@@ -198,5 +192,31 @@ def batch(batchtype, ctx):
     click.echo('Batch completed, have a great day!')
 
 
+@cli.command()
+@click.option('--tag', default=None)
+@click.option('--no-tag', is_flag=True, default=False)
+@click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
+@click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
+@click.option('--attachments', is_flag=True, help='select cards which have attachments')
+@click.option('--has-due', is_flag=True, help='select cards which have due dates')
+@click.option('--daily', help='daily review mode')
+def review(tag, no_tag, match, listname, attachments, has_due, daily):
+    '''open a menu for each card selected'''
+    if daily:
+        click.echo('Welcome to daily review mode!\nThis combines all "Doing" lists so you can review what you should be doing soon.\n')
+        listname = 'Doing'
+    config, wrapper, cards = init_and_filter(tag, no_tag, match, listname, attachments, has_due)
+    display = TextDisplay(config.color)
+    display.review_list(cards, wrapper)
+    click.echo('All done, have a great day!')
+
+
 if __name__ == '__main__':
-    cli(obj={})
+    try:
+        cli()
+    except GTDException as e:
+        if e.errno == 0:
+            sys.exit(0)
+        else:
+            print('Quitting due to error')
+            sys.exit(1)
