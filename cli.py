@@ -17,7 +17,7 @@ from gtd import __version__
 def init_and_filter(tag, no_tag, match, listname, attachments, has_due, flags=0):
     '''set up the interaction backend and filter cards by the users' selected
     flags'''
-    config = ConfigParser(parse_args=False).config
+    config = ConfigParser().config
     connection = TrelloConnection(config)
     wrapper = BoardTool(connection)
     if listname:
@@ -121,7 +121,7 @@ def show(showtype, json, tag, no_tag, match, list, attachments, has_due):
 @click.option('--edit', is_flag=True)
 def add(add_type, title, message, edit):
     '''add a new card, tag, or list'''
-    config = ConfigParser(parse_args=False).config
+    config = ConfigParser().config
     connection = TrelloConnection(config)
     wrapper = BoardTool(connection)
     display = TextDisplay(config.color)
