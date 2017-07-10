@@ -99,15 +99,20 @@ class BoardTool:
         self.trello = connection.trello
         self.config = connection.config
         self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
-        list_name = self.config.list or self.config['list_names']['incoming']
-        main_list = self._filter_by_name(self.main_board.get_lists('open'), list_name)
-        if main_list:
+        # Determine the list for inbound cards
+        configured_list = self.config.get('inbox_list', False)
+        if configured_list:
+            main_list = self._filter_by_name(self.main_board.get_lists('open'), configured_list)
+            if not main_list:
+                print('[FATAL] The provided list name did not match any lists in {0}!'.format(self.main_board.name.decode('utf8')))
+                raise GTDException(1)
             self.main_list = main_list
         else:
-            print('[FATAL] The provided list name did not match any lists in {0}!'.format(self.main_board.name.decode('utf8')))
-            raise GTDException(1)
+            self.main_list = self.get_first_list(self.main_board)
+        # These are dicts of list&tag names -> objects to make subsequent reads faster
         self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
         self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
+        # The value passed to get_cards() if you want cards with no tags
         self.magic_value = 'NOTAG'
 
     def _filter_by_name(self, iterable, name):
@@ -125,6 +130,9 @@ class BoardTool:
         for cardlist in target_lists:
             for card in cardlist.list_cards():
                 yield card
+
+    def get_first_list(self, board_obj):
+        return board_obj.open_lists()[0]
 
     def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None, has_attachments=None, has_due_date=None, regex_flags=0):
         '''Find cards on the main board that match our filters, hand them back

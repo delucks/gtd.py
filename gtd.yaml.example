@@ -1,15 +1,9 @@
-api_key: your-api-key
-api_secret: your-api-secret
-oauth_token: your-oauth-token
-oauth_token_secret: your-oauth-secret
-board_name: GTD
-testing_board_name: Unused
-list_names:
-  incoming: Incoming
-  holding: Holding
-  projects: Projects
-  blocked: Blocked
-  in_progress: Doing
-  reference: Reference
-  someday: Ideas
-  done: Done
+api_key: "your-api-key"
+api_secret: "your-api-secret"
+oauth_token: "your-oauth-token"
+oauth_token_secret: "your-oauth-secret"
+board_name: "The name of the board to work with"
+# Everything from here on is NOT required
+inbox_list: "Name of list for new cards"  # Default: first list on the board
+color: True  # a boolean indicating whether you want ANSI color escape codes in the program's output
+banner: True  # should a banner be printed on each program run?

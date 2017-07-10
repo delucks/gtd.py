@@ -100,6 +100,8 @@ def show(showtype, json, tag, no_tag, match, list, attachments, has_due):
         max_list_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')], key=len))
         max_label_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_labels()], key=len))
         display = TableDisplay(config.color, max_list_len, max_label_len)
+    if config.banner:
+        display.banner()
     if showtype == 'lists':
         lnames = [l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')]
         with display:
@@ -125,7 +127,6 @@ def add(add_type, title, message, edit):
     connection = TrelloConnection(config)
     wrapper = BoardTool(connection)
     display = TextDisplay(config.color)
-    click.echo(add_type, title, message, edit)
     if add_type == 'tag':
         label = wrapper.main_board.add_label(title, 'black')
         click.echo('Successfully added tag {0}!'.format(label))
@@ -150,6 +151,8 @@ def grep(pattern, insensitive):
     max_list_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')], key=len))
     max_label_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_labels()], key=len))
     display = TableDisplay(config.color, max_list_len, max_label_len)
+    if config.banner:
+        display.banner()
     with display:
         for card in cards:
             display.show(card, True)
@@ -167,6 +170,8 @@ def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
     '''perform one action on many cards'''
     config, wrapper, cards = init_and_filter(tag, no_tag, match, listname, attachments, has_due)
     display = TextDisplay(config.color)
+    if config.banner:
+        display.banner()
     with display:
         if batchtype == 'move':
             for card in cards:
@@ -207,6 +212,8 @@ def review(tag, no_tag, match, listname, attachments, has_due, daily):
         listname = 'Doing'
     config, wrapper, cards = init_and_filter(tag, no_tag, match, listname, attachments, has_due)
     display = TextDisplay(config.color)
+    if config.banner:
+        display.banner()
     display.review_list(cards, wrapper)
     click.echo('All done, have a great day!')
 

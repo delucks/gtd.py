@@ -173,7 +173,7 @@ class TextDisplay(Display):
     :param bool coloration: use color for the output of this session
     :param str primary: unix escape for the primary accent color
     '''
-    def __init__(self, coloration, primary=Colors.green):
+    def __init__(self, coloration, primary=Colors.red):
         super(TextDisplay, self).__init__(coloration)
         self.primary = primary
 
@@ -226,6 +226,7 @@ class TextDisplay(Display):
             '{on}D{off}elete, '
             '{on}T{off}ag, '
             '{on}A{off}ttach Title, '
+            'ar{on}C{off}hive, '
             '{on}P{off}rint Card, '
             '{on}R{off}ename, '
             'd{on}U{off}e Date, '
@@ -243,6 +244,9 @@ class TextDisplay(Display):
             if choice == 'D':
                 card.delete()
                 print('Card deleted')
+            elif choice == 'C':
+                card.set_closed(True)
+                print('Card archived')
             elif choice == 'T':
                 wrapper.add_labels(card)
             elif choice == 'A':
