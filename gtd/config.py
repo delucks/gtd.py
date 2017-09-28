@@ -1,8 +1,5 @@
 import os
-import sys
 import yaml
-
-from gtd import __version__, __doc__
 from gtd.misc import AttrDict
 from gtd.exceptions import GTDException
 

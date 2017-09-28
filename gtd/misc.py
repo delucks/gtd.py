@@ -1,3 +1,7 @@
+import requests
+from gtd import __version__
+
+
 class Colors:
     esc = '\033'
     black = esc + '[0;30m'
@@ -14,3 +18,13 @@ class Colors:
 class AttrDict(dict):
     def __init__(self):
         self.__dict__ = self
+
+
+def get_title_of_webpage(url):
+    headers = {'User-Agent': 'gtd.py version ' + __version__}
+    try:
+        resp = requests.get(url, headers=headers)
+        as_text = resp.text
+        return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
+    except requests.exceptions.ConnectionError:
+        return None

@@ -47,7 +47,6 @@ class Display:
         raise NotImplemented()
 
 
-
 class TableDisplay(Display):
     '''outputs cards in a terminal-width optimized manner
     Column Layout:
@@ -78,10 +77,10 @@ class TableDisplay(Display):
         off = Colors.reset if self.coloration else ''
         self.__show_divider()
         print(self.fmt_str.format(
-            name='Name', sz_name = self.sz_name,
+            name='Name', sz_name=self.sz_name,
             listname='List', sz_list=self.sz_list,
-            ctime='Creation', sz_created = self.sz_created,
-            cdue='Due Date', sz_due = self.sz_due,
+            ctime='Creation', sz_created=self.sz_created,
+            cdue='Due Date', sz_due=self.sz_due,
             tags='Tags', sz_tags=self.sz_label,
             on=on, off=off
         ))
@@ -153,11 +152,11 @@ class TableDisplay(Display):
         # Take one element at a time each column's contents, print it
         for group in itertools.zip_longest(name, listname, create, tags, due, fillvalue=''):
             print(self.fmt_str.format(
-                name=group[0], sz_name = self.sz_name,
+                name=group[0], sz_name=self.sz_name,
                 listname=group[1], sz_list=self.sz_list,
-                ctime=group[2], sz_created = self.sz_created,
+                ctime=group[2], sz_created=self.sz_created,
                 tags=group[3], sz_tags=self.sz_label,
-                cdue=group[4], sz_due = self.sz_due,
+                cdue=group[4], sz_due=self.sz_due,
                 on='', off=''
             ))
 

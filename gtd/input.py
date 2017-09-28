@@ -6,9 +6,10 @@ import string
 import trello
 import termios
 import datetime
-import requests
+import webbrowser
 from functools import partial
-from gtd import __version__
+from gtd.exceptions import GTDException
+from gtd.misc import get_title_of_webpage, Colors
 
 
 def multiple_select(iterable):
@@ -87,6 +88,145 @@ def filter_card_by_tag(card, tag):
         return False
 
 
+class CardTool:
+    '''This static class holds functionality to do atomic modifications on certain cards.
+    These methods are used inside of the user interaction parts of the codebase as a way of doing the same operation across
+    different UI components.
+    '''
+    # TODO add type hints
+    @staticmethod
+    def add_labels(card, label_choices):
+        '''Select labels to add to this card
+        :param trello.Card card: the card to modify
+        :param dict label_choices: str->trello.Label, the names and objects of labels on this board
+        '''
+        done = False
+        newlabels = []
+        while not done:
+            label_to_add = multiple_select(label_choices)
+            newlabels.extend([label_choices[l] for l in label_to_add])
+            done = prompt_for_confirmation('Are you done tagging?', default=True)
+        if newlabels:
+            for label in newlabels:
+                try:
+                    card.add_label(label)
+                except trello.exceptions.ResourceUnavailable:
+                    print('Tag {0} is already present!'.format(label))
+        return newlabels
+
+    @staticmethod
+    def title_to_link(card):
+        # assumes card.name is the link you want
+        links = [n for n in card.name.decode('utf8').split() if 'http' in n]
+        existing_attachments = [a['name'] for a in card.get_attachments()]
+        for l in links:
+            if l not in existing_attachments:
+                card.attach(url=l)
+        # attempt to get the title of the link
+        possible_title = get_title_of_webpage(links[0])
+        if possible_title:
+            CardTool.rename(card, default=possible_title)
+        else:
+            CardTool.rename(card)
+
+    @staticmethod
+    def rename(card, default=None):
+        newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name.decode('utf8'))).strip()
+        if newname:
+            card.set_name(newname)
+            # FIXME this hacks around a bug in the pytrello library, contribute it upstream
+            card.name = bytes(newname, 'utf8')
+        else:
+            if default:
+                card.set_name(default)
+                card.name = bytes(default, 'utf8')
+
+    @staticmethod
+    def set_due_date(card):
+        # prompt for the date
+        input_date = ''
+        while not re.match('^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$', input_date):
+            input_date = input('Input a due date in the format of DD/MM/YYYY, May 1st = 01/05/2017: ').strip()
+        date_args = [int(x) for x in input_date.split('/')[::-1]]
+        input_datetime = datetime.datetime(*date_args, tzinfo=datetime.timezone.utc)
+        card.set_due(input_datetime)
+        return input_datetime
+
+    @staticmethod
+    def move_to_list(card, list_choices):
+        '''Select labels to add to this card
+        :param trello.Card card: the card to modify
+        :param dict list_choices: str->trello.List, the names and objects of lists on this board
+        '''
+        dest = single_select(list_choices.keys())
+        if dest is not None:
+            destination_list = list_choices[dest]
+            card.change_list(destination_list.id)
+            print('Moved to {0}'.format(destination_list.name.decode('utf8')))
+            return destination_list
+        else:
+            print('Skipping!')
+            return None
+
+    @staticmethod
+    def review_card(card, f_display, list_choices, label_choices, main_color=None):
+        '''present the user with an option-based interface to do every operation on
+        a single card
+        :param trello.Card card: the card to modify
+        :param function f_display: function to call with a string in order to draw the card
+        :param str main_color: ansi escape code for the color you want this to be pretty-printed as
+        '''
+        on = main_color if main_color else ''
+        off = Colors.reset if main_color else ''
+        header = ''.join([
+            '{on}D{off}elete, '
+            '{on}T{off}ag, '
+            '{on}A{off}ttach Title, '
+            'ar{on}C{off}hive, '
+            '{on}P{off}rint Card, '
+            '{on}R{off}ename, '
+            'd{on}U{off}e Date, '
+            '{on}M{off}ove, '
+            '{on}N{off}ext, '
+            '{on}Q{off}uit'
+        ]).format(on=on, off=off)
+        if card.get_attachments():
+            header = '{on}O{off}pen attachment, '.format(on=on, off=off) + header
+        choice = ''
+        f_display(card, True)
+        while choice != 'N' and choice != 'D':
+            print(header)
+            choice = input('Input option character: ').strip().upper()
+            if choice == 'D':
+                card.delete()
+                print('Card deleted')
+            elif choice == 'C':
+                card.set_closed(True)
+                print('Card archived')
+            elif choice == 'T':
+                CardTool.add_labels(card, label_choices)
+            elif choice == 'A':
+                CardTool.title_to_link(card)
+            elif choice == 'P':
+                f_display(card, True)
+            elif choice == 'R':
+                CardTool.rename(card)
+            elif choice == 'U':
+                CardTool.set_due_date(card)
+            elif choice == 'M':
+                if CardTool.move_to_list(card, list_choices):
+                    break
+            elif choice == 'Q':
+                raise GTDException(0)
+            elif choice == 'N':
+                pass
+            elif choice == 'O':
+                for l in [a['name'] for a in card.get_attachments()]:
+                    webbrowser.open(l)
+            else:
+                print('Invalid option {0}'.format(choice))
+
+
 class BoardTool:
     '''given a board, this one handles operations on individual cards and dynamically generating lookups that make certain
     operations faster
@@ -161,73 +301,3 @@ class BoardTool:
 
     def get_list(self, name):
         return self.list_lookup.get(bytes(name, 'utf8'), None)
-
-    def add_labels(self, card):
-        done = False
-        newlabels = []
-        while not done:
-            label_to_add = multiple_select(self.label_lookup.keys())
-            newlabels.extend([self.label_lookup[l] for l in label_to_add])
-            done = prompt_for_confirmation('Are you done tagging?', default=True)
-        if newlabels:
-            for label in newlabels:
-                try:
-                    card.add_label(label)
-                except trello.exceptions.ResourceUnavailable:
-                    print('Tag {0} is already present!'.format(label))
-        return newlabels
-
-    def set_due_date(self, card):
-        # prompt for the date
-        input_date = ''
-        while not re.match('^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$', input_date):
-            input_date = input('Input a due date in the format of DD/MM/YYYY, May 1st = 01/05/2017: ').strip()
-        date_args = [int(x) for x in input_date.split('/')[::-1]]
-        input_datetime = datetime.datetime(*date_args, tzinfo=datetime.timezone.utc)
-        card.set_due(input_datetime)
-        return input_datetime
-
-    def _get_title_of_webpage(self, url):
-        headers = {'User-Agent': 'gtd.py version ' + __version__}
-        try:
-            resp = requests.get(url, headers=headers)
-            as_text = resp.text
-            return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
-        except requests.exceptions.ConnectionError:
-            return None
-
-    def title_to_link(self, card):
-        # assumes card.name is the link you want
-        links = [n for n in card.name.decode('utf8').split() if 'http' in n]
-        existing_attachments = [a['name'] for a in card.get_attachments()]
-        for l in links:
-            if l not in existing_attachments:
-                card.attach(url=l)
-        # attempt to get the title of the link
-        possible_title = self._get_title_of_webpage(links[0])
-        if possible_title:
-            self.rename(card, default=possible_title)
-        else:
-            self.rename(card)
-
-    def rename(self, card, default=None):
-        newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name.decode('utf8'))).strip()
-        if newname:
-            card.set_name(newname)
-            # FIXME this hacks around a bug in the pytrello library, contribute it upstream
-            card.name = bytes(newname, 'utf8')
-        else:
-            if default:
-                card.set_name(default)
-                card.name = bytes(default, 'utf8')
-
-    def move_to_list(self, card):
-        dest = single_select(self.list_lookup.keys())
-        if dest is not None:
-            destination_list = self.list_lookup[dest]
-            card.change_list(destination_list.id)
-            print('Moved to {0}'.format(destination_list.name.decode('utf8')))
-            return destination_list
-        else:
-            print('Skipping!')
-            return None

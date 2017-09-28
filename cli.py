@@ -6,11 +6,12 @@ import readline  # noqa
 
 import click
 
-from gtd.input import prompt_for_confirmation, BoardTool
+from gtd.input import prompt_for_confirmation, BoardTool, CardTool
 from gtd.display import JSONDisplay, TextDisplay, TableDisplay
 from gtd.exceptions import GTDException
 from gtd.connection import TrelloConnection
 from gtd.config import ConfigParser
+from gtd.misc import Colors
 from gtd import __version__
 
 
@@ -40,7 +41,7 @@ def init_and_filter(tag, no_tag, match, listname, attachments, has_due, flags=0)
     return config, wrapper, cards
 
 
-@click.group(context_settings={'help_option_names':['-h','--help']})
+@click.group(context_settings={'help_option_names': ['-h', '--help']})
 def cli():
     '''gtd.py'''
     pass
@@ -136,7 +137,10 @@ def add(add_type, title, message, edit):
     else:
         returned = wrapper.main_list.add_card(name=title, desc=message)
         if edit:
-            display.review_card(returned, wrapper)
+            if config.color:
+                CardTool.review_card(returned, display.show, wrapper.list_lookup, wrapper.label_lookup, Colors.green)
+            else:
+                CardTool.review_card(returned, display.show, wrapper.list_lookup, wrapper.label_lookup)
         else:
             click.echo('Successfully added card {0}!'.format(returned))
 
@@ -177,7 +181,7 @@ def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Want to move this one?', True):
-                    wrapper.move_to_list(card)
+                    CardTool.move_to_list(card, wrapper.list_lookup)
         elif batchtype == 'delete':
             for card in cards:
                 display.show(card)
@@ -188,12 +192,12 @@ def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Set due date?'):
-                    wrapper.set_due_date(card)
+                    CardTool.set_due_date(card)
         else:
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Want to tag this one?'):
-                    wrapper.add_labels(card)
+                    CardTool.add_labels(card, wrapper.label_lookup)
     click.echo('Batch completed, have a great day!')
 
 
@@ -214,7 +218,11 @@ def review(tag, no_tag, match, listname, attachments, has_due, daily):
     display = TextDisplay(config.color)
     if config.banner:
         display.banner()
-    display.review_list(cards, wrapper)
+    for card in cards:
+        if config.color:
+            CardTool.review_card(card, display.show, wrapper.list_lookup, wrapper.label_lookup, Colors.green)
+        else:
+            CardTool.review_card(card, display.show, wrapper.list_lookup, wrapper.label_lookup)
     click.echo('All done, have a great day!')
 
 
