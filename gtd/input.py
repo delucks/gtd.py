@@ -4,30 +4,16 @@ import sys
 import tty
 import string
 import trello
+import shutil
 import termios
 import datetime
 import webbrowser
 from functools import partial
-from gtd.exceptions import GTDException
+from prompt_toolkit import prompt
+from itertools import zip_longest
 from gtd.misc import get_title_of_webpage, Colors
-
-
-def multiple_select(iterable):
-    listed = list(iterable)
-    for index, item in enumerate(listed):
-        print('  [{0}] {1}'.format(index, item.decode('utf8')))
-    while True:
-        usersel = input('Input the numeric ID or IDs of the item(s) you want: ').strip()
-        try:
-            if ',' in usersel or ' ' in usersel:
-                delimiter = ',' if ',' in usersel else ' '
-                indicies = [int(i) for i in usersel.split(delimiter)]
-            else:
-                indicies = [int(usersel)]
-            break
-        except ValueError:
-            print('You gave a malformed input!')
-    return [listed[i] for i in indicies]
+from prompt_toolkit.contrib.completers import WordCompleter
+from gtd.exceptions import GTDException, InternalCLIExitException
 
 
 def prompt_for_confirmation(message, default=False):
@@ -88,6 +74,15 @@ def filter_card_by_tag(card, tag):
         return False
 
 
+def triple_column_print(iterable):
+    chunk_count = 3
+    max_width = shutil.get_terminal_size().columns
+    chunk_size = max_width // chunk_count
+    args = [iter(iterable)] * chunk_count
+    for triplet in zip_longest(fillvalue='', *args):
+        print('{0:<{width}}{1:^{width}}{2:>{width}}'.format(width=chunk_size, *triplet))
+
+
 class CardTool:
     '''This static class holds functionality to do atomic modifications on certain cards.
     These methods are used inside of the user interaction parts of the codebase as a way of doing the same operation across
@@ -96,23 +91,34 @@ class CardTool:
     # TODO add type hints
     @staticmethod
     def add_labels(card, label_choices):
-        '''Select labels to add to this card
+        '''Give the user a way to toggle labels on this card by their
+        name rather than by a numeric selection interface. Using
+        prompt_toolkit, we have automatic completion which makes
+        things substantially faster without having to do a visual
+        lookup against numeric IDs
         :param trello.Card card: the card to modify
         :param dict label_choices: str->trello.Label, the names and objects of labels on this board
         '''
-        done = False
-        newlabels = []
-        while not done:
-            label_to_add = multiple_select(label_choices)
-            newlabels.extend([label_choices[l] for l in label_to_add])
-            done = prompt_for_confirmation('Are you done tagging?', default=True)
-        if newlabels:
-            for label in newlabels:
+        label_names = [l.decode('utf8') for l in label_choices.keys()]
+        label_completer = WordCompleter(label_names, ignore_case=True)
+        while True:
+            userinput = prompt('label name > ', completer=label_completer).strip()
+            if userinput == '':
+                break
+            elif userinput == 'ls':
+                triple_column_print(label_names)
+            elif userinput not in label_names:
+                #TODO put a prompt here to create the label name if it does not exist
+                print('Unrecognized label name {0}, try again'.format(userinput))
+            else:
+                label_obj = label_choices[bytes(userinput, 'utf8')]
                 try:
-                    card.add_label(label)
+                    card.add_label(label_obj)
+                    print('Added label {0}'.format(Colors.green + userinput + Colors.reset))
                 except trello.exceptions.ResourceUnavailable:
-                    print('Tag {0} is already present!'.format(label))
-        return newlabels
+                    # This label already exists on the card so remove it
+                    card.remove_label(label_obj)
+                    print('Removed label {0}'.format(Colors.red + userinput + Colors.reset))
 
     @staticmethod
     def title_to_link(card):

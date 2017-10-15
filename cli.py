@@ -31,13 +31,13 @@ def init_and_filter(tag, no_tag, match, listname, attachments, has_due, flags=0)
         target_lists = []
     selected_tag = wrapper.magic_value if no_tag else tag if tag else None
     cards = wrapper.get_cards(
-                target_lists=target_lists,
-                tag=selected_tag,
-                title_regex=match,
-                has_attachments=attachments,
-                has_due_date=has_due,
-                regex_flags=flags
-            )
+        target_lists=target_lists,
+        tag=selected_tag,
+        title_regex=match,
+        has_attachments=attachments,
+        has_due_date=has_due,
+        regex_flags=flags
+    )
     return config, wrapper, cards
 
 
@@ -196,8 +196,7 @@ def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
         else:
             for card in cards:
                 display.show(card)
-                if prompt_for_confirmation('Want to tag this one?'):
-                    CardTool.add_labels(card, wrapper.label_lookup)
+                CardTool.add_labels(card, wrapper.label_lookup)
     click.echo('Batch completed, have a great day!')
 
 

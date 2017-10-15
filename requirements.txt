@@ -1,3 +1,5 @@
 PyYAML==3.11
 py-trello==0.5.0
 pytest==2.9.2
+click
+prompt_toolkit
