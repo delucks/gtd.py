@@ -175,6 +175,7 @@ class TextDisplay(Display):
     def __init__(self, coloration, primary=Colors.red):
         super(TextDisplay, self).__init__(coloration)
         self.primary = primary
+        self.maxwidth = shutil.get_terminal_size().columns
 
     def _colorize(self, lbl, msg, colorstring):
         return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
@@ -213,6 +214,8 @@ class TextDisplay(Display):
             except TypeError:
                 # fucking datetime throws exceptions about bullshit
                 pass
+        if card.description:
+            self._p('  Description', card.description)
         if show_list:
             self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
 

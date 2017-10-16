@@ -327,7 +327,7 @@ class BoardTool:
         '''use the configuration to get the main board & list from
         Trello, return the list where new cards should go.
         '''
-        board = BoardTool.get_main_board()
+        board = BoardTool.get_main_board(connection, config)
         if config.get('inbox_list', False):
             return [l for l in board.open_lists() if l.name == bytes(config.inbox_list, 'utf8')][0]
         else:
