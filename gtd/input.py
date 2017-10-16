@@ -66,13 +66,15 @@ def single_select(options):
     else:
         return None
 
-
-def filter_card_by_tag(card, tag):
+def tags_on_card(card, tags):
+    '''Take in a comma-sep list of tag names, and ensure that
+    each is on this card'''
     if card.list_labels:
-        return tag in [l.name.decode('utf8') for l in card.list_labels]
+        user_tags = set(tags.split(','))
+        card_tags = set([l.name.decode('utf8') for l in card.list_labels])
+        return user_tags.issubset(card_tags)
     else:
         return False
-
 
 def triple_column_print(iterable):
     chunk_count = 3
@@ -234,76 +236,98 @@ class CardTool:
 
 
 class BoardTool:
-    '''given a board, this one handles operations on individual cards and dynamically generating lookups that make certain
-    operations faster
-    provides convenience methods for doing certain repeatable tasks on the main board and lists described by the configuration properties
-    Note that this will break if you have a tag in your Board named NOTAG
-
-    :param str primary_list: name of the list you want to use for new cards
+    '''modeled after the last successful static class rewrite, this one will
+    take in a top-level API connection (trello.Trello) with just about every method
+    and return something useful to the program, like an iterable of cards or something else
+    this should replace the existing BoardTool class and the init_and_filter method, which is really just
+    doing some boilerplate that can be handled in this class
     '''
-    def __init__(self, connection):
-        self.trello = connection.trello
-        self.config = connection.config
-        self.main_board = self._filter_by_name(self.trello.list_boards(), self.config['board_name'])
-        # Determine the list for inbound cards
-        configured_list = self.config.get('inbox_list', False)
-        if configured_list:
-            main_list = self._filter_by_name(self.main_board.get_lists('open'), configured_list)
-            if not main_list:
-                print('[FATAL] The provided list name did not match any lists in {0}!'.format(self.main_board.name.decode('utf8')))
-                raise GTDException(1)
-            self.main_list = main_list
-        else:
-            self.main_list = self.get_first_list(self.main_board)
-        # These are dicts of list&tag names -> objects to make subsequent reads faster
-        self.label_lookup = self._make_name_lookup(self.main_board.get_labels())
-        self.list_lookup = self._make_name_lookup(self.main_board.get_lists('open'))
-        # The value passed to get_cards() if you want cards with no tags
-        self.magic_value = 'NOTAG'
-
-    def _filter_by_name(self, iterable, name):
-        try:
-            return set(b for b in iterable if name.lower() in b.name.decode('utf8').lower()).pop()
-        except KeyError:
-            return []
-
-    def _make_name_lookup(self, object_grouping):
-        return {o.name: o for o in object_grouping}
-
-    def _cardpipe(self, target_lists):
-        '''I wish their API had a "search" feature so this doesn't have to be
-        N^2'''
+    @staticmethod
+    def take_cards_from_lists(board, list_regex):
+        pattern = re.compile(list_regex, flags=re.I)
+        target_lists = filter(
+            lambda x: pattern.search(x.name.decode('utf8')),
+            board.get_lists('open')
+        )
         for cardlist in target_lists:
             for card in cardlist.list_cards():
                 yield card
 
-    def get_first_list(self, board_obj):
-        return board_obj.open_lists()[0]
-
-    def get_cards(self, target_lists=[], tag=None, title_regex=None, filterspec=None, has_attachments=None, has_due_date=None, regex_flags=0):
-        '''Find cards on the main board that match our filters, hand them back
-        as a generator'''
-        cardsource = self._cardpipe(target_lists) if target_lists else self.main_board.get_cards('open')
+    @staticmethod
+    def create_card_filters(**kwargs):
+        '''takes in arguments that relate to how cards should be filtered, and outputs
+        a number of callables that are used in filtering an iterable of cards
+        '''
+        # Regular expression on trello.Card.name
+        title_regex = kwargs.get('title_regex', None)
+        regex_flags = kwargs.get('regex_flags', 0)
+        # boolean queries about whether the card has things
+        has_attachments = kwargs.get('has_attachments', None)
+        no_tags = kwargs.get('no_tags', False)
+        has_due_date = kwargs.get('has_due_date', None)
+        # comma-separated string of tags to filter on
+        tags = kwargs.get('tags', None)
+        # custom user-supplied callable functions to filter a card on
+        filter_funcs = kwargs.get('filter_funcs', None)
+        ### Parse arguments into callables
         filters = []
-        if tag == self.magic_value:
+        if tags:
+            filters.append(partial(tags_on_card, tags=tags))
+        if no_tags:
             filters.append(lambda c: not c.list_labels)
-        elif tag:
-            filters.append(partial(filter_card_by_tag, tag=tag))
         if title_regex:
             filters.append(lambda c: re.search(title_regex, c.name.decode('utf8'), regex_flags))
-        if filterspec and callable(filterspec):
-            filters.append(filterspec)
-        if has_attachments:
-            filters.append(lambda c: has_attachments and c.get_attachments())
+        if filter_funcs:
+            if callable(filter_funcs):
+                filters.append(filter_funcs)
+            elif type(filter_funcs) is list and all(callable(x) for x in filter_funcs):
+                filters.extend(filter_funcs)
+        if has_attachments is not None:
+            filters.append(lambda c: c.get_attachments())
         if has_due_date:
             filters.append(lambda c: c.due_date)
+        return filters
+
+    @staticmethod
+    def filter_cards(board, **kwargs):
+        list_regex = kwargs.get('list_regex', None)
+        filters = BoardTool.create_card_filters(**kwargs)
+        # create a generator of cards to filter
+        if list_regex is not None:
+            cardsource = BoardTool.take_cards_from_lists(board, list_regex)
+        else:
+            cardsource = board.get_cards('open')
         for card in cardsource:
-            keep = True
-            for f in filters:
-                if not f(card):
-                    keep = False
-            if keep:
+            if all(x(card) for x in filters):
                 yield card
 
-    def get_list(self, name):
-        return self.list_lookup.get(bytes(name, 'utf8'), None)
+    @staticmethod
+    def get_main_board(connection, config):
+        '''use the configuration to get the main board & return it'''
+        return [b for b in connection.trello.list_boards('open') if b.name == bytes(config.board_name, 'utf8')][0]
+
+    @staticmethod
+    def get_inbox_list(connection, config):
+        '''use the configuration to get the main board & list from
+        Trello, return the list where new cards should go.
+        '''
+        board = BoardTool.get_main_board()
+        if config.get('inbox_list', False):
+            return [l for l in board.open_lists() if l.name == bytes(config.inbox_list, 'utf8')][0]
+        else:
+            return board.open_lists()[0]
+
+    @staticmethod
+    def list_lookup(board):
+        return {o.name: o for o in board.get_lists('open')}
+
+    @staticmethod
+    def label_lookup(board):
+        return {o.name: o for o in board.get_labels()}
+
+    @staticmethod
+    def list_and_label_length(board):
+        '''return maximum string length of lists & labels '''
+        max_list_len = len(max([l.name.decode('utf8') for l in board.get_lists('open')], key=len))
+        max_label_len = len(max([l.name.decode('utf8') for l in board.get_labels()], key=len))
+        return max_list_len, max_label_len

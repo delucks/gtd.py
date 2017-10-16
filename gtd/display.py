@@ -216,63 +216,6 @@ class TextDisplay(Display):
         if show_list:
             self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
 
-    def review_card(self, card, wrapper):
-        '''present the user with an option-based interface to do every operation on
-        a single card'''
-        on = self.primary if self.coloration else ''
-        off = Colors.reset if self.coloration else ''
-        header = ''.join([
-            '{on}D{off}elete, '
-            '{on}T{off}ag, '
-            '{on}A{off}ttach Title, '
-            'ar{on}C{off}hive, '
-            '{on}P{off}rint Card, '
-            '{on}R{off}ename, '
-            'd{on}U{off}e Date, '
-            '{on}M{off}ove, '
-            '{on}N{off}ext, '
-            '{on}Q{off}uit'
-        ]).format(on=on, off=off)
-        if card.get_attachments():
-            header = '{on}O{off}pen attachment, '.format(on=on, off=off) + header
-        choice = ''
-        self.show(card, True)
-        while choice != 'N' and choice != 'D':
-            print(header)
-            choice = input('Input option character: ').strip().upper()
-            if choice == 'D':
-                card.delete()
-                print('Card deleted')
-            elif choice == 'C':
-                card.set_closed(True)
-                print('Card archived')
-            elif choice == 'T':
-                wrapper.add_labels(card)
-            elif choice == 'A':
-                wrapper.title_to_link(card)
-            elif choice == 'P':
-                self.show(card, True)
-            elif choice == 'R':
-                wrapper.rename(card)
-            elif choice == 'U':
-                wrapper.set_due_date(card)
-            elif choice == 'M':
-                if wrapper.move_to_list(card):
-                    break
-            elif choice == 'Q':
-                raise GTDException(0)
-            elif choice == 'N':
-                pass
-            elif choice == 'O':
-                for l in [a['name'] for a in card.get_attachments()]:
-                    webbrowser.open(l)
-            else:
-                print('Invalid option {0}'.format(choice))
-
-    def review_list(self, cards, wrapper):
-        for card in cards:
-            self.review_card(card, wrapper)
-
     def show_list(self, iterable):
         for l in iterable:
             print(l)

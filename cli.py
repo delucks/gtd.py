@@ -15,32 +15,6 @@ from gtd.misc import Colors
 from gtd import __version__
 
 
-def init_and_filter(tag, no_tag, match, listname, attachments, has_due, flags=0):
-    '''set up the interaction backend and filter cards by the users' selected
-    flags'''
-    config = ConfigParser().config
-    connection = TrelloConnection(config)
-    wrapper = BoardTool(connection)
-    if listname:
-        pattern = re.compile(listname, flags=re.I)
-        target_lists = filter(
-            lambda x: pattern.search(x.name.decode('utf8')),
-            wrapper.main_board.get_lists('open')
-        )
-    else:
-        target_lists = []
-    selected_tag = wrapper.magic_value if no_tag else tag if tag else None
-    cards = wrapper.get_cards(
-        target_lists=target_lists,
-        tag=selected_tag,
-        title_regex=match,
-        has_attachments=attachments,
-        has_due_date=has_due,
-        regex_flags=flags
-    )
-    return config, wrapper, cards
-
-
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 def cli():
     '''gtd.py'''
@@ -86,32 +60,42 @@ def workflow():
 @cli.command()
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
 @click.option('-j', '--json', is_flag=True, default=False, help='output as JSON')
-@click.option('-t', '--tag', default=None)
-@click.option('--no-tag', is_flag=True, default=False)
+@click.option('-t', '--tags', default=None)
+@click.option('--no-tags', is_flag=True, default=False)
 @click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
-@click.option('-l', '--list', help='filter cards to this list', default=None)
+@click.option('-l', '--listname', help='filter cards to this list', default=None)
 @click.option('--attachments', is_flag=True, help='select cards which have attachments')
 @click.option('--has-due', is_flag=True, help='select cards which have due dates')
-def show(showtype, json, tag, no_tag, match, list, attachments, has_due):
+def show(showtype, json, tags, no_tags, match, listname, attachments, has_due):
     '''filter and display cards'''
-    config, wrapper, cards = init_and_filter(tag, no_tag, match, list, attachments, has_due)
+    config = ConfigParser().config
+    connection = TrelloConnection(config)
+    board = BoardTool.get_main_board(connection, config)
     if json:
         display = JSONDisplay(config.color)
     else:
-        max_list_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')], key=len))
-        max_label_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_labels()], key=len))
-        display = TableDisplay(config.color, max_list_len, max_label_len)
+        li, la = BoardTool.list_and_label_length(board)
+        display = TableDisplay(config.color, li, la)
     if config.banner:
         display.banner()
     if showtype == 'lists':
-        lnames = [l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')]
+        lnames = [l.name.decode('utf8') for l in board.get_lists('open')]
         with display:
             display.show_list(lnames)
     elif showtype == 'tags':
-        tnames = [t.name.decode('utf8') for t in wrapper.main_board.get_labels()]
+        tnames = [t.name.decode('utf8') for t in board.get_labels()]
         with display:
             display.show_list(tnames)
     else:
+        cards = BoardTool.filter_cards(
+            board,
+            tags=tags,
+            no_tags=no_tags,
+            title_regex=match,
+            list_regex=listname,
+            has_attachments=attachments,
+            has_due_date=has_due
+        )
         with display:
             for card in cards:
                 display.show(card, True)
@@ -126,21 +110,22 @@ def add(add_type, title, message, edit):
     '''add a new card, tag, or list'''
     config = ConfigParser().config
     connection = TrelloConnection(config)
-    wrapper = BoardTool(connection)
+    board = BoardTool.get_main_board(connection, config)
     display = TextDisplay(config.color)
     if add_type == 'tag':
-        label = wrapper.main_board.add_label(title, 'black')
+        label = board.add_label(title, 'black')
         click.echo('Successfully added tag {0}!'.format(label))
     elif add_type == 'list':
-        l = wrapper.main_board.add_list(title)
+        l = board.add_list(title)
         click.echo('Successfully added list {0}!'.format(l))
     else:
-        returned = wrapper.main_list.add_card(name=title, desc=message)
+        inbox = BoardTool.get_inbox_list(connection, config)
+        returned = inbox.add_card(name=title, desc=message)
         if edit:
             if config.color:
-                CardTool.review_card(returned, display.show, wrapper.list_lookup, wrapper.label_lookup, Colors.green)
+                CardTool.review_card(returned, display.show, BoardTool.list_lookup(board), BoardTool.label_lookup(board), Colors.green)
             else:
-                CardTool.review_card(returned, display.show, wrapper.list_lookup, wrapper.label_lookup)
+                CardTool.review_card(returned, display.show, BoardTool.list_lookup(board), BoardTool.label_lookup(board))
         else:
             click.echo('Successfully added card {0}!'.format(returned))
 
@@ -151,10 +136,16 @@ def add(add_type, title, message, edit):
 def grep(pattern, insensitive):
     '''egrep through titles of cards'''
     flags = re.I if insensitive else 0
-    config, wrapper, cards = init_and_filter([], None, pattern, None, None, None, flags)
-    max_list_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_lists('open')], key=len))
-    max_label_len = len(max([l.name.decode('utf8') for l in wrapper.main_board.get_labels()], key=len))
-    display = TableDisplay(config.color, max_list_len, max_label_len)
+    config = ConfigParser().config
+    connection = TrelloConnection(config)
+    board = BoardTool.get_main_board(connection, config)
+    cards = BoardTool.filter_cards(
+        board,
+        title_regex=pattern,
+        regex_flags=flags
+    )
+    li, la = BoardTool.list_and_label_length(board)
+    display = TableDisplay(config.color, li, la)
     if config.banner:
         display.banner()
     with display:
@@ -164,15 +155,29 @@ def grep(pattern, insensitive):
 
 @cli.command()
 @click.argument('batchtype')
-@click.option('--tag', default=None)
-@click.option('--no-tag', is_flag=True, default=False)
+@click.option('-t', '--tags', default=None)
+@click.option('--no-tags', is_flag=True, default=False)
 @click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
 @click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
 @click.option('--attachments', is_flag=True, help='select cards which have attachments')
 @click.option('--has-due', is_flag=True, help='select cards which have due dates')
-def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
+def batch(batchtype, tags, no_tags, match, listname, attachments, has_due):
     '''perform one action on many cards'''
-    config, wrapper, cards = init_and_filter(tag, no_tag, match, listname, attachments, has_due)
+    config = ConfigParser().config
+    connection = TrelloConnection(config)
+    board = BoardTool.get_main_board(connection, config)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due
+    )
+    list_lookup = BoardTool.list_lookup(board)
+    label_lookup = BoardTool.label_lookup(board)
+
     display = TextDisplay(config.color)
     if config.banner:
         display.banner()
@@ -181,7 +186,7 @@ def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
             for card in cards:
                 display.show(card)
                 if prompt_for_confirmation('Want to move this one?', True):
-                    CardTool.move_to_list(card, wrapper.list_lookup)
+                    CardTool.move_to_list(card, list_lookup)
         elif batchtype == 'delete':
             for card in cards:
                 display.show(card)
@@ -196,32 +201,45 @@ def batch(batchtype, tag, no_tag, match, listname, attachments, has_due):
         else:
             for card in cards:
                 display.show(card)
-                CardTool.add_labels(card, wrapper.label_lookup)
+                CardTool.add_labels(card, label_lookup)
     click.echo('Batch completed, have a great day!')
 
 
 @cli.command()
-@click.option('--tag', default=None)
-@click.option('--no-tag', is_flag=True, default=False)
+@click.option('-t', '--tags', default=None)
+@click.option('--no-tags', is_flag=True, default=False)
 @click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
 @click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
 @click.option('--attachments', is_flag=True, help='select cards which have attachments')
 @click.option('--has-due', is_flag=True, help='select cards which have due dates')
 @click.option('--daily', help='daily review mode')
-def review(tag, no_tag, match, listname, attachments, has_due, daily):
+def review(tags, no_tags, match, listname, attachments, has_due, daily):
     '''open a menu for each card selected'''
     if daily:
         click.echo('Welcome to daily review mode!\nThis combines all "Doing" lists so you can review what you should be doing soon.\n')
         listname = 'Doing'
-    config, wrapper, cards = init_and_filter(tag, no_tag, match, listname, attachments, has_due)
+    config = ConfigParser().config
+    connection = TrelloConnection(config)
+    board = BoardTool.get_main_board(connection, config)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due
+    )
+    list_lookup = BoardTool.list_lookup(board)
+    label_lookup = BoardTool.label_lookup(board)
     display = TextDisplay(config.color)
     if config.banner:
         display.banner()
     for card in cards:
         if config.color:
-            CardTool.review_card(card, display.show, wrapper.list_lookup, wrapper.label_lookup, Colors.green)
+            CardTool.review_card(card, display.show, list_lookup, label_lookup, Colors.green)
         else:
-            CardTool.review_card(card, display.show, wrapper.list_lookup, wrapper.label_lookup)
+            CardTool.review_card(card, display.show, list_lookup, label_lookup)
     click.echo('All done, have a great day!')
 
 

@@ -5,7 +5,7 @@ from gtd.exceptions import GTDException
 
 
 class ConfigParser:
-    '''this one handles the yaml config file and possibly
+    '''this class handles the yaml config file and possibly
     eventually a python config files
 
     :param str config_file: path to the yaml configuration file for this program

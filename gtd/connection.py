@@ -29,6 +29,13 @@ class TrelloConnection:
             print('[FATAL] Trello API credentials are invalid')
             raise GTDException(1)
 
+    def __repr__(self):
+        c = 'disconnected' if self.trello is None else 'connected'
+        return 'TrelloConnection {0} at {0}'.format(c, id(self))
+
+    def __str__(self):
+        return repr(self)
+
     def initialize_trello(self, config):
         '''Initializes our connection to the trello API
         :param dict config: parsed configuration from the yaml file
