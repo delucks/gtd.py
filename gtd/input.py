@@ -13,7 +13,10 @@ from prompt_toolkit import prompt
 from itertools import zip_longest
 from gtd.misc import get_title_of_webpage, Colors
 from prompt_toolkit.contrib.completers import WordCompleter
-from gtd.exceptions import GTDException, InternalCLIExitException
+from gtd.exceptions import GTDException
+from gtd.connection import TrelloConnection
+from gtd.config import ConfigParser
+from gtd import __version__
 
 
 def prompt_for_confirmation(message, default=False):
@@ -79,10 +82,10 @@ def tags_on_card(card, tags):
 def triple_column_print(iterable):
     chunk_count = 3
     max_width = shutil.get_terminal_size().columns
-    chunk_size = max_width // chunk_count
+    chunk_size = (max_width-4) // chunk_count
     args = [iter(iterable)] * chunk_count
     for triplet in zip_longest(fillvalue='', *args):
-        print('{0:<{width}}{1:^{width}}{2:>{width}}'.format(width=chunk_size, *triplet))
+        print('  {0:<{width}}{1:^{width}}{2:>{width}}  '.format(width=chunk_size, *triplet))
 
 
 class CardTool:
@@ -104,14 +107,14 @@ class CardTool:
         label_names = [l.decode('utf8') for l in label_choices.keys()]
         label_completer = WordCompleter(label_names, ignore_case=True)
         while True:
-            userinput = prompt('label name > ', completer=label_completer).strip()
+            userinput = prompt('tag > ', completer=label_completer).strip()
             if userinput == '':
                 break
             elif userinput == 'ls':
                 triple_column_print(label_names)
             elif userinput not in label_names:
-                #TODO put a prompt here to create the label name if it does not exist
-                print('Unrecognized label name {0}, try again'.format(userinput))
+                #TODO put a prompt here to create the tag name if it does not exist
+                print('Unrecognized tag name {0}, try again'.format(userinput))
             else:
                 label_obj = label_choices[bytes(userinput, 'utf8')]
                 try:
@@ -121,6 +124,70 @@ class CardTool:
                     # This label already exists on the card so remove it
                     card.remove_label(label_obj)
                     print('Removed label {0}'.format(Colors.red + userinput + Colors.reset))
+
+    @staticmethod
+    def smart_menu(card, f_display, list_choices, label_choices, color=None):
+        '''make assumptions about what you want to do with a card and ask the user if they want to'''
+        on = color if color else ''
+        off = Colors.reset if color else ''
+        f_display(card, True)
+        if not card.list_labels:
+            print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
+            CardTool.add_labels(card, label_choices)
+        if re.search('https?://', card.name.decode('utf8')):
+            if prompt_for_confirmation('{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True):
+                CardTool.title_to_link(card)
+        if card.get_attachments():
+            if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
+                for l in [a['name'] for a in card.get_attachments()]:
+                    webbrowser.open(l)
+        commands = {
+            'archive': 'mark this card as closed',
+            'delete': 'permanently delete this card',
+            'duedate': 'add a due date or change the due date',
+            'help': 'display this help output',
+            'move': 'move to a different list',
+            'next': 'move on to the next card',
+            'open': 'open all links on this card',
+            'print': 'display this card',
+            'rename': 'change title of this card',
+            'tag': 'add or remove tags on this card',
+            'quit': 'exit program'
+        }
+        command_completer = WordCompleter(commands.keys())
+        while True:
+            user_input = prompt('gtd.py {0} > '.format(__version__), completer=command_completer)
+            if user_input in ['q', 'quit']:
+                raise GTDException(0)
+            elif user_input in ['n', 'next']:
+                break
+            elif user_input in ['p', 'print']:
+                f_display(card, True)
+            elif user_input in ['o', 'open']:
+                for l in [a['name'] for a in card.get_attachments()]:
+                    webbrowser.open(l)
+            elif user_input == 'delete':
+                card.delete()
+                print('Card deleted')
+                break
+            elif user_input == 'archive':
+                card.set_closed(True)
+                print('Card archived')
+                break
+            elif user_input in ['t', 'tag']:
+                CardTool.add_labels(card, label_choices)
+            elif user_input == 'rename':
+                CardTool.rename(card)
+            elif user_input == 'duedate':
+                CardTool.set_due_date(card)
+            elif user_input in ['h', 'help']:
+                for cname, cdesc in commands.items():
+                    print('{0:<13}: {1}{2}{3}'.format(cname, on, cdesc, off))
+            elif user_input in ['m', 'move']:
+                if CardTool.move_to_list(card, list_choices):
+                    break
+            else:
+                print('{0}{1}{2} is not a command, type "{0}help{2}" to view available commands'.format(on, user_input, off))
 
     @staticmethod
     def title_to_link(card):
@@ -166,7 +233,7 @@ class CardTool:
         :param trello.Card card: the card to modify
         :param dict list_choices: str->trello.List, the names and objects of lists on this board
         '''
-        dest = single_select(list_choices.keys())
+        dest = single_select(sorted(list_choices.keys()))
         if dest is not None:
             destination_list = list_choices[dest]
             card.change_list(destination_list.id)
@@ -176,64 +243,6 @@ class CardTool:
             print('Skipping!')
             return None
 
-    @staticmethod
-    def review_card(card, f_display, list_choices, label_choices, main_color=None):
-        '''present the user with an option-based interface to do every operation on
-        a single card
-        :param trello.Card card: the card to modify
-        :param function f_display: function to call with a string in order to draw the card
-        :param str main_color: ansi escape code for the color you want this to be pretty-printed as
-        '''
-        on = main_color if main_color else ''
-        off = Colors.reset if main_color else ''
-        header = ''.join([
-            '{on}D{off}elete, '
-            '{on}T{off}ag, '
-            '{on}A{off}ttach Title, '
-            'ar{on}C{off}hive, '
-            '{on}P{off}rint Card, '
-            '{on}R{off}ename, '
-            'd{on}U{off}e Date, '
-            '{on}M{off}ove, '
-            '{on}N{off}ext, '
-            '{on}Q{off}uit'
-        ]).format(on=on, off=off)
-        if card.get_attachments():
-            header = '{on}O{off}pen attachment, '.format(on=on, off=off) + header
-        choice = ''
-        f_display(card, True)
-        while choice != 'N' and choice != 'D':
-            print(header)
-            choice = input('Input option character: ').strip().upper()
-            if choice == 'D':
-                card.delete()
-                print('Card deleted')
-            elif choice == 'C':
-                card.set_closed(True)
-                print('Card archived')
-            elif choice == 'T':
-                CardTool.add_labels(card, label_choices)
-            elif choice == 'A':
-                CardTool.title_to_link(card)
-            elif choice == 'P':
-                f_display(card, True)
-            elif choice == 'R':
-                CardTool.rename(card)
-            elif choice == 'U':
-                CardTool.set_due_date(card)
-            elif choice == 'M':
-                if CardTool.move_to_list(card, list_choices):
-                    break
-            elif choice == 'Q':
-                raise GTDException(0)
-            elif choice == 'N':
-                pass
-            elif choice == 'O':
-                for l in [a['name'] for a in card.get_attachments()]:
-                    webbrowser.open(l)
-            else:
-                print('Invalid option {0}'.format(choice))
-
 
 class BoardTool:
     '''modeled after the last successful static class rewrite, this one will
@@ -242,6 +251,13 @@ class BoardTool:
     this should replace the existing BoardTool class and the init_and_filter method, which is really just
     doing some boilerplate that can be handled in this class
     '''
+    @staticmethod
+    def start():
+        config = ConfigParser().config
+        connection = TrelloConnection(config)
+        board = BoardTool.get_main_board(connection, config)
+        return config, connection, board
+
     @staticmethod
     def take_cards_from_lists(board, list_regex):
         pattern = re.compile(list_regex, flags=re.I)

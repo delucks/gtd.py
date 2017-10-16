@@ -2,15 +2,11 @@
 '''entrypoint to gtd.py, written with click'''
 import re
 import sys
-import readline  # noqa
-
 import click
-
+import readline  # noqa
 from gtd.input import prompt_for_confirmation, BoardTool, CardTool
 from gtd.display import JSONDisplay, TextDisplay, TableDisplay
 from gtd.exceptions import GTDException
-from gtd.connection import TrelloConnection
-from gtd.config import ConfigParser
 from gtd.misc import Colors
 from gtd import __version__
 
@@ -64,13 +60,11 @@ def workflow():
 @click.option('--no-tags', is_flag=True, default=False)
 @click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
 @click.option('-l', '--listname', help='filter cards to this list', default=None)
-@click.option('--attachments', is_flag=True, help='select cards which have attachments')
-@click.option('--has-due', is_flag=True, help='select cards which have due dates')
+@click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
+@click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
 def show(showtype, json, tags, no_tags, match, listname, attachments, has_due):
     '''filter and display cards'''
-    config = ConfigParser().config
-    connection = TrelloConnection(config)
-    board = BoardTool.get_main_board(connection, config)
+    config, _, board = BoardTool.start()
     if json:
         display = JSONDisplay(config.color)
     else:
@@ -108,9 +102,7 @@ def show(showtype, json, tags, no_tags, match, listname, attachments, has_due):
 @click.option('--edit', is_flag=True)
 def add(add_type, title, message, edit):
     '''add a new card, tag, or list'''
-    config = ConfigParser().config
-    connection = TrelloConnection(config)
-    board = BoardTool.get_main_board(connection, config)
+    config, connection, board = BoardTool.start()
     display = TextDisplay(config.color)
     if add_type == 'tag':
         label = board.add_label(title, 'black')
@@ -136,9 +128,7 @@ def add(add_type, title, message, edit):
 def grep(pattern, insensitive):
     '''egrep through titles of cards'''
     flags = re.I if insensitive else 0
-    config = ConfigParser().config
-    connection = TrelloConnection(config)
-    board = BoardTool.get_main_board(connection, config)
+    config, connection, board = BoardTool.start()
     cards = BoardTool.filter_cards(
         board,
         title_regex=pattern,
@@ -159,13 +149,11 @@ def grep(pattern, insensitive):
 @click.option('--no-tags', is_flag=True, default=False)
 @click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
 @click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
-@click.option('--attachments', is_flag=True, help='select cards which have attachments')
-@click.option('--has-due', is_flag=True, help='select cards which have due dates')
+@click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
+@click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
 def batch(batchtype, tags, no_tags, match, listname, attachments, has_due):
     '''perform one action on many cards'''
-    config = ConfigParser().config
-    connection = TrelloConnection(config)
-    board = BoardTool.get_main_board(connection, config)
+    config, connection, board = BoardTool.start()
     cards = BoardTool.filter_cards(
         board,
         tags=tags,
@@ -210,17 +198,15 @@ def batch(batchtype, tags, no_tags, match, listname, attachments, has_due):
 @click.option('--no-tags', is_flag=True, default=False)
 @click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
 @click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
-@click.option('--attachments', is_flag=True, help='select cards which have attachments')
-@click.option('--has-due', is_flag=True, help='select cards which have due dates')
+@click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
+@click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
 @click.option('--daily', help='daily review mode')
 def review(tags, no_tags, match, listname, attachments, has_due, daily):
     '''open a menu for each card selected'''
     if daily:
         click.echo('Welcome to daily review mode!\nThis combines all "Doing" lists so you can review what you should be doing soon.\n')
         listname = 'Doing'
-    config = ConfigParser().config
-    connection = TrelloConnection(config)
-    board = BoardTool.get_main_board(connection, config)
+    config, connection, board = BoardTool.start()
     cards = BoardTool.filter_cards(
         board,
         tags=tags,
@@ -236,10 +222,11 @@ def review(tags, no_tags, match, listname, attachments, has_due, daily):
     if config.banner:
         display.banner()
     for card in cards:
-        if config.color:
-            CardTool.review_card(card, display.show, list_lookup, label_lookup, Colors.green)
-        else:
-            CardTool.review_card(card, display.show, list_lookup, label_lookup)
+        CardTool.smart_menu(card, display.show, list_lookup, label_lookup, Colors.yellow)
+        #if config.color:
+        #    CardTool.review_card(card, display.show, list_lookup, label_lookup, Colors.green)
+        #else:
+        #    CardTool.review_card(card, display.show, list_lookup, label_lookup)
     click.echo('All done, have a great day!')
 
 
