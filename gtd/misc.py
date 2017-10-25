@@ -1,5 +1,5 @@
 import requests
-from gtd import __version__
+from todo import __version__
 
 
 class Colors:
@@ -13,6 +13,10 @@ class Colors:
     cyan = esc + '[0;36m'
     white = esc + '[0;37m'
     reset = esc + '[0m'
+
+    @staticmethod
+    def all_colors():
+        return [Colors.red, Colors.green, Colors.yellow, Colors.blue, Colors.purple, Colors.cyan]
 
 
 class AttrDict(dict):

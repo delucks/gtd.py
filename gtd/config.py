@@ -1,7 +1,7 @@
 import os
 import yaml
-from gtd.misc import AttrDict
-from gtd.exceptions import GTDException
+from todo.misc import AttrDict
+from todo.exceptions import GTDException
 
 
 class ConfigParser:

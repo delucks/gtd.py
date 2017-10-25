@@ -4,8 +4,8 @@ import yaml
 import pytest
 import tempfile
 
-from gtd.config import ConfigParser
-from gtd.exceptions import GTDException
+from todo.config import ConfigParser
+from todo.exceptions import GTDException
 
 def test_yaml_parser():
     # open and parse our example configs, sunny case

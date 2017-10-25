@@ -1,6 +1,6 @@
 import pytest
-from gtd.config import ConfigParser
-from gtd.connection import TrelloConnection
+from todo.config import ConfigParser
+from todo.connection import TrelloConnection
 
 @pytest.fixture
 def on_connection():

@@ -1,6 +1,6 @@
 import trello
 import requests
-from gtd.exceptions import GTDException
+from todo.exceptions import GTDException
 
 
 class TrelloConnection:

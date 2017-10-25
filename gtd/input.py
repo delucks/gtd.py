@@ -11,12 +11,12 @@ import itertools
 import webbrowser
 from functools import partial
 from prompt_toolkit import prompt
-from gtd.misc import get_title_of_webpage, Colors
+from todo.misc import get_title_of_webpage, Colors
 from prompt_toolkit.contrib.completers import WordCompleter
-from gtd.exceptions import GTDException
-from gtd.connection import TrelloConnection
-from gtd.config import ConfigParser
-from gtd import __version__
+from todo.exceptions import GTDException
+from todo.connection import TrelloConnection
+from todo.config import ConfigParser
+from todo import __version__
 
 
 def prompt_for_confirmation(message, default=False):
@@ -158,7 +158,7 @@ class CardTool:
         }
         command_completer = WordCompleter(commands.keys())
         while True:
-            user_input = prompt('gtd.py {0} > '.format(__version__), completer=command_completer)
+            user_input = prompt('> ', completer=command_completer)
             if user_input in ['q', 'quit']:
                 raise GTDException(0)
             elif user_input in ['n', 'next']:

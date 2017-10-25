@@ -5,9 +5,9 @@ import datetime
 import itertools
 import webbrowser
 
-from gtd import __version__, __author__
-from gtd.misc import Colors
-from gtd.exceptions import GTDException
+from todo import __version__, __author__
+from todo.misc import Colors
+from todo.exceptions import GTDException
 
 
 class Display:

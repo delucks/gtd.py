@@ -5,11 +5,11 @@ import sys
 import click
 import requests
 import readline  # noqa
-from gtd.input import prompt_for_confirmation, BoardTool, CardTool
-from gtd.display import JSONDisplay, TextDisplay, TableDisplay
-from gtd.exceptions import GTDException
-from gtd.misc import Colors
-from gtd import __version__
+from todo.input import prompt_for_confirmation, BoardTool, CardTool
+from todo.display import JSONDisplay, TextDisplay, TableDisplay
+from todo.exceptions import GTDException
+from todo.misc import Colors
+from todo import __version__
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})

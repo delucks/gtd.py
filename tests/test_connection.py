@@ -1,6 +1,6 @@
 import pytest
 import trello
-from gtd.connection import TrelloConnection
+from todo.connection import TrelloConnection
 
 def test_connection_basics(off_connection):
     assert off_connection.trello is None
