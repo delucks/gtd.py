@@ -3,6 +3,7 @@
 import re
 import sys
 import click
+import requests
 import readline  # noqa
 from gtd.input import prompt_for_confirmation, BoardTool, CardTool
 from gtd.display import JSONDisplay, TextDisplay, TableDisplay
@@ -233,6 +234,9 @@ def review(tags, no_tags, match, listname, attachments, has_due, daily):
 if __name__ == '__main__':
     try:
         cli()
+    except requests.exceptions.ConnectionError:
+        print('[FATAL] Connection lost to the Trello API!')
+        sys.exit(1)
     except GTDException as e:
         if e.errno == 0:
             sys.exit(0)
