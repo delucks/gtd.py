@@ -7,10 +7,10 @@ import trello
 import shutil
 import termios
 import datetime
+import itertools
 import webbrowser
 from functools import partial
 from prompt_toolkit import prompt
-from itertools import zip_longest
 from gtd.misc import get_title_of_webpage, Colors
 from prompt_toolkit.contrib.completers import WordCompleter
 from gtd.exceptions import GTDException
@@ -69,6 +69,7 @@ def single_select(options):
     else:
         return None
 
+
 def tags_on_card(card, tags):
     '''Take in a comma-sep list of tag names, and ensure that
     each is on this card'''
@@ -79,12 +80,13 @@ def tags_on_card(card, tags):
     else:
         return False
 
+
 def triple_column_print(iterable):
     chunk_count = 3
     max_width = shutil.get_terminal_size().columns
     chunk_size = (max_width-4) // chunk_count
     args = [iter(iterable)] * chunk_count
-    for triplet in zip_longest(fillvalue='', *args):
+    for triplet in itertools.zip_longest(fillvalue='', *args):
         print('  {0:<{width}}{1:^{width}}{2:>{width}}  '.format(width=chunk_size, *triplet))
 
 
@@ -107,13 +109,15 @@ class CardTool:
         label_names = [l.decode('utf8') for l in label_choices.keys()]
         label_completer = WordCompleter(label_names, ignore_case=True)
         while True:
-            userinput = prompt('tag > ', completer=label_completer).strip()
+            tag_list = '' if card.list_labels is None else '|'.join([l.name.decode('utf8') for l in card.list_labels])
+            ps1 = 'tag names [{0}]> '.format(tag_list)
+            userinput = prompt(ps1, completer=label_completer).strip()
             if userinput == '':
                 break
             elif userinput == 'ls':
                 triple_column_print(label_names)
             elif userinput not in label_names:
-                #TODO put a prompt here to create the tag name if it does not exist
+                # TODO put a prompt here to create the tag name if it does not exist
                 print('Unrecognized tag name {0}, try again'.format(userinput))
             else:
                 label_obj = label_choices[bytes(userinput, 'utf8')]
@@ -124,6 +128,7 @@ class CardTool:
                     # This label already exists on the card so remove it
                     card.remove_label(label_obj)
                     print('Removed label {0}'.format(Colors.red + userinput + Colors.reset))
+                card.fetch()
 
     @staticmethod
     def smart_menu(card, f_display, list_choices, label_choices, color=None):
@@ -285,7 +290,7 @@ class BoardTool:
         tags = kwargs.get('tags', None)
         # custom user-supplied callable functions to filter a card on
         filter_funcs = kwargs.get('filter_funcs', None)
-        ### Parse arguments into callables
+        # Parse arguments into callables
         filters = []
         if tags:
             filters.append(partial(tags_on_card, tags=tags))
