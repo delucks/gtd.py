@@ -109,9 +109,7 @@ class CardTool:
         label_names = [l.decode('utf8') for l in label_choices.keys()]
         label_completer = WordCompleter(label_names, ignore_case=True)
         while True:
-            tag_list = '' if card.list_labels is None else '|'.join([l.name.decode('utf8') for l in card.list_labels])
-            ps1 = 'tag names [{0}]> '.format(tag_list)
-            userinput = prompt(ps1, completer=label_completer).strip()
+            userinput = prompt('tag name (blank exits) > ', completer=label_completer).strip()
             if userinput == '':
                 break
             elif userinput == 'ls':
@@ -128,7 +126,6 @@ class CardTool:
                     # This label already exists on the card so remove it
                     card.remove_label(label_obj)
                     print('Removed label {0}'.format(Colors.red + userinput + Colors.reset))
-                card.fetch()
 
     @staticmethod
     def smart_menu(card, f_display, list_choices, label_choices, color=None):
