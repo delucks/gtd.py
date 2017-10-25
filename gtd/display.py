@@ -186,7 +186,7 @@ class TextDisplay(Display):
         else:
             print('{0} {1}'.format(lbl, msg))
 
-    def show(self, card, show_list=True):
+    def show(self, card, *kwargs):
         self._p('Card', card.id)
         self._p('  Name:', card.name.decode('utf8'))
         try:
@@ -215,9 +215,10 @@ class TextDisplay(Display):
                 # fucking datetime throws exceptions about bullshit
                 pass
         if card.description:
-            self._p('  Description', card.description)
-        if show_list:
-            self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
+            self._p('  Description', '')
+            for line in card.description.splitlines():
+                print(' '*4 + line)
+        self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
 
     def show_list(self, iterable):
         for l in iterable:
@@ -264,7 +265,7 @@ class JSONDisplay(Display):
     def banner(self):
         pass
 
-    def show(self, card, _=None):
+    def show(self, card, *kwargs):
         result = {}
         for k, v in card.__dict__.items():
             if k != 'client':

@@ -93,7 +93,7 @@ def show(showtype, json, tags, no_tags, match, listname, attachments, has_due):
         )
         with display:
             for card in cards:
-                display.show(card, True)
+                display.show(card)
 
 
 @cli.command()
@@ -141,7 +141,7 @@ def grep(pattern, insensitive):
         display.banner()
     with display:
         for card in cards:
-            display.show(card, True)
+            display.show(card)
 
 
 @cli.command()
