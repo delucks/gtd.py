@@ -1,3 +1,5 @@
+import os
+import sys
 import requests
 from todo import __version__
 
@@ -32,3 +34,18 @@ def get_title_of_webpage(url):
         return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
     except requests.exceptions.ConnectionError:
         return None
+
+def StdErrRedirect:
+    '''Temporarily eat sys.stderr and allow no output.
+    This is used to suppress browser messages in webbrowser.open'''
+    def __init__(self):
+        self.devnull = open(os.devnull, 'w')
+
+    def __enter__(self):
+        self.old_stderr = sys.stderr
+        self.old_stderr.flush()
+        sys.stderr = self.devnull
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.devnull.flush()
+        sys.stderr = self.old_stderr

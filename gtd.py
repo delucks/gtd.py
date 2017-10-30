@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 '''entrypoint to gtd.py, written with click'''
 import re
+import os
 import sys
+import yaml
 import click
+import shutil
 import requests
 import readline  # noqa
+import webbrowser
+from requests_oauthlib import OAuth1Session
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import JSONDisplay, TextDisplay, TableDisplay
 from todo.exceptions import GTDException
@@ -52,6 +57,84 @@ def workflow():
         'The goal is to get everything except the current task out of your head\n'
         'and into a trusted system external to your mind.'
     )
+
+
+@cli.command()
+@click.option('-n', '--no-open', is_flag=True, default=False, help='do not automatically open URLs in a web browser')
+def onboard(no_open):
+    # TODO use StdErrRedirect to swallow warnings from the browsers
+    '''obtain an API key and OAUTH scopes necessary to run this program and output them into a yaml file'''
+    output_file = 'gtd.yaml'
+    user_api_key_url = 'https://trello.com/app-key'
+    request_token_url = 'https://trello.com/1/OAuthGetRequestToken'
+    authorize_url = 'https://trello.com/1/OAuthAuthorizeToken'
+    access_token_url = 'https://trello.com/1/OAuthGetAccessToken'
+    browser = None if no_open else webbrowser.get()
+    # First, open the URL that allows the user to get an auth token. Tell them to copy both into the program
+    click.echo('Welcome to gtd.py! To get started, open the following URL in your web browser:')
+    click.echo('  ' + user_api_key_url)
+    click.echo('When you arrive at that page, log in and copy the "Key" displayed in a text box.')
+    if not no_open:
+        browser.open_new_tab(user_api_key_url)
+    api_key = click.prompt('Please enter the value for "Key"', confirmation_prompt=True)
+    click.echo('Now scroll to the bottom of the page and copy the "Secret" shown in a text box.')
+    api_secret = click.prompt('Please enter the value for "Secret"', confirmation_prompt=True)
+    # Then, work on getting OAuth credentials for the user so they are permanently authorized to use this program
+    click.echo('We will now get the OAuth credentials necessary to use this program')
+    # The following code is cannibalized from trello.util.create_oauth_token from the py-trello project.
+    # Rewriting because it does not support opening the auth URLs using webbrowser.open and since we're using
+    # click, a lot of the input methods used in that script are simplistic compared to what's available to us.
+    # Thank you to the original authors!
+    '''Step 1: Get a request token. This is a temporary token that is used for
+    having the user authorize an access token and to sign the request to obtain
+    said access token.'''
+    session = OAuth1Session(client_key=api_key, client_secret=api_secret)
+    response = session.fetch_request_token(request_token_url)
+    resource_owner_key, resource_owner_secret = response.get('oauth_token'), response.get('oauth_token_secret')
+    '''Step 2: Redirect to the provider. Since this is a CLI script we do not
+    redirect. In a web application you would redirect the user to the URL
+    below.'''
+    user_confirmation_url = '{authorize_url}?oauth_token={oauth_token}&scope={scope}&expiration={expiration}&name={name}'.format(
+        authorize_url=authorize_url,
+        oauth_token=resource_owner_key,
+        expiration='never',
+        scope='read,write',
+        name='gtd.py'
+    )
+    click.echo('Visit the following URL in your web browser to authorize gtd.py to access your account:')
+    click.echo('  ' + user_confirmation_url)
+    if not no_open:
+        browser.open_new_tab(user_confirmation_url)
+    '''After the user has granted access to you, the consumer, the provider will
+    redirect you to whatever URL you have told them to redirect to. You can
+    usually define this in the oauth_callback argument as well.'''
+    while not click.confirm('Have you authorized gtd.py?', default=False):
+        pass
+    oauth_verifier = click.prompt('What is the PIN?')
+    '''Step 3: Once the consumer has redirected the user back to the oauth_callback
+    URL you can request the access token the user has approved. You use the
+    request token to sign this request. After this is done you throw away the
+    request token and use the access token returned. You should store this
+    access token somewhere safe, like a database, for future use.'''
+    session = OAuth1Session(client_key=api_key, client_secret=api_secret,
+                            resource_owner_key=resource_owner_key, resource_owner_secret=resource_owner_secret,
+                            verifier=oauth_verifier)
+    access_token = session.fetch_access_token(access_token_url)
+    final_output_data = {
+        'oauth_token': access_token['oauth_token'],
+        'oauth_token_secret': access_token['oauth_token_secret'],
+        'api_key': api_key,
+        'api_secret': api_secret
+    }
+    # Try to be safe about not destroying existing credentials
+    if os.path.exists(output_file):
+        if click.confirm('{0} exists already, would you like to back it up?'.format(output_file), default=True):
+            shutil.move(output_file, output_file + '.backup')
+        if not click.confirm('Overwrite the existing file?', default=False):
+            return
+    with open(output_file, 'w') as f:
+        f.write(yaml.safe_dump(final_output_data))
+    click.echo('Credentials saved in "{0}"- you can now use gtd.py!'.format(output_file))
 
 
 @cli.command()
