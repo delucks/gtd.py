@@ -214,7 +214,8 @@ def add(add_type, title, message, edit):
 @cli.command()
 @click.argument('pattern')
 @click.option('-i', '--insensitive', is_flag=True, help='ignore case')
-def grep(pattern, insensitive):
+@click.option('-c', '--count', is_flag=True)
+def grep(pattern, insensitive, count):
     '''egrep through titles of cards'''
     flags = re.I if insensitive else 0
     config, connection, board = BoardTool.start()
@@ -223,6 +224,9 @@ def grep(pattern, insensitive):
         title_regex=pattern,
         regex_flags=flags
     )
+    if count:
+        print(len(list(cards)))
+        return
     li, la = BoardTool.list_and_label_length(board)
     display = TableDisplay(config.color, li, la)
     if config.banner:
