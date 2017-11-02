@@ -13,7 +13,7 @@ from requests_oauthlib import OAuth1Session
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import JSONDisplay, TextDisplay, TableDisplay
 from todo.exceptions import GTDException
-from todo.misc import Colors
+from todo.misc import Colors, DevNullRedirect
 from todo import __version__
 
 
@@ -62,20 +62,19 @@ def workflow():
 @cli.command()
 @click.option('-n', '--no-open', is_flag=True, default=False, help='do not automatically open URLs in a web browser')
 def onboard(no_open):
-    # TODO use StdErrRedirect to swallow warnings from the browsers
     '''obtain an API key and OAUTH scopes necessary to run this program and output them into a yaml file'''
     output_file = 'gtd.yaml'
     user_api_key_url = 'https://trello.com/app-key'
     request_token_url = 'https://trello.com/1/OAuthGetRequestToken'
     authorize_url = 'https://trello.com/1/OAuthAuthorizeToken'
     access_token_url = 'https://trello.com/1/OAuthGetAccessToken'
-    browser = None if no_open else webbrowser.get()
     # First, open the URL that allows the user to get an auth token. Tell them to copy both into the program
     click.echo('Welcome to gtd.py! To get started, open the following URL in your web browser:')
     click.echo('  ' + user_api_key_url)
     click.echo('When you arrive at that page, log in and copy the "Key" displayed in a text box.')
     if not no_open:
-        browser.open_new_tab(user_api_key_url)
+        with DevNullRedirect():
+            webbrowser.open_new_tab(user_api_key_url)
     api_key = click.prompt('Please enter the value for "Key"', confirmation_prompt=True)
     click.echo('Now scroll to the bottom of the page and copy the "Secret" shown in a text box.')
     api_secret = click.prompt('Please enter the value for "Secret"', confirmation_prompt=True)
@@ -104,7 +103,8 @@ def onboard(no_open):
     click.echo('Visit the following URL in your web browser to authorize gtd.py to access your account:')
     click.echo('  ' + user_confirmation_url)
     if not no_open:
-        browser.open_new_tab(user_confirmation_url)
+        with DevNullRedirect():
+            webbrowser.open_new_tab(user_confirmation_url)
     '''After the user has granted access to you, the consumer, the provider will
     redirect you to whatever URL you have told them to redirect to. You can
     usually define this in the oauth_callback argument as well.'''
