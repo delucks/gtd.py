@@ -7,8 +7,13 @@ from todo import __version__
 with open('requirements.txt') as f:
     reqs = [l.strip() for l in f]
 
+with open('README.rst') as f:
+    readme_contents = f.read()
+
 setup(
     name='gtd.py',
+    description='A Fast Command-line Interface for Trello',
+    long_description=readme_contents,
     version=__version__,
     install_requires=reqs,
     packages=['todo'],
