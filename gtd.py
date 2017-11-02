@@ -323,7 +323,7 @@ def review(tags, no_tags, match, listname, attachments, has_due, daily):
     click.echo('All done, have a great day!')
 
 
-if __name__ == '__main__':
+def main():
     try:
         cli()
     except requests.exceptions.ConnectionError:
@@ -335,3 +335,6 @@ if __name__ == '__main__':
         else:
             print('Quitting due to error')
             sys.exit(1)
+
+if __name__ == '__main__':
+    main()

@@ -8,3 +8,6 @@ pip-selfcheck.json
 __pycache__
 share/*
 .cache/*
+build/*
+dist/*
+*egg-info*
