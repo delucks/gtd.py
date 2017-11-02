@@ -10,6 +10,7 @@ import requests
 import readline  # noqa
 import webbrowser
 from requests_oauthlib import OAuth1Session
+from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import JSONDisplay, TextDisplay, TableDisplay
 from todo.exceptions import GTDException
@@ -79,7 +80,7 @@ def onboard(no_open):
     click.echo('Now scroll to the bottom of the page and copy the "Secret" shown in a text box.')
     api_secret = click.prompt('Please enter the value for "Secret"', confirmation_prompt=True)
     # Then, work on getting OAuth credentials for the user so they are permanently authorized to use this program
-    click.echo('We will now get the OAuth credentials necessary to use this program')
+    click.echo('We will now get the OAuth credentials necessary to use this program...')
     # The following code is cannibalized from trello.util.create_oauth_token from the py-trello project.
     # Rewriting because it does not support opening the auth URLs using webbrowser.open and since we're using
     # click, a lot of the input methods used in that script are simplistic compared to what's available to us.
@@ -88,7 +89,11 @@ def onboard(no_open):
     having the user authorize an access token and to sign the request to obtain
     said access token.'''
     session = OAuth1Session(client_key=api_key, client_secret=api_secret)
-    response = session.fetch_request_token(request_token_url)
+    try:
+        response = session.fetch_request_token(request_token_url)
+    except TokenRequestDenied:
+        click.echo('Invalid API key/secret provided: {0} / {1}'.format(api_key, api_secret))
+        sys.exit(1)
     resource_owner_key, resource_owner_secret = response.get('oauth_token'), response.get('oauth_token_secret')
     '''Step 2: Redirect to the provider. Since this is a CLI script we do not
     redirect. In a web application you would redirect the user to the URL
