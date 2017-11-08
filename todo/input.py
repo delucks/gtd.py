@@ -254,11 +254,10 @@ class BoardTool:
     doing some boilerplate that can be handled in this class
     '''
     @staticmethod
-    def start():
-        config = ConfigParser().config
+    def start(config):
         connection = TrelloConnection(config)
         board = BoardTool.get_main_board(connection, config)
-        return config, connection, board
+        return connection, board
 
     @staticmethod
     def take_cards_from_lists(board, list_regex):
@@ -322,7 +321,11 @@ class BoardTool:
     @staticmethod
     def get_main_board(connection, config):
         '''use the configuration to get the main board & return it'''
-        return [b for b in connection.trello.list_boards('open') if b.name == bytes(config.board_name, 'utf8')][0]
+        if config.board is None:
+            # If no board name is passed, default to the first board
+            return [b for b in connection.trello.list_boards('open')][0]
+        else:
+            return [b for b in connection.trello.list_boards('open') if b.name == bytes(config.board, 'utf8')][0]
 
     @staticmethod
     def get_inbox_list(connection, config):

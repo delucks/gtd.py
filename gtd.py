@@ -7,6 +7,7 @@ import yaml
 import click
 import shutil
 import requests
+import platform
 import readline  # noqa
 import webbrowser
 from requests_oauthlib import OAuth1Session
@@ -18,10 +19,97 @@ from todo.misc import Colors, DevNullRedirect
 from todo import __version__
 
 
+class Configuration:
+    '''hold global configuration for this application. This class has required
+    arguments of the properties we need to connect to the Trello API and some
+    other properties that modify global state during each run
+    '''
+    def __init__(self, api_key, api_secret, oauth_token, oauth_token_secret, **kwargs):
+        self.api_key = api_key
+        self.api_secret = api_secret
+        self.oauth_token = oauth_token
+        self.oauth_token_secret = oauth_token_secret
+        self.board = kwargs.get('board', None)
+        self.banner = kwargs.get('banner', True)
+        self.color = kwargs.get('color', True)
+
+    @staticmethod
+    def suggest_config_location():
+        '''Do some platform detection and suggest a place for the users' config file to go'''
+        system = platform.system()
+        if system == 'Windows':
+            print('gtd.py support for Windows is rudimentary to none. Try to put your config file in $HOME/.gtd.yaml and run the script again')
+            raise GTDException(0)
+        elif system == 'Darwin':
+            preferred_location = os.path.expanduser('~/Library/Application Support/gtd/gtd.yaml')
+        elif system == 'Linux':
+            preferred_location = os.path.expanduser('~/.config/gtd/gtd.yaml')
+        else:
+            preferred_location = os.path.expanduser('~/.gtd.yaml')
+        return preferred_location
+
+    @staticmethod
+    def find_config_file():
+        # where to try finding the file in order
+        locations = [os.path.expanduser(x) for x in [
+            '~/.gtd.yaml',
+            '~/.config/gtd/gtd.yaml',
+            '~/Library/Application Support/gtd/gtd.yaml',
+            '~/.local/etc/gtd.yaml',
+            '~/.local/etc/gtd/gtd.yaml',
+        ]]
+        possible_cfg = None
+        for possible_loc in locations:
+            if os.path.isfile(possible_loc):
+                return possible_loc
+        # If we've gotten this far and did not find the configuration file, it does not exist
+        print('Could not find a valid config file for gtd. Put it in one of:')
+        for l in locations:
+            print('  ' + l)
+        raise GTDException(1)
+
+    @staticmethod
+    def from_file(filename=None):
+        if filename is None:
+            filename = Configuration.find_config_file()
+        with open(filename, 'r') as config_yaml:
+            file_config = yaml.safe_load(config_yaml)
+        for prop in ['api_key', 'api_secret', 'oauth_token', 'oauth_token_secret']:
+            if file_config.get(prop, None) is not None:
+                # great!
+                continue
+            else:
+                print('A required property {0} in your configuration was not found!'.format(prop))
+                print('Check the file {0}'.format(filename))
+                raise GTDException(1)
+        return Configuration(
+            file_config['api_key'],
+            file_config['api_secret'],
+            file_config['oauth_token'],
+            file_config['oauth_token_secret'],
+            board=file_config.get('board', None),
+            color=file_config.get('color', True),
+            banner=file_config.get('banner', True)
+        )
+
+pass_config = click.make_pass_decorator(Configuration)
+
+
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
-def cli():
+@click.option('-b', '--board', default=None)
+@click.option('--no-color', is_flag=True, default=False)
+@click.option('--no-banner', is_flag=True, default=False)
+@click.pass_context
+def cli(ctx, board, no_color, no_banner):
     '''gtd.py'''
-    pass
+    config = Configuration.from_file()
+    if board is not None:
+        config.board = board
+    if no_color:
+        config.color = False
+    if no_banner:
+        config.banner = False
+    ctx.obj = config
 
 
 @cli.command()
@@ -64,7 +152,7 @@ def workflow():
 @click.option('-n', '--no-open', is_flag=True, default=False, help='do not automatically open URLs in a web browser')
 def onboard(no_open):
     '''obtain an API key and OAUTH scopes necessary to run this program and output them into a yaml file'''
-    output_file = 'gtd.yaml'
+    output_file = Configuration.suggest_config_location()  # Use platform detection
     user_api_key_url = 'https://trello.com/app-key'
     request_token_url = 'https://trello.com/1/OAuthGetRequestToken'
     authorize_url = 'https://trello.com/1/OAuthAuthorizeToken'
@@ -131,6 +219,11 @@ def onboard(no_open):
         'api_key': api_key,
         'api_secret': api_secret
     }
+    # Ensure we have a folder to put this in, if it's in a nested config location
+    output_folder = os.path.dirname(output_file)
+    if not os.path.isdir(output_folder):
+        os.makedirs(output_folder)
+        click.echo('Created folder {0} to hold your configuration'.format(output_folder))
     # Try to be safe about not destroying existing credentials
     if os.path.exists(output_file):
         if click.confirm('{0} exists already, would you like to back it up?'.format(output_file), default=True):
@@ -151,9 +244,10 @@ def onboard(no_open):
 @click.option('-l', '--listname', help='filter cards to this list', default=None)
 @click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
 @click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
-def show(showtype, json, tags, no_tags, match, listname, attachments, has_due):
+@pass_config
+def show(config, showtype, json, tags, no_tags, match, listname, attachments, has_due):
     '''filter and display cards'''
-    config, _, board = BoardTool.start()
+    _, board = BoardTool.start(config)
     if json:
         display = JSONDisplay(config.color)
     else:
@@ -189,9 +283,10 @@ def show(showtype, json, tags, no_tags, match, listname, attachments, has_due):
 @click.argument('title')
 @click.option('-m', '--message', help='description for a new card')
 @click.option('--edit', is_flag=True)
-def add(add_type, title, message, edit):
+@pass_config
+def add(config, add_type, title, message, edit):
     '''add a new card, tag, or list'''
-    config, connection, board = BoardTool.start()
+    connection, board = BoardTool.start(config)
     display = TextDisplay(config.color)
     if add_type == 'tag':
         label = board.add_label(title, 'black')
@@ -215,10 +310,11 @@ def add(add_type, title, message, edit):
 @click.argument('pattern')
 @click.option('-i', '--insensitive', is_flag=True, help='ignore case')
 @click.option('-c', '--count', is_flag=True)
-def grep(pattern, insensitive, count):
+@pass_config
+def grep(config, pattern, insensitive, count):
     '''egrep through titles of cards'''
     flags = re.I if insensitive else 0
-    config, connection, board = BoardTool.start()
+    connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
         title_regex=pattern,
@@ -244,9 +340,10 @@ def grep(pattern, insensitive, count):
 @click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
 @click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
 @click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
-def batch(batchtype, tags, no_tags, match, listname, attachments, has_due):
+@pass_config
+def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_due):
     '''perform one action on many cards'''
-    config, connection, board = BoardTool.start()
+    connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
         tags=tags,
@@ -294,12 +391,13 @@ def batch(batchtype, tags, no_tags, match, listname, attachments, has_due):
 @click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
 @click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
 @click.option('--daily', help='daily review mode')
-def review(tags, no_tags, match, listname, attachments, has_due, daily):
+@pass_config
+def review(config, tags, no_tags, match, listname, attachments, has_due, daily):
     '''open a menu for each card selected'''
     if daily:
         click.echo('Welcome to daily review mode!\nThis combines all "Doing" lists so you can review what you should be doing soon.\n')
         listname = 'Doing'
-    config, connection, board = BoardTool.start()
+    connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
         tags=tags,
