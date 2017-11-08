@@ -17,6 +17,7 @@ setup(
     version=__version__,
     install_requires=reqs,
     packages=['todo'],
+    py_modules=['gtd'],
     entry_points={
         'console_scripts': [
             'gtd = gtd:main'

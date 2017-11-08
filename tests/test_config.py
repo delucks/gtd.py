@@ -4,7 +4,6 @@ import yaml
 import pytest
 import tempfile
 
-from todo.config import ConfigParser
 from todo.exceptions import GTDException
 
 def test_yaml_parser():

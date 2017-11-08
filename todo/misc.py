@@ -21,11 +21,6 @@ class Colors:
         return [Colors.red, Colors.green, Colors.yellow, Colors.blue, Colors.purple, Colors.cyan]
 
 
-class AttrDict(dict):
-    def __init__(self):
-        self.__dict__ = self
-
-
 def get_title_of_webpage(url):
     headers = {'User-Agent': 'gtd.py version ' + __version__}
     try:

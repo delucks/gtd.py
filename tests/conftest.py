@@ -1,5 +1,4 @@
 import pytest
-from todo.config import ConfigParser
 from todo.connection import TrelloConnection
 
 @pytest.fixture

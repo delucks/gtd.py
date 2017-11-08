@@ -15,7 +15,6 @@ from todo.misc import get_title_of_webpage, Colors
 from prompt_toolkit.contrib.completers import WordCompleter
 from todo.exceptions import GTDException
 from todo.connection import TrelloConnection
-from todo.config import ConfigParser
 from todo import __version__
 
 
@@ -323,9 +322,13 @@ class BoardTool:
         '''use the configuration to get the main board & return it'''
         if config.board is None:
             # If no board name is passed, default to the first board
-            return [b for b in connection.trello.list_boards('open')][0]
+            return connection.trello.list_boards('open')[0]
         else:
-            return [b for b in connection.trello.list_boards('open') if b.name == bytes(config.board, 'utf8')][0]
+            possible = [b for b in connection.trello.list_boards('open') if b.name == bytes(config.board, 'utf8')]
+            if possible:
+                return possible[0]
+            else:
+                return connection.trello.list_boards('open')[0]
 
     @staticmethod
     def get_inbox_list(connection, config):
