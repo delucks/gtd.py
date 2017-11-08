@@ -1,5 +1,5 @@
 PyYAML
-py-trello
+py-trello==0.9.0
 pytest==2.9.2
 click
 prompt_toolkit

@@ -137,18 +137,18 @@ class TableDisplay(Display):
         if self.per_row_divider:
             self.__show_divider()
         # Set up lists of the contents of each column
-        rawname = card.name.decode('utf8')
+        rawname = card.name
         if len(rawname) > self.sz_name:
             name = self._wrap_long_string(rawname, self.sz_name)
         else:
             name = [rawname]
         try:
-            create = [card.create_date.strftime(self.time_format_string)]
+            create = [card.card_created_date.strftime(self.time_format_string)]
         except IndexError:
             create = ['Repeating']
-        tags = [l.name.decode('utf8') for l in card.list_labels] if card.list_labels else []
-        due = [card.due_date.strftime(self.time_format_string)] if card.due else []
-        listname = [card.get_list().name.decode('utf8')]
+        tags = [l.name for l in card.list_labels] if card.list_labels else []
+        due = [card.due_date.strftime(self.time_format_string)] if card.due_date else []
+        listname = [card.get_list().name]
         # Take one element at a time each column's contents, print it
         for group in itertools.zip_longest(name, listname, create, tags, due, fillvalue=''):
             print(self.fmt_str.format(
@@ -188,7 +188,7 @@ class TextDisplay(Display):
 
     def show(self, card, *kwargs):
         self._p('Card', card.id)
-        self._p('  Name:', card.name.decode('utf8'))
+        self._p('  Name:', card.name)
         try:
             created = card.create_date
             self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
@@ -197,7 +197,7 @@ class TextDisplay(Display):
             # this happens when the card is created by the repeating cards trello power-up
             print('  Repeating Creation Date')
         if card.list_labels:
-            self._p('  Tags:', ','.join([l.name.decode('utf8') for l in card.list_labels]))
+            self._p('  Tags:', ','.join([l.name for l in card.list_labels]))
         if card.get_attachments():
             self._p('  Attachments:', ','.join([a['name'] for a in card.get_attachments()]))
         if card.due:
@@ -218,7 +218,7 @@ class TextDisplay(Display):
             self._p('  Description', '')
             for line in card.description.splitlines():
                 print(' '*4 + line)
-        self._p('  List:', '{0}'.format(card.get_list().name.decode('utf8')))
+        self._p('  List:', '{0}'.format(card.get_list().name))
 
     def show_list(self, iterable):
         for l in iterable:
@@ -240,11 +240,11 @@ class JSONDisplay(Display):
     def _normalize(self, for_json):
         '''force things to be json-serializable by name only'''
         if isinstance(for_json, trello.List):
-            return for_json.name.decode('utf8')
+            return for_json.name
         elif isinstance(for_json, trello.Label):
-            return for_json.name.decode('utf8')
+            return for_json.name
         elif isinstance(for_json, trello.Board):
-            return for_json.name.decode('utf8')
+            return for_json.name
         elif isinstance(for_json, bytes):
             return for_json.decode('utf8')
         elif isinstance(for_json, list):

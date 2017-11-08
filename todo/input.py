@@ -60,7 +60,7 @@ def single_select(options):
     for idx, chunk in enumerate(options):
         assigned = all_keys[idx]
         lookup[assigned] = idx
-        print('[{0}] {1}'.format(assigned, chunk.decode('utf8')))
+        print('[{0}] {1}'.format(assigned, chunk))
     print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+C to cancel')
     result = lookup.get(getch(), None)
     if result is not None:
@@ -74,7 +74,7 @@ def tags_on_card(card, tags):
     each is on this card'''
     if card.list_labels:
         user_tags = set(tags.split(','))
-        card_tags = set([l.name.decode('utf8') for l in card.list_labels])
+        card_tags = set([l.name for l in card.list_labels])
         return user_tags.issubset(card_tags)
     else:
         return False
@@ -105,7 +105,7 @@ class CardTool:
         :param trello.Card card: the card to modify
         :param dict label_choices: str->trello.Label, the names and objects of labels on this board
         '''
-        label_names = [l.decode('utf8') for l in label_choices.keys()]
+        label_names = [l for l in label_choices.keys()]
         label_completer = WordCompleter(label_names, ignore_case=True)
         while True:
             userinput = prompt('tag name (blank exits) > ', completer=label_completer).strip()
@@ -135,7 +135,7 @@ class CardTool:
         if not card.list_labels:
             print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
             CardTool.add_labels(card, label_choices)
-        if re.search('https?://', card.name.decode('utf8')):
+        if re.search('https?://', card.name):
             if prompt_for_confirmation('{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True):
                 CardTool.title_to_link(card)
         if card.get_attachments():
@@ -193,7 +193,7 @@ class CardTool:
     @staticmethod
     def title_to_link(card):
         # assumes card.name is the link you want
-        links = [n for n in card.name.decode('utf8').split() if 'http' in n]
+        links = [n for n in card.name.split() if 'http' in n]
         existing_attachments = [a['name'] for a in card.get_attachments()]
         for l in links:
             if l not in existing_attachments:
@@ -207,7 +207,7 @@ class CardTool:
 
     @staticmethod
     def rename(card, default=None):
-        newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name.decode('utf8'))).strip()
+        newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name)).strip()
         if newname:
             card.set_name(newname)
             # FIXME this hacks around a bug in the pytrello library, contribute it upstream
@@ -238,7 +238,7 @@ class CardTool:
         if dest is not None:
             destination_list = list_choices[dest]
             card.change_list(destination_list.id)
-            print('Moved to {0}'.format(destination_list.name.decode('utf8')))
+            print('Moved to {0}'.format(destination_list.name))
             return destination_list
         else:
             print('Skipping!')
@@ -262,7 +262,7 @@ class BoardTool:
     def take_cards_from_lists(board, list_regex):
         pattern = re.compile(list_regex, flags=re.I)
         target_lists = filter(
-            lambda x: pattern.search(x.name.decode('utf8')),
+            lambda x: pattern.search(x.name),
             board.get_lists('open')
         )
         for cardlist in target_lists:
@@ -292,7 +292,7 @@ class BoardTool:
         if no_tags:
             filters.append(lambda c: not c.list_labels)
         if title_regex:
-            filters.append(lambda c: re.search(title_regex, c.name.decode('utf8'), regex_flags))
+            filters.append(lambda c: re.search(title_regex, c.name, regex_flags))
         if filter_funcs:
             if callable(filter_funcs):
                 filters.append(filter_funcs)
@@ -324,7 +324,7 @@ class BoardTool:
             # If no board name is passed, default to the first board
             return connection.trello.list_boards('open')[0]
         else:
-            possible = [b for b in connection.trello.list_boards('open') if b.name == bytes(config.board, 'utf8')]
+            possible = [b for b in connection.trello.list_boards('open') if b.name == config.board]
             if possible:
                 return possible[0]
             else:
@@ -352,6 +352,6 @@ class BoardTool:
     @staticmethod
     def list_and_label_length(board):
         '''return maximum string length of lists & labels '''
-        max_list_len = len(max([l.name.decode('utf8') for l in board.get_lists('open')], key=len))
-        max_label_len = len(max([l.name.decode('utf8') for l in board.get_labels()], key=len))
+        max_list_len = len(max([l.name for l in board.get_lists('open')], key=len))
+        max_label_len = len(max([l.name for l in board.get_labels()], key=len))
         return max_list_len, max_label_len

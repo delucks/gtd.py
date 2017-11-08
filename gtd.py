@@ -203,7 +203,7 @@ def onboard(no_open):
     usually define this in the oauth_callback argument as well.'''
     while not click.confirm('Have you authorized gtd.py?', default=False):
         pass
-    oauth_verifier = click.prompt('What is the PIN?')
+    oauth_verifier = click.prompt('What is the Verification code?').strip()
     '''Step 3: Once the consumer has redirected the user back to the oauth_callback
     URL you can request the access token the user has approved. You use the
     request token to sign this request. After this is done you throw away the
@@ -256,11 +256,11 @@ def show(config, showtype, json, tags, no_tags, match, listname, attachments, ha
     if config.banner:
         display.banner()
     if showtype == 'lists':
-        lnames = [l.name.decode('utf8') for l in board.get_lists('open')]
+        lnames = [l.name for l in board.get_lists('open')]
         with display:
             display.show_list(lnames)
     elif showtype == 'tags':
-        tnames = [t.name.decode('utf8') for t in board.get_labels()]
+        tnames = [t.name for t in board.get_labels()]
         with display:
             display.show_list(tnames)
     else:
