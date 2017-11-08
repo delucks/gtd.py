@@ -190,7 +190,7 @@ class TextDisplay(Display):
         self._p('Card', card.id)
         self._p('  Name:', card.name)
         try:
-            created = card.create_date
+            created = card.card_created_date
             self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
             self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
         except IndexError:
