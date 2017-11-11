@@ -201,32 +201,49 @@ def show(config, showtype, json, tags, no_tags, match, listname, attachments, ha
                 display.show(card)
 
 
-@cli.command()
-@click.argument('add_type', type=click.Choice(['tag', 'card', 'list']))
+@cli.group()
+def add():
+    pass
+
+
+@add.command()
 @click.argument('title')
 @click.option('-m', '--message', help='Description for a new card')
 @click.option('--edit', is_flag=True, help="Edit the card as soon as it's created")
 @pass_config
-def add(config, add_type, title, message, edit):
-    '''Add a new card, tag, or list'''
+def card(config, title, message, edit):
+    '''Add a new card'''
     connection, board = BoardTool.start(config)
     display = TextDisplay(config.color)
-    if add_type == 'tag':
-        label = board.add_label(title, 'black')
-        click.echo('Successfully added tag {0}!'.format(label))
-    elif add_type == 'list':
-        l = board.add_list(title)
-        click.echo('Successfully added list {0}!'.format(l))
+    inbox = BoardTool.get_inbox_list(connection, config)
+    returned = inbox.add_card(name=title, desc=message)
+    if edit:
+        list_lookup = BoardTool.list_lookup(board)
+        label_lookup = BoardTool.label_lookup(board)
+        CardTool.smart_menu(card, display.show, list_lookup, label_lookup, Colors.yellow)
     else:
-        inbox = BoardTool.get_inbox_list(connection, config)
-        returned = inbox.add_card(name=title, desc=message)
-        if edit:
-            if config.color:
-                CardTool.review_card(returned, display.show, BoardTool.list_lookup(board), BoardTool.label_lookup(board), Colors.green)
-            else:
-                CardTool.review_card(returned, display.show, BoardTool.list_lookup(board), BoardTool.label_lookup(board))
-        else:
-            click.echo('Successfully added card {0}!'.format(returned))
+        click.echo('Successfully added card {0}!'.format(returned))
+
+
+@add.command()
+@click.argument('tagname')
+@click.option('-c', '--color', help='color to create this tag with', default='black')
+@pass_config
+def tag(config, tagname, color):
+    '''Add a new tag'''
+    connection, board = BoardTool.start(config)
+    label = board.add_label(tagname, color)
+    click.echo('Successfully added tag {0}!'.format(label))
+
+
+@add.command()
+@click.argument('listname')
+@pass_config
+def list(config, listname):
+    '''Add a new list'''
+    connection, board = BoardTool.start(config)
+    l = board.add_list(listname)
+    click.echo('Successfully added list {0}!'.format(l))
 
 
 @cli.command()
