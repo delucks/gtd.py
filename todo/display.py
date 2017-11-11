@@ -3,11 +3,9 @@ import shutil
 import trello
 import datetime
 import itertools
-import webbrowser
 
 from todo import __version__, __author__
 from todo.misc import Colors
-from todo.exceptions import GTDException
 
 
 class Display:

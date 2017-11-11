@@ -1,5 +1,4 @@
 import os
-import sys
 import requests
 from todo import __version__
 
