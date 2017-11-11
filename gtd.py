@@ -203,6 +203,7 @@ def show(config, showtype, json, tags, no_tags, match, listname, attachments, ha
 
 @cli.group()
 def add():
+    '''Add a new card, tag, or list'''
     pass
 
 
@@ -273,7 +274,7 @@ def grep(config, pattern, insensitive, count):
 
 
 @cli.command()
-@click.argument('batchtype')
+@click.argument('batchtype', type=click.Choice(['move', 'delete', 'tag', 'due', 'attach']))
 @click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
 @click.option('--no-tags', is_flag=True, default=False, help='Only use cards which have no tags')
 @click.option('-m', '--match', help='Only use cards whose title matches this regular expression', default=None)
@@ -316,6 +317,20 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
                 display.show(card)
                 if prompt_for_confirmation('Set due date?'):
                     CardTool.set_due_date(card)
+        elif batchtype == 'attach':
+            cards = BoardTool.filter_cards(
+                board,
+                tags=tags,
+                no_tags=no_tags,
+                title_regex='https?://',
+                list_regex=listname,
+                has_attachments=attachments,
+                has_due_date=has_due
+            )
+            for card in cards:
+                display.show(card)
+                if prompt_for_confirmation('Attach title?', True):
+                    CardTool.title_to_link(card)
         else:
             for card in cards:
                 display.show(card)
