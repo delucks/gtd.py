@@ -132,16 +132,16 @@ class CardTool:
         on = color if color else ''
         off = Colors.reset if color else ''
         f_display(card, True)
-        if not card.list_labels:
-            print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
-            CardTool.add_labels(card, label_choices)
-        if re.search('https?://', card.name):
-            if prompt_for_confirmation('{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True):
-                CardTool.title_to_link(card)
         if card.get_attachments():
             if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
                 for l in [a.name for a in card.get_attachments()]:
                     webbrowser.open(l)
+        if re.search('https?://', card.name):
+            if prompt_for_confirmation('{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True):
+                CardTool.title_to_link(card)
+        if not card.list_labels:
+            print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
+            CardTool.add_labels(card, label_choices)
         commands = {
             'archive': 'mark this card as closed',
             'delete': 'permanently delete this card',

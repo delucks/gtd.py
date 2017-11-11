@@ -23,9 +23,9 @@ pass_config = click.make_pass_decorator(Configuration)
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.version_option(__version__)
-@click.option('-b', '--board', default=None)
-@click.option('--no-color', is_flag=True, default=False)
-@click.option('--no-banner', is_flag=True, default=False)
+@click.option('-b', '--board', default=None, help='Name of the board to work with for this session')
+@click.option('--no-color', is_flag=True, default=False, help='Disable ANSI terminal color?')
+@click.option('--no-banner', is_flag=True, default=False, help='Disable banner printing?')
 @click.pass_context
 def cli(ctx, board, no_color, no_banner):
     '''gtd.py'''
@@ -52,9 +52,9 @@ def cli(ctx, board, no_color, no_banner):
 
 
 @cli.command()
-@click.option('-w', '--workflow', is_flag=True, default=False)
+@click.option('-w', '--workflow', is_flag=True, default=False, help='Show a Getting Things Done workflow')
 def info(workflow):
-    '''show information about this program and its configuration'''
+    '''Learn more about gtd.py'''
     if workflow:
         click.echo(WORKFLOW_TEXT)
         raise GTDException(0)
@@ -65,14 +65,16 @@ def info(workflow):
 
 @cli.command()
 def config():
-    '''show the user configuration'''
+    '''Show user configuration'''
     print(Configuration.from_file())
 
 
-@cli.command()
-@click.option('-n', '--no-open', is_flag=True, default=False, help='do not automatically open URLs in a web browser')
+@cli.command(short_help='Obtain Trello API credentials')
+@click.option('-n', '--no-open', is_flag=True, default=False, help='Do not automatically open URLs in a web browser')
 def onboard(no_open, output_path=None):
-    '''obtain an API key and OAUTH scopes necessary to run this program and output them into a yaml file'''
+    '''Obtain Trello API credentials and put them into your config file.
+    This is invoked automatically the first time you attempt to do an operation which requires authentication.
+    '''
     output_file = output_path or Configuration.suggest_config_location()  # Use platform detection
     user_api_key_url = 'https://trello.com/app-key'
     request_token_url = 'https://trello.com/1/OAuthGetRequestToken'
@@ -158,16 +160,16 @@ def onboard(no_open, output_path=None):
 
 @cli.command()
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
-@click.option('-j', '--json', is_flag=True, default=False, help='output as JSON')
-@click.option('-t', '--tags', default=None)
-@click.option('--no-tags', is_flag=True, default=False)
-@click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
-@click.option('-l', '--listname', help='filter cards to this list', default=None)
-@click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
-@click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
+@click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')
+@click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
+@click.option('--no-tags', is_flag=True, default=False, help='Only show cards which have no tags')
+@click.option('-m', '--match', help='Filter cards to this regex on their title', default=None)
+@click.option('-l', '--listname', help='Only show cards from this list', default=None)
+@click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)
+@click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)
 @pass_config
 def show(config, showtype, json, tags, no_tags, match, listname, attachments, has_due):
-    '''filter and display cards'''
+    '''Display cards, tags, or lists on this board'''
     _, board = BoardTool.start(config)
     if json:
         display = JSONDisplay(config.color)
@@ -202,11 +204,11 @@ def show(config, showtype, json, tags, no_tags, match, listname, attachments, ha
 @cli.command()
 @click.argument('add_type', type=click.Choice(['tag', 'card', 'list']))
 @click.argument('title')
-@click.option('-m', '--message', help='description for a new card')
-@click.option('--edit', is_flag=True)
+@click.option('-m', '--message', help='Description for a new card')
+@click.option('--edit', is_flag=True, help="Edit the card as soon as it's created")
 @pass_config
 def add(config, add_type, title, message, edit):
-    '''add a new card, tag, or list'''
+    '''Add a new card, tag, or list'''
     connection, board = BoardTool.start(config)
     display = TextDisplay(config.color)
     if add_type == 'tag':
@@ -229,8 +231,8 @@ def add(config, add_type, title, message, edit):
 
 @cli.command()
 @click.argument('pattern')
-@click.option('-i', '--insensitive', is_flag=True, help='ignore case')
-@click.option('-c', '--count', is_flag=True)
+@click.option('-i', '--insensitive', is_flag=True, help='Ignore case')
+@click.option('-c', '--count', is_flag=True, help='Output the count of matching cards')
 @pass_config
 def grep(config, pattern, insensitive, count):
     '''egrep through titles of cards'''
@@ -255,15 +257,15 @@ def grep(config, pattern, insensitive, count):
 
 @cli.command()
 @click.argument('batchtype')
-@click.option('-t', '--tags', default=None)
-@click.option('--no-tags', is_flag=True, default=False)
-@click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
-@click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
-@click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
-@click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
+@click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
+@click.option('--no-tags', is_flag=True, default=False, help='Only use cards which have no tags')
+@click.option('-m', '--match', help='Only use cards whose title matches this regular expression', default=None)
+@click.option('-l', '--listname', help='Only use cards from this list', default=None)
+@click.option('--attachments', is_flag=True, help='Only use cards which have attachments', default=None)
+@click.option('--has-due', is_flag=True, help='Only use cards which have due dates', default=None)
 @pass_config
 def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_due):
-    '''perform one action on many cards'''
+    '''Perform one action on many cards'''
     connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
@@ -304,20 +306,19 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
     click.echo('Batch completed, have a great day!')
 
 
-@cli.command()
-@click.option('-t', '--tags', default=None)
-@click.option('--no-tags', is_flag=True, default=False)
-@click.option('-m', '--match', help='filter cards to this regex on their title', default=None)
-@click.option('-l', '--listname', help='use cards from lists with names matching this regular expression', default=None)
-@click.option('--attachments', is_flag=True, help='select cards which have attachments', default=None)
-@click.option('--has-due', is_flag=True, help='select cards which have due dates', default=None)
-@click.option('--daily', help='daily review mode')
+@cli.command(short_help='Use a smart CLI menu')
+@click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
+@click.option('--no-tags', is_flag=True, default=False, help='Only use cards which have no tags')
+@click.option('-m', '--match', help='Only use cards whose title matches this regular expression', default=None)
+@click.option('-l', '--listname', help='Only use cards from this list', default=None)
+@click.option('--attachments', is_flag=True, help='Only use cards which have attachments', default=None)
+@click.option('--has-due', is_flag=True, help='Only use cards which have due dates', default=None)
 @pass_config
-def review(config, tags, no_tags, match, listname, attachments, has_due, daily):
-    '''open a menu for each card selected'''
-    if daily:
-        click.echo('Welcome to daily review mode!\nThis combines all "Doing" lists so you can review what you should be doing soon.\n')
-        listname = 'Doing'
+def review(config, tags, no_tags, match, listname, attachments, has_due):
+    '''show a smart, command-line based menu for each card selected.
+    This menu will prompt you to add tags to untagged cards, to attach the title
+    of cards which have a link in the title, and gives you all the other functionality combined.
+    '''
     connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
