@@ -4,7 +4,8 @@ import re
 import os
 import sys
 import yaml
-import click import shutil
+import click
+import shutil
 import requests
 import readline  # noqa
 import webbrowser
@@ -52,17 +53,20 @@ def cli(ctx, board, no_color, no_banner):
 
 @cli.command()
 @click.option('-w', '--workflow', is_flag=True, default=False)
-@click.option('-c', '--config', is_flag=True, default=False)
-def info(workflow, config):
+def info(workflow):
     '''show information about this program and its configuration'''
     if workflow:
         click.echo(WORKFLOW_TEXT)
         raise GTDException(0)
-    elif config:
-        print(Configuration.from_file())
     else:
         print('gtd.py version {c}{0}{r}'.format(__version__, c=Colors.green, r=Colors.reset))
         print('{c}https://github.com/delucks/gtd.py/{r}\nPRs welcome\n'.format(c=Colors.green, r=Colors.reset))
+
+
+@cli.command()
+def config():
+    '''show the user configuration'''
+    print(Configuration.from_file())
 
 
 @cli.command()
