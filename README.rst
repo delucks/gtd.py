@@ -11,7 +11,8 @@ The project is named "gtd.py" because it was initially built as a tool for me to
 Setup
 ------
 
-.. code:: shell
+::
+
   $ pip install gtd.py
   $ gtd onboard
 
@@ -19,7 +20,8 @@ The ``onboard`` command will assist you through the process of getting a Trello 
 
 If you prefer to do the process manually, Trello has a button on their website for temporarily creating an OAUTH key/token. That should be put in a yaml file located at ``$HOME/.config/gtd/gtd.yaml``, formatted like this:
 
-.. code:: yaml
+::
+
   api_key: "your-api-key"
   api_secret: "your-api-secret"
   oauth_token: "your-oauth-token"
@@ -34,7 +36,8 @@ Usage
 
 Filter & show cards:
 
-.. code:: shell
+::
+
   $ # Show cards from a list matching a regular expression on their titles
   $ gtd show cards -l Inbox -m 'https?'
   $ # Show cards which have no tags but have due dates
