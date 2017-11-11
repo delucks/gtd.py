@@ -117,7 +117,7 @@ class CardTool:
                 # TODO put a prompt here to create the tag name if it does not exist
                 print('Unrecognized tag name {0}, try again'.format(userinput))
             else:
-                label_obj = label_choices[bytes(userinput, 'utf8')]
+                label_obj = label_choices[userinput]
                 try:
                     card.add_label(label_obj)
                     print('Added label {0}'.format(Colors.green + userinput + Colors.reset))
@@ -140,7 +140,7 @@ class CardTool:
                 CardTool.title_to_link(card)
         if card.get_attachments():
             if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
-                for l in [a['name'] for a in card.get_attachments()]:
+                for l in [a.name for a in card.get_attachments()]:
                     webbrowser.open(l)
         commands = {
             'archive': 'mark this card as closed',
@@ -211,11 +211,11 @@ class CardTool:
         if newname:
             card.set_name(newname)
             # FIXME this hacks around a bug in the pytrello library, contribute it upstream
-            card.name = bytes(newname, 'utf8')
+            #card.name = bytes(newname, 'utf8')
         else:
             if default:
                 card.set_name(default)
-                card.name = bytes(default, 'utf8')
+                #card.name = bytes(default, 'utf8')
 
     @staticmethod
     def set_due_date(card):
@@ -336,7 +336,7 @@ class BoardTool:
         Trello, return the list where new cards should go.
         '''
         board = BoardTool.get_main_board(connection, config)
-        if config.get('inbox_list', False):
+        if getattr(config, 'inbox_list', False):
             return [l for l in board.open_lists() if l.name == bytes(config.inbox_list, 'utf8')][0]
         else:
             return board.open_lists()[0]

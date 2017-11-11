@@ -192,14 +192,14 @@ class TextDisplay(Display):
         try:
             created = card.card_created_date
             self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
-            self._p('  Age:', datetime.datetime.now(datetime.timezone.utc) - created)
+            self._p('  Age:', datetime.datetime.now() - created)
         except IndexError:
             # this happens when the card is created by the repeating cards trello power-up
             print('  Repeating Creation Date')
         if card.list_labels:
             self._p('  Tags:', ','.join([l.name for l in card.list_labels]))
         if card.get_attachments():
-            self._p('  Attachments:', ','.join([a['name'] for a in card.get_attachments()]))
+            self._p('  Attachments:', ','.join(a.name for a in card.get_attachments()))
         if card.due:
             self._p('  Due:', card.due_date)
             try:

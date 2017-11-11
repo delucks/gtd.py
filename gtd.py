@@ -15,7 +15,7 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import JSONDisplay, TextDisplay, TableDisplay
 from todo.exceptions import GTDException
-from todo.misc import Colors, DevNullRedirect
+from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT
 from todo import __version__
 
 
@@ -33,6 +33,20 @@ class Configuration:
         self.banner = kwargs.get('banner', True)
         self.color = kwargs.get('color', True)
 
+    def __repr__(self):
+        return '\n'.join(['GTD Configuration:',
+                '  API key: ' + self.api_key,
+                '  API secret: ' + self.api_secret,
+                '  OAuth token: ' + self.oauth_token,
+                '  OAuth secret: ' + self.oauth_token_secret,
+                '  Primary board: '.format(self.board),
+                '  Banner? '.format(self.banner),
+                '  Use ANSI color? {0}'.format(self.color),
+        ])
+
+    def __str__(self):
+        return repr(self)
+
     @staticmethod
     def suggest_config_location():
         '''Do some platform detection and suggest a place for the users' config file to go'''
@@ -49,23 +63,23 @@ class Configuration:
         return preferred_location
 
     @staticmethod
-    def find_config_file():
-        # where to try finding the file in order
-        locations = [os.path.expanduser(x) for x in [
+    def all_config_locations():
+        return [os.path.expanduser(x) for x in [
             '~/.gtd.yaml',
             '~/.config/gtd/gtd.yaml',
             '~/Library/Application Support/gtd/gtd.yaml',
             '~/.local/etc/gtd.yaml',
             '~/.local/etc/gtd/gtd.yaml',
         ]]
+
+    @staticmethod
+    def find_config_file():
+        # where to try finding the file in order
         possible_cfg = None
-        for possible_loc in locations:
+        for possible_loc in Configuration.all_config_locations():
             if os.path.isfile(possible_loc):
                 return possible_loc
         # If we've gotten this far and did not find the configuration file, it does not exist
-        print('Could not find a valid config file for gtd. Put it in one of:')
-        for l in locations:
-            print('  ' + l)
         raise GTDException(1)
 
     @staticmethod
@@ -95,14 +109,26 @@ class Configuration:
 pass_config = click.make_pass_decorator(Configuration)
 
 
-@click.group(context_settings={'help_option_names': ['-h', '--help']})
+@click.group(context_settings={'help_option_names': ['-h', '--help']}, invoke_without_command=True)
+@click.version_option(__version__)
 @click.option('-b', '--board', default=None)
 @click.option('--no-color', is_flag=True, default=False)
 @click.option('--no-banner', is_flag=True, default=False)
 @click.pass_context
 def cli(ctx, board, no_color, no_banner):
     '''gtd.py'''
-    config = Configuration.from_file()
+    try:
+        config = Configuration.from_file()
+    except GTDException:
+        click.echo('Could not find a valid config file for gtd.')
+        if click.confirm('Would you like to create it interactively?'):
+            ctx.invoke(onboard)
+            raise GTDException(0)
+        else:
+            click.echo('Put your config file in one of the following locations:')
+            for l in Configuration.all_config_locations():
+                print('  ' + l)
+            raise
     if board is not None:
         config.board = board
     if no_color:
@@ -113,46 +139,25 @@ def cli(ctx, board, no_color, no_banner):
 
 
 @cli.command()
-@click.pass_context
-def help(ctx):
-    '''Show this help message and exit.'''
-    click.echo(ctx.parent.get_help())
-
-
-@cli.command()
-def version():
-    '''Display the running version of gtd.py'''
-    click.echo('gtd.py version {0}'.format(__version__))
-
-
-@cli.command()
-def workflow():
-    '''show the recommended workflow'''
-    click.echo(
-        '1. Collect absolutely everything that can take your attention into "Inbound"\n'
-        '2. Filter:\n'
-        '    Nonactionable -> Static Reference or Delete\n'
-        '    Takes < 2 minutes -> Do now, then Delete\n'
-        '    Not your responsibility -> "Holding" or "Blocked" with follow-up\n'
-        '    Something to communicate -> messaging lists\n'
-        '    Your responsibility -> Your lists\n'
-        '3. Write "final" state of each task and "next" state of each task\n'
-        '4. Categorize inbound items into lists based on action type required (call x, talk to x, meet x...)\n'
-        '5. Reviews:\n'
-        '    Daily -> Go through "Inbound" and "Doing"\n'
-        '    Weekly -> Additionally, go through "Holding", "Blocked", and messaging lists\n'
-        '6. Do\n'
-        '\n'
-        'The goal is to get everything except the current task out of your head\n'
-        'and into a trusted system external to your mind.'
-    )
+@click.option('-w', '--workflow', is_flag=True, default=False)
+@click.option('-c', '--config', is_flag=True, default=False)
+def info(workflow, config):
+    '''show information about this program and its configuration'''
+    if workflow:
+        click.echo(WORKFLOW_TEXT)
+        raise GTDException(0)
+    elif config:
+        print(Configuration.from_file())
+    else:
+        print('gtd.py version {c}{0}{r}'.format(__version__, c=Colors.green, r=Colors.reset))
+        print('{c}https://github.com/delucks/gtd.py/{r}\nPRs welcome\n'.format(c=Colors.green, r=Colors.reset))
 
 
 @cli.command()
 @click.option('-n', '--no-open', is_flag=True, default=False, help='do not automatically open URLs in a web browser')
-def onboard(no_open):
+def onboard(no_open, output_path=None):
     '''obtain an API key and OAUTH scopes necessary to run this program and output them into a yaml file'''
-    output_file = Configuration.suggest_config_location()  # Use platform detection
+    output_file = output_path or Configuration.suggest_config_location()  # Use platform detection
     user_api_key_url = 'https://trello.com/app-key'
     request_token_url = 'https://trello.com/1/OAuthGetRequestToken'
     authorize_url = 'https://trello.com/1/OAuthAuthorizeToken'
@@ -231,7 +236,7 @@ def onboard(no_open):
         if not click.confirm('Overwrite the existing file?', default=False):
             return
     with open(output_file, 'w') as f:
-        f.write(yaml.safe_dump(final_output_data))
+        f.write(yaml.safe_dump(final_output_data, default_flow_style=False))
     click.echo('Credentials saved in "{0}"- you can now use gtd.py!'.format(output_file))
 
 
@@ -422,6 +427,7 @@ def review(config, tags, no_tags, match, listname, attachments, has_due, daily):
 
 
 def main():
+    # Try implementing the workflow, help, onboard entrypoint here
     try:
         cli()
     except requests.exceptions.ConnectionError:
