@@ -6,20 +6,20 @@ A Fast Command-line Interface for Trello
 
 This is a command-line tool that enables you to add, sort, and review cards on Trello rapidly. It is designed to reduce the amount of friction between your thoughts and your TODO list, especially if you never leave the terminal.
 
-The project is named "gtd.py" because it was initially built as a tool for me to maintain a Trello board using the `Getting Things Done<https://en.wikipedia.org/wiki/Getting_Things_Done>`_ task tracking method. I've been actively using this tool for GTD since the first commit; if you're trying to use GTD with Trello this is the tool for you.
+The project is named "gtd.py" because it was initially built as a tool for me to maintain a Trello board using the gettingthingsdone_ task tracking method. I've been actively using this tool for GTD since the first commit; if you're trying to use GTD with Trello this is the tool for you.
 
 Setup
 ------
 
-::
-  pip install gtd.py
-  gtd onboard
+.. code:: shell
+  $ pip install gtd.py
+  $ gtd onboard
 
 The ``onboard`` command will assist you through the process of getting a Trello API key for use with this program and putting it in the correct file. Until you've run ``onboard``, all invocations of ``gtd`` will fail.
 
 If you prefer to do the process manually, Trello has a button on their website for temporarily creating an OAUTH key/token. That should be put in a yaml file located at ``$HOME/.config/gtd/gtd.yaml``, formatted like this:
 
-::
+.. code:: yaml
   api_key: "your-api-key"
   api_secret: "your-api-secret"
   oauth_token: "your-oauth-token"
@@ -27,6 +27,21 @@ If you prefer to do the process manually, Trello has a button on their website f
   board_name: "The name of the board you want to work with"
 
 The ``board_name`` property will soon not be required.
+
+
+Usage
+-----
+
+Filter & show cards:
+
+.. code:: shell
+  $ # Show cards from a list matching a regular expression on their titles
+  $ gtd show cards -l Inbox -m 'https?'
+  $ # Show cards which have no tags but have due dates
+  $ gtd show cards --no-tags --has-due
+  $ # Filter all cards based on a regex
+  $ gtd grep 'http.*amazon'
+
 
 Notes
 ------
@@ -41,3 +56,6 @@ License
 BSD. There is a copy included with the software as LICENSE.txt
 
 Copyright 2017 Jamie Luck (delucks)
+
+
+.. _gettingthingsdone: https://en.wikipedia.org/wiki/Getting_Things_Done
