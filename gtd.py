@@ -255,7 +255,6 @@ def grep(config, pattern, insensitive, count):
     if count:
         print(len(list(cards)))
         return
-    li, la = BoardTool.list_and_label_length(board)
     display = Display(config.color)
     if config.banner:
         display.banner()

@@ -345,10 +345,3 @@ class BoardTool:
     @staticmethod
     def label_lookup(board):
         return {o.name: o for o in board.get_labels()}
-
-    @staticmethod
-    def list_and_label_length(board):
-        '''return maximum string length of lists & labels '''
-        max_list_len = len(max([l.name for l in board.get_lists('open')], key=len))
-        max_label_len = len(max([l.name for l in board.get_labels()], key=len))
-        return max_list_len, max_label_len
