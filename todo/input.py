@@ -131,7 +131,7 @@ class CardTool:
         '''make assumptions about what you want to do with a card and ask the user if they want to'''
         on = color if color else ''
         off = Colors.reset if color else ''
-        f_display(card, True)
+        f_display(card)
         if card.get_attachments():
             if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
                 for l in [a.name for a in card.get_attachments()]:
@@ -163,7 +163,7 @@ class CardTool:
             elif user_input in ['n', 'next']:
                 break
             elif user_input in ['p', 'print']:
-                f_display(card, True)
+                f_display(card)
             elif user_input in ['o', 'open']:
                 for l in [a['name'] for a in card.get_attachments()]:
                     webbrowser.open(l)
@@ -210,12 +210,9 @@ class CardTool:
         newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name)).strip()
         if newname:
             card.set_name(newname)
-            # FIXME this hacks around a bug in the pytrello library, contribute it upstream
-            #card.name = bytes(newname, 'utf8')
         else:
             if default:
                 card.set_name(default)
-                #card.name = bytes(default, 'utf8')
 
     @staticmethod
     def set_due_date(card):

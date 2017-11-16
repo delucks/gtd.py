@@ -12,7 +12,7 @@ import webbrowser
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
-from todo.display import JSONDisplay, TextDisplay, TableDisplay
+from todo.display import Display
 from todo.exceptions import GTDException
 from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT
 from todo.configuration import Configuration
@@ -171,21 +171,13 @@ def onboard(no_open, output_path=None):
 def show(config, showtype, json, tags, no_tags, match, listname, attachments, has_due):
     '''Display cards, tags, or lists on this board'''
     _, board = BoardTool.start(config)
-    if json:
-        display = JSONDisplay(config.color)
-    else:
-        li, la = BoardTool.list_and_label_length(board)
-        display = TableDisplay(config.color, li, la)
+    display = Display()
     if config.banner:
         display.banner()
     if showtype == 'lists':
-        lnames = [l.name for l in board.get_lists('open')]
-        with display:
-            display.show_list(lnames)
+        display.show_raw([l.name for l in board.get_lists('open')])
     elif showtype == 'tags':
-        tnames = [t.name for t in board.get_labels()]
-        with display:
-            display.show_list(tnames)
+        display.show_raw([t.name for t in board.get_labels()])
     else:
         cards = BoardTool.filter_cards(
             board,
@@ -196,9 +188,7 @@ def show(config, showtype, json, tags, no_tags, match, listname, attachments, ha
             has_attachments=attachments,
             has_due_date=has_due
         )
-        with display:
-            for card in cards:
-                display.show(card)
+        display.show_cards(cards, use_json=json)
 
 
 @cli.group()
@@ -215,13 +205,13 @@ def add():
 def card(config, title, message, edit):
     '''Add a new card'''
     connection, board = BoardTool.start(config)
-    display = TextDisplay(config.color)
     inbox = BoardTool.get_inbox_list(connection, config)
     returned = inbox.add_card(name=title, desc=message)
     if edit:
+        display = Display(config.color)
         list_lookup = BoardTool.list_lookup(board)
         label_lookup = BoardTool.label_lookup(board)
-        CardTool.smart_menu(card, display.show, list_lookup, label_lookup, Colors.yellow)
+        CardTool.smart_menu(card, display.show_card, list_lookup, label_lookup, Colors.yellow)
     else:
         click.echo('Successfully added card {0}!'.format(returned))
 
@@ -265,12 +255,10 @@ def grep(config, pattern, insensitive, count):
         print(len(list(cards)))
         return
     li, la = BoardTool.list_and_label_length(board)
-    display = TableDisplay(config.color, li, la)
+    display = Display(config.color)
     if config.banner:
         display.banner()
-    with display:
-        for card in cards:
-            display.show(card)
+    display.show_cards(cards)
 
 
 @cli.command()
@@ -297,44 +285,43 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
     list_lookup = BoardTool.list_lookup(board)
     label_lookup = BoardTool.label_lookup(board)
 
-    display = TextDisplay(config.color)
+    display = Display(config.color)
     if config.banner:
         display.banner()
-    with display:
-        if batchtype == 'move':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Want to move this one?', True):
-                    CardTool.move_to_list(card, list_lookup)
-        elif batchtype == 'delete':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Should we delete this card?'):
-                    card.delete()
-                    click.echo('Card deleted!')
-        elif batchtype == 'due':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Set due date?'):
-                    CardTool.set_due_date(card)
-        elif batchtype == 'attach':
-            cards = BoardTool.filter_cards(
-                board,
-                tags=tags,
-                no_tags=no_tags,
-                title_regex='https?://',
-                list_regex=listname,
-                has_attachments=attachments,
-                has_due_date=has_due
-            )
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Attach title?', True):
-                    CardTool.title_to_link(card)
-        else:
-            for card in cards:
-                display.show(card)
-                CardTool.add_labels(card, label_lookup)
+    if batchtype == 'move':
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Want to move this one?', True):
+                CardTool.move_to_list(card, list_lookup)
+    elif batchtype == 'delete':
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Should we delete this card?'):
+                card.delete()
+                click.echo('Card deleted!')
+    elif batchtype == 'due':
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Set due date?'):
+                CardTool.set_due_date(card)
+    elif batchtype == 'attach':
+        cards = BoardTool.filter_cards(
+            board,
+            tags=tags,
+            no_tags=no_tags,
+            title_regex='https?://',
+            list_regex=listname,
+            has_attachments=attachments,
+            has_due_date=has_due
+        )
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Attach title?', True):
+                CardTool.title_to_link(card)
+    else:
+        for card in cards:
+            display.show_card(card)
+            CardTool.add_labels(card, label_lookup)
     click.echo('Batch completed, have a great day!')
 
 
@@ -363,11 +350,11 @@ def review(config, tags, no_tags, match, listname, attachments, has_due):
     )
     list_lookup = BoardTool.list_lookup(board)
     label_lookup = BoardTool.label_lookup(board)
-    display = TextDisplay(config.color)
+    display = Display(config.color)
     if config.banner:
         display.banner()
     for card in cards:
-        CardTool.smart_menu(card, display.show, list_lookup, label_lookup, Colors.yellow)
+        CardTool.smart_menu(card, display.show_card, list_lookup, label_lookup, Colors.yellow)
     click.echo('All done, have a great day!')
 
 
