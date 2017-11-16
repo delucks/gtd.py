@@ -22,13 +22,14 @@ class Display:
       something to stdout
     - banner should have more ascii art options :D
     '''
-    def __init__(self, color=True):
+    def __init__(self, color=True, primary_color=Colors.blue):
         self.color = color
+        self.primary = primary_color
 
     def banner(self):
         '''display a banner for the beginning of program run, if supported'''
-        on = self.primary if self.coloration else ''
-        off = Colors.reset if self.coloration else ''
+        on = self.primary if self.color else ''
+        off = Colors.reset if self.color else ''
         banner = (
             ' __|_ _| ._     version {on}{0}{off}\n'
             '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
@@ -60,10 +61,10 @@ class Display:
         else:
             print(data)
 
-    '''copied from the JSONDisplay'''
-
     def _force_json(self, for_json):
-        '''force things to be json-serializable by name only'''
+        '''force objects held in datastructures to be json-serializable by name only
+        :param List|Label|Board|bytes|list|dict|datetime for_json: object to be encoded
+        '''
         if isinstance(for_json, trello.List):
             return for_json.name
         elif isinstance(for_json, trello.Label):
@@ -81,13 +82,18 @@ class Display:
         else:
             return for_json
 
-    # 'name', 'tags', 'list'
-    def show_cards(self, cards, use_json=False, csv=False, table_fields=[], field_blacklist=['desc']):
-        # this shows a table of some objects + metadata
-        # this shows a group of cards
-        '''supports
+    def show_cards(self, cards, use_json=False, tsv=False, table_fields=[], field_blacklist=['desc']):
+        '''Display an iterable of cards all at once.
+        Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
+        Supports the following cli commands:
             show cards
             grep
+    
+        :param list(trello.Card)|iterable(trello.Card) cards: cards to show
+        :param bool use_json: display all metadata of these cards in JSON format
+        :param bool tsv: display these cards using a tab-separated value format
+        :param list table_fields: display only these fields (overrides field_blacklist)
+        :param list field_blacklist: display all except these fields
         '''
         if use_json:
             sanitized_cards = list(map(
@@ -96,9 +102,6 @@ class Display:
             ))
             tostr = self._force_json(sanitized_cards)
             print(json.dumps(tostr, sort_keys=True, indent=2))
-        elif csv:
-            # not yet supported
-            pass
         else:
             # table
             # name of field -> callable that obtains this field from the card
@@ -118,8 +121,11 @@ class Display:
             fields['url'] = lambda c: getattr(c, 'shortUrl')
             table = prettytable.PrettyTable()
             table.field_names = fields.keys()
-            table.hrules = prettytable.FRAME
             table.align = 'l'
+            if tsv:
+                table.set_style(prettytable.PLAIN_COLUMNS)
+            else:
+                table.hrules = prettytable.FRAME
             for card in cards:
                 table.add_row([x(card) for x in fields.values()])
             # TODO add detection for when the table is over maximum width of the terminal and chop off fields
@@ -131,39 +137,33 @@ class Display:
             else:
                 print(table)
 
-    '''copied from the TextDisplay'''
-
-    # TODO refactor these out
-    def _colorize(self, lbl, msg, colorstring):
-        return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
-
-    def _p(self, lbl, msg, colorstring=Colors.blue):
-        if self.color:
-            print(self._colorize(lbl, msg, colorstring))
-        else:
-            print('{0} {1}'.format(lbl, msg))
-
     def show_card(self, card):
-        '''display one card in a way that does not depend on external styling like a table
-        supports
+        '''Display only one card in a format that doesn't take up too much space or depend on external styling.
+        Supports the following cli commands:
             review
             batch
+
+        :param trello.Card card: card to display
         '''
-        self._p('Card', card.id)
-        self._p('  Name:', card.name)
+        indent_print = lambda m, d: print('  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off))
+        on = self.primary if self.color else ''
+        off = Colors.reset if self.color else ''
+        print('{on}Card{off}'.format(on=on, off=off), card.id)
+        indent_print('Name:', card.name)
+        indent_print('List:', '{0}'.format(card.get_list().name))
+        if card.list_labels:
+            indent_print('Tags:', ','.join([l.name for l in card.list_labels]))
         try:
             created = card.card_created_date
-            self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
-            self._p('  Age:', datetime.datetime.now() - created)
+            indent_print('Created:', '{0} ({1})'.format(created, created.timestamp()))
+            indent_print('Age:', datetime.datetime.now() - created)
         except IndexError:
             # this happens when the card is created by the repeating cards trello power-up
-            print('  Repeating Creation Date')
-        if card.list_labels:
-            self._p('  Tags:', ','.join([l.name for l in card.list_labels]))
+            indent_print('Created:', 'Repeating Creation Date')
         if card.get_attachments():
-            self._p('  Attachments:', ','.join(a.name for a in card.get_attachments()))
+            indent_print('Attachments:', ','.join(a.name for a in card.get_attachments()))
         if card.due:
-            self._p('  Due:', card.due_date)
+            indent_print('Due:', card.due_date)
             try:
                 diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
                 if diff < datetime.timedelta(0):
@@ -172,12 +172,11 @@ class Display:
                     display = Colors.yellow
                 else:
                     display = Colors.green
-                print('  {0}Remaining: {1}{2}'.format(display, diff, Colors.reset))
+                indent_print('Remaining:', '{0}{1}{2}'.format(display, diff, Colors.reset))
             except TypeError:
                 # fucking datetime throws exceptions about bullshit
                 pass
         if card.description:
-            self._p('  Description', '')
+            indent_print('Description', '')
             for line in card.description.splitlines():
                 print(' '*4 + line)
-        self._p('  List:', '{0}'.format(card.get_list().name))

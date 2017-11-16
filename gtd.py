@@ -161,6 +161,7 @@ def onboard(no_open, output_path=None):
 @cli.command()
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
 @click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')
+@click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
 @click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
 @click.option('--no-tags', is_flag=True, default=False, help='Only show cards which have no tags')
 @click.option('-m', '--match', help='Filter cards to this regex on their title', default=None)
@@ -168,7 +169,7 @@ def onboard(no_open, output_path=None):
 @click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)
 @click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)
 @pass_config
-def show(config, showtype, json, tags, no_tags, match, listname, attachments, has_due):
+def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachments, has_due):
     '''Display cards, tags, or lists on this board'''
     _, board = BoardTool.start(config)
     display = Display()
@@ -188,7 +189,7 @@ def show(config, showtype, json, tags, no_tags, match, listname, attachments, ha
             has_attachments=attachments,
             has_due_date=has_due
         )
-        display.show_cards(cards, use_json=json)
+        display.show_cards(cards, use_json=json, tsv=tsv)
 
 
 @cli.group()
