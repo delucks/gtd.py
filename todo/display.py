@@ -27,7 +27,7 @@ class Display:
         self.primary = primary_color
 
     def banner(self):
-        '''display a banner for the beginning of program run, if supported'''
+        '''Display an ASCII art banner for the beginning of program run'''
         on = self.primary if self.color else ''
         off = Colors.reset if self.color else ''
         banner = (
@@ -103,10 +103,6 @@ class Display:
             tostr = self._force_json(sanitized_cards)
             print(json.dumps(tostr, sort_keys=True, indent=2))
         else:
-            # table
-            # name of field -> callable that obtains this field from the card
-            # we'll register the table with .keys()
-            # then iterate through the cards and call each .value() on the card to produce columns
             # TODO implement a custom sorting functions so the table can be sorted by multiple columns
             fields = OrderedDict()
             # This is done repetitively to establish column order
