@@ -5,6 +5,7 @@ import datetime
 import itertools
 import prettytable
 from collections import OrderedDict
+from click import get_terminal_size
 
 from todo import __version__, __author__
 from todo.misc import Colors
@@ -82,7 +83,7 @@ class Display:
         else:
             return for_json
 
-    def show_cards(self, cards, use_json=False, tsv=False, table_fields=[], field_blacklist=['desc']):
+    def show_cards(self, cards, use_json=False, tsv=False, table_fields=[], field_blacklist=[]):
         '''Display an iterable of cards all at once.
         Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
         Supports the following cli commands:
@@ -124,14 +125,26 @@ class Display:
                 table.hrules = prettytable.FRAME
             for card in cards:
                 table.add_row([x(card) for x in fields.values()])
-            # TODO add detection for when the table is over maximum width of the terminal and chop off fields
             if table_fields:
-                print(table.get_string(fields=table_fields, sortby='last activity'))
+                print(self.resize_and_get_table(table, table_fields))
             elif field_blacklist:
-                f = list(set(fields.keys()) - set(field_blacklist))
-                print(table.get_string(fields=f, sortby='last activity'))
+                print(self.resize_and_get_table(table, f))
             else:
-                print(table)
+                print(self.resize_and_get_table(table, fields.keys()))
+
+    def resize_and_get_table(self, table, fields):
+        '''Remove columns from the table until it fits in your terminal'''
+        maxwidth = get_terminal_size()[0]
+        possible = table.get_string(fields=fields, sortby='last activity')
+        fset = set(fields)
+        # Fields in increasing order of importance
+        to_remove = ['desc', 'id', 'board', 'url', 'last activity', 'list']
+        # Wait until we're under max width or until we can't discard more fields
+        while len(possible.splitlines()[0]) >= maxwidth and to_remove:
+            # Remove a field one at a time
+            fset.remove(to_remove.pop(0))
+            possible = table.get_string(fields=list(fset), sortby='last activity')
+        return possible
 
     def show_card(self, card):
         '''Display only one card in a format that doesn't take up too much space or depend on external styling.
