@@ -53,20 +53,31 @@ def cli(ctx, board, no_color, no_banner):
 
 @cli.command()
 @click.option('-w', '--workflow', is_flag=True, default=False, help='Show a Getting Things Done workflow')
-def info(workflow):
+@click.option('-b', '--banner', is_flag=True, default=False, help='Show a random banner')
+def info(workflow, banner):
     '''Learn more about gtd.py'''
     if workflow:
         click.echo(WORKFLOW_TEXT)
         raise GTDException(0)
+    elif banner:
+        print(get_banner())
     else:
         print('gtd.py version {c}{0}{r}'.format(__version__, c=Colors.green, r=Colors.reset))
         print('{c}https://github.com/delucks/gtd.py/{r}\nPRs welcome\n'.format(c=Colors.green, r=Colors.reset))
 
 
 @cli.command()
-def config():
-    '''Show user configuration'''
-    print(Configuration.from_file())
+@click.option('-e', '--edit', is_flag=True, help='Open $EDITOR on the configuration file')
+def config(edit):
+    '''Show/modify user configuration'''
+    if edit:
+        try:
+            click.edit(filename=Configuration.find_config_file())
+        except GTDException:
+            # There is no configuration file
+            click.echo("Could not find config file! Please run onboard if you haven't already")
+    else:
+        print(Configuration.from_file())
 
 
 @cli.command(short_help='Obtain Trello API credentials')
@@ -74,6 +85,8 @@ def config():
 def onboard(no_open, output_path=None):
     '''Obtain Trello API credentials and put them into your config file.
     This is invoked automatically the first time you attempt to do an operation which requires authentication.
+    The configuration file is put in an appropriate place for your operating system. If you want to change it later,
+    you can use `gtd config -e` to open it in $EDITOR.
     '''
     output_file = output_path or Configuration.suggest_config_location()  # Use platform detection
     user_api_key_url = 'https://trello.com/app-key'
@@ -140,7 +153,9 @@ def onboard(no_open, output_path=None):
         'oauth_token': access_token['oauth_token'],
         'oauth_token_secret': access_token['oauth_token_secret'],
         'api_key': api_key,
-        'api_secret': api_secret
+        'api_secret': api_secret,
+        'color': True,
+        'banner': True
     }
     # Ensure we have a folder to put this in, if it's in a nested config location
     output_folder = os.path.dirname(output_file)
@@ -156,9 +171,10 @@ def onboard(no_open, output_path=None):
     with open(output_file, 'w') as f:
         f.write(yaml.safe_dump(final_output_data, default_flow_style=False))
     click.echo('Credentials saved in "{0}"- you can now use gtd.py!'.format(output_file))
+    click.echo('Use the "config" command to view or edit your configuration file')
 
 
-@cli.command()
+@cli.command(short_help='Display cards, tags, or lists on this board')
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
 @click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')
 @click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
@@ -170,9 +186,14 @@ def onboard(no_open, output_path=None):
 @click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)
 @pass_config
 def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachments, has_due):
-    '''Display cards, tags, or lists on this board'''
+    '''Display cards, tags, or lists on this board.
+    The show command prints a table of all the cards with fields that will fit on the terminal you're using.
+    You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
+    This command along with the batch & review commands share a flexible argument scheme for getting card information.
+    Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
+    '''
     _, board = BoardTool.start(config)
-    display = Display()
+    display = Display(config.color)
     if config.banner:
         display.banner()
     if showtype == 'lists':
@@ -198,15 +219,22 @@ def add():
     pass
 
 
-@add.command()
-@click.argument('title')
+@add.command(short_help='Add a new card')
+@click.argument('title', required=False)
 @click.option('-m', '--message', help='Description for a new card')
 @click.option('--edit', is_flag=True, help="Edit the card as soon as it's created")
 @pass_config
 def card(config, title, message, edit):
-    '''Add a new card'''
+    '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
     connection, board = BoardTool.start(config)
     inbox = BoardTool.get_inbox_list(connection, config)
+    if not title:
+        title = click.edit(require_save=True, text='Change this buffer to the title for your card')
+        if title is None:  # No changes were made in $EDITOR
+            click.echo('No title entered for the new card!')
+            raise GTDException(1)
+        else:
+            title = title.strip()
     returned = inbox.add_card(name=title, desc=message)
     if edit:
         display = Display(config.color)
@@ -325,7 +353,7 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
     click.echo('Batch completed, have a great day!')
 
 
-@cli.command(short_help='Use a smart CLI menu')
+@cli.command(short_help='Use a smart shell-like menu')
 @click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
 @click.option('--no-tags', is_flag=True, default=False, help='Only use cards which have no tags')
 @click.option('-m', '--match', help='Only use cards whose title matches this regular expression', default=None)
