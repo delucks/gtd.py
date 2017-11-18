@@ -120,6 +120,11 @@ class Display:
                 table.hrules = prettytable.FRAME
             for card in cards:
                 table.add_row([x(card) for x in fields.values()])
+            try:
+                table[0]
+            except IndexError:
+                print('No cards match!')
+                raise GTDException(1)
             if table_fields:
                 print(self.resize_and_get_table(table, table_fields))
             elif field_blacklist:
