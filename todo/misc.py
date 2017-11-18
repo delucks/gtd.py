@@ -1,6 +1,11 @@
 import os
 import requests
-from todo import __version__
+from todo import __version__, __author__
+try:
+    from random import choice
+except OSError:
+    # Some platforms (cough cough armv7, mips) fail when importing random due to lack of hardware support
+    choice = lambda n: n.pop()
 
 
 class Colors:
@@ -63,3 +68,52 @@ WORKFLOW_TEXT = (
     'The goal is to get everything except the current task out of your head\n'
     'and into a trusted system external to your mind.'
 )
+
+
+def get_banner(version=__version__, author=__author__, use_color=True):
+    '''Hold a buncha poorly done ASCII banners and display one at random!'''
+    if use_color:
+        on = choice(Colors.all_colors())
+        off = Colors.reset
+    else:
+        on = off = ''
+    b1 = (
+        ' __|_ _| ._     version {on}{0}{off}\n'
+        '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
+        ' _|      |  /\n'
+    ).format(version, author, on=on, off=off)
+    b2 = (
+        '  ___  ____  ____    ____  _  _\n'
+        ' / __)(_  _)(  _ \  (  _ \( \/ )\n'
+        '( (_-.  )(   )(_) )  )___/ \  /\n'
+        ' \___/ (__) (____/{on}(){off}(__)   (__)\n'
+        '   version {on}{0}{off}\n'
+    ).format(version, on=on, off=off)
+    b3 = (
+        '        __      __   version {on}{0}{off}\n'
+        '.-----.|  |_.--|  |  .-----.--.--.\n'
+        '|  _  ||   _|  _  |{on}__{off}|  _  |  |  |\n'
+        '|___  ||____|_____{on}|__|{off}   __|___  |\n'
+        '|_____|              |__|  |_____|\n'
+    ).format(version, on=on, off=off)
+    b4 = (
+        '         __      .___  version {on}{0}{off}\n'
+        '   _____/  |_  __| _/______ ___.__.\n'
+        '  / ___\   __\/ __ | \____ <   |  |\n'
+        ' / /_/  >  | / /_/ | |  |_> >___  |\n'
+        ' \___  /|__| \____ |{on}/\{off}   __// ____|\n'
+        '/_____/           \/{on}\/{off}__|   \/\n'
+    ).format(version, on=on, off=off)
+    # A joke, is funny
+    b5 = '67 74 64 {on}2e{off} 70 79\n76 65 72 73 69 6f 6e {on}{0}{off}\n'.format(version, on=on, off=off)
+    b6 = '--. - -.. {on}.-.-.-{off} .--. -.--\n...- . .-. ... .. --- -. {on}{0}{off}\n'.format(version, on=on, off=off)
+    b7 = (
+        '     _     _\n'
+        ' ___| |_ _| |  ___ _ _\n'
+        '| . |  _| . |{on}_{off}| . | | |\n'
+        '|_  |_| |___{on}|_|{off}  _|_  |\n'
+        '|___|         |_| |___|\n'
+        '     version {on}{0}{off}\n'
+    ).format(version, on=on, off=off)
+    banner_choices = [b1, b2, b3, b4, b5, b6, b7]
+    return choice(banner_choices)

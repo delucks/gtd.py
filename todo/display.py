@@ -7,8 +7,9 @@ import prettytable
 from collections import OrderedDict
 from click import get_terminal_size
 
+from todo.exceptions import GTDException
 from todo import __version__, __author__
-from todo.misc import Colors
+from todo.misc import Colors, get_banner
 
 
 class Display:
@@ -29,13 +30,7 @@ class Display:
 
     def banner(self):
         '''Display an ASCII art banner for the beginning of program run'''
-        on = self.primary if self.color else ''
-        off = Colors.reset if self.color else ''
-        banner = (
-            ' __|_ _| ._     version {on}{0}{off}\n'
-            '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
-            ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
-        print(banner)
+        print(get_banner(use_color=self.color))
 
     def show_raw(self, data, use_json=False):
         '''this shows random datastructures
@@ -89,7 +84,7 @@ class Display:
         Supports the following cli commands:
             show cards
             grep
-    
+
         :param list(trello.Card)|iterable(trello.Card) cards: cards to show
         :param bool use_json: display all metadata of these cards in JSON format
         :param bool tsv: display these cards using a tab-separated value format

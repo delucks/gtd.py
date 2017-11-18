@@ -14,7 +14,7 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import Display
 from todo.exceptions import GTDException
-from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT
+from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner
 from todo.configuration import Configuration
 from todo import __version__
 
