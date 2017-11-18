@@ -266,23 +266,35 @@ def list(config, listname):
     click.echo('Successfully added list {0}!'.format(l))
 
 
-@cli.command()
-@click.argument('pattern')
+@cli.command(short_help='egrep through titles of cards')
+@click.argument('pattern', required=False)
 @click.option('-i', '--insensitive', is_flag=True, help='Ignore case')
 @click.option('-c', '--count', is_flag=True, help='Output the count of matching cards')
+@click.option('-e', '--regexp', help='Specify multiple patterns to match against the titles of cards', multiple=True)
 @pass_config
-def grep(config, pattern, insensitive, count):
-    '''egrep through titles of cards'''
+def grep(config, pattern, insensitive, count, regexp):
+    '''egrep through titles of cards on this board. This command attemps to replicate a couple of grep flags
+    faithfully, so if you're a power-user of grep this command will feel familiar.
+    '''
+    if not (pattern or regexp):
+        click.echo('No pattern provided to grep: use either the argument or -e')
+        raise GTDException(1)
+    # Merge together the different regex arguments
+    final_pattern = '|'.join(regexp) if regexp else ''
+    if pattern and final_pattern:
+        final_pattern = final_pattern + '|' + pattern
+    elif pattern:
+        final_pattern = pattern
     flags = re.I if insensitive else 0
     connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
-        title_regex=pattern,
+        title_regex=final_pattern,
         regex_flags=flags
     )
     if count:
-        print(len(list(cards)))
-        return
+        print(sum(1 for _ in cards))
+        raise GTDException(0)
     display = Display(config.color)
     if config.banner:
         display.banner()
