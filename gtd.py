@@ -221,7 +221,7 @@ def card(config, title, message, edit):
     if edit:
         list_lookup = BoardTool.list_lookup(board)
         label_lookup = BoardTool.label_lookup(board)
-        CardTool.smart_menu(card, display.show, list_lookup, label_lookup, Colors.yellow)
+        CardTool.smart_menu(returned, display.show, list_lookup, label_lookup, Colors.yellow)
     else:
         click.echo('Successfully added card {0}!'.format(returned))
 
