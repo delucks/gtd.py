@@ -8,6 +8,103 @@ This is a command-line tool that enables you to add, sort, and review cards on T
 
 The project is named "gtd.py" because it was initially built as a tool for me to maintain a Trello board using the GTD_ task tracking method. I've been actively using this tool for GTD since the first commit; if you're trying to use GTD with Trello this is the tool for you.
 
+
+Usage
+-----
+
+Displaying Cards
+^^^^^^^^^^^^^^^^
+
+The ``show`` command will return all the cards which match your supplied arguments as a table, in JSON format, or in TSV.
+
+::
+
+  # Show cards from the list "Inbox" matching a regular expression on their titles
+  $ gtd show cards -l Inbox -m 'https?'
+
+  # Show cards which have no tags but have due dates, in pretty-printed JSON format
+  $ gtd show cards --no-tags --has-due -j
+
+
+``grep`` faithfully implements some flags from the venerable utility, including -c, -i, and -e! An invocation of this command is similar to a longer invocation of ``show``: ``gtd grep 'some_pattern'`` is equivalent to ``gtd show cards -m 'some_pattern'``.
+
+::
+
+  # Filter all cards based on a regex
+  $ gtd grep 'http.*amazon'
+
+  # or multiple regexes!
+  $ gtd grep -e '[Jj]ob' -e 'career' -e '[oO]pportunity?'
+
+  # Use other popular grep flags!
+  $ gtd grep -ci 'meeting'
+
+Creating Things
+^^^^^^^^^^^^^^^^
+
+``add`` takes care of your needs for creating new:
+
+* Cards
+* Tags
+* Lists
+
+The command you'll probably use most frequently is ``add card``. Here are some common ways I use it:
+
+::
+
+  # Add a new card with title "foo"
+  $ gtd add card foo
+
+  # Specify a description with the card title
+  $ gtd add card foo -m 'Description for my new card'
+
+  # Open $EDITOR so you can write the card title
+  $ gtd add card
+
+The other subcommands for ``add`` (``add list`` and ``add tag``) are self-explanatory.
+
+Manipulating Cards in Bulk
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Frequently it's useful to move a whole bunch of cards at once, tag cards that match a certain parameter, or do other single actions repeatedly across a bunch of cards. To accomplish this, use the ``batch`` command. All the subcommands of ``batch`` are interactive, so you'll be prompted before anything is modified.
+
+::
+
+  # Tag all cards that have no tags
+  $ gtd batch tag --no-tags
+
+  # Find all cards with a URL in their title and move those URLs into their attachments
+  $ gtd batch attach
+
+  # Move all cards in your "Inbox" list
+  $ gtd batch move -l Inbox
+
+  # Delete all cards whose titles match this regular expression
+  $ gtd batch delete -m 'on T(hurs|ues)day'
+
+  # Set the due dates for all cards in a list containing the substring "Week"
+  $ gtd batch due -l Week
+
+  # Change the due date for all cards that have one already
+  $ gtd batch due --has-due
+
+
+Bringing It all Together
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+What if you don't know what kind of action you want to take on a card before you invoke ``gtd``? Well, we provide a nice menu for you to work on each card in turn. The menu is kinda REPL-like so if you're a terminal power user (truly, why would you use this tool unless you're already a terminal power-user) it'll feel familiar. The menu is built using ``python-prompt-toolkit`` so it has nice tab-completion on every command available within it. You can type ``help`` at any time to view all the commands available within the REPL.
+
+Seeing is believing, so until I record a terminal session of me using it I'd highly encourage you to play around with this menu. It does some detection on the title of your card and will prompt you to move links out into attachments if appropriate. If the card doesn't have any tags yet, it'll prompt you to add some.
+
+::
+
+  # Work through cards in the "Inbox" list one at a time
+  $ gtd review -l Inbox
+
+  # Review only cards from the "Today" list that have due dates
+  $ gtd review -l Today --has-due
+
+
 Setup
 ------
 
@@ -50,24 +147,6 @@ This configuration file can be put in a variety of locations within your home fo
 * ``~/Library/Application Support/gtd/gtd.yaml``
 * ``~/.local/etc/gtd.yaml``
 * ``~/.local/etc/gtd/gtd.yaml``
-
-
-Usage
------
-
-Filter & show cards:
-
-::
-
-  # Show cards from a list matching a regular expression on their titles
-  $ gtd show cards -l Inbox -m 'https?'
-
-  # Show cards which have no tags but have due dates
-  $ gtd show cards --no-tags --has-due
-
-  # Filter all cards based on a regex
-  $ gtd grep 'http.*amazon'
-
 
 Notes
 ------

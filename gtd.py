@@ -12,9 +12,9 @@ import webbrowser
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
-from todo.display import JSONDisplay, TextDisplay, TableDisplay
+from todo.display import Display
 from todo.exceptions import GTDException
-from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT
+from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner
 from todo.configuration import Configuration
 from todo import __version__
 
@@ -53,20 +53,31 @@ def cli(ctx, board, no_color, no_banner):
 
 @cli.command()
 @click.option('-w', '--workflow', is_flag=True, default=False, help='Show a Getting Things Done workflow')
-def info(workflow):
+@click.option('-b', '--banner', is_flag=True, default=False, help='Show a random banner')
+def info(workflow, banner):
     '''Learn more about gtd.py'''
     if workflow:
         click.echo(WORKFLOW_TEXT)
         raise GTDException(0)
+    elif banner:
+        print(get_banner())
     else:
         print('gtd.py version {c}{0}{r}'.format(__version__, c=Colors.green, r=Colors.reset))
         print('{c}https://github.com/delucks/gtd.py/{r}\nPRs welcome\n'.format(c=Colors.green, r=Colors.reset))
 
 
 @cli.command()
-def config():
-    '''Show user configuration'''
-    print(Configuration.from_file())
+@click.option('-e', '--edit', is_flag=True, help='Open $EDITOR on the configuration file')
+def config(edit):
+    '''Show/modify user configuration'''
+    if edit:
+        try:
+            click.edit(filename=Configuration.find_config_file())
+        except GTDException:
+            # There is no configuration file
+            click.echo("Could not find config file! Please run onboard if you haven't already")
+    else:
+        print(Configuration.from_file())
 
 
 @cli.command(short_help='Obtain Trello API credentials')
@@ -74,6 +85,8 @@ def config():
 def onboard(no_open, output_path=None):
     '''Obtain Trello API credentials and put them into your config file.
     This is invoked automatically the first time you attempt to do an operation which requires authentication.
+    The configuration file is put in an appropriate place for your operating system. If you want to change it later,
+    you can use `gtd config -e` to open it in $EDITOR.
     '''
     output_file = output_path or Configuration.suggest_config_location()  # Use platform detection
     user_api_key_url = 'https://trello.com/app-key'
@@ -140,7 +153,9 @@ def onboard(no_open, output_path=None):
         'oauth_token': access_token['oauth_token'],
         'oauth_token_secret': access_token['oauth_token_secret'],
         'api_key': api_key,
-        'api_secret': api_secret
+        'api_secret': api_secret,
+        'color': True,
+        'banner': True
     }
     # Ensure we have a folder to put this in, if it's in a nested config location
     output_folder = os.path.dirname(output_file)
@@ -156,11 +171,13 @@ def onboard(no_open, output_path=None):
     with open(output_file, 'w') as f:
         f.write(yaml.safe_dump(final_output_data, default_flow_style=False))
     click.echo('Credentials saved in "{0}"- you can now use gtd.py!'.format(output_file))
+    click.echo('Use the "config" command to view or edit your configuration file')
 
 
-@cli.command()
+@cli.command(short_help='Display cards, tags, or lists on this board')
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
 @click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')
+@click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
 @click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
 @click.option('--no-tags', is_flag=True, default=False, help='Only show cards which have no tags')
 @click.option('-m', '--match', help='Filter cards to this regex on their title', default=None)
@@ -168,24 +185,21 @@ def onboard(no_open, output_path=None):
 @click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)
 @click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)
 @pass_config
-def show(config, showtype, json, tags, no_tags, match, listname, attachments, has_due):
-    '''Display cards, tags, or lists on this board'''
+def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachments, has_due):
+    '''Display cards, tags, or lists on this board.
+    The show command prints a table of all the cards with fields that will fit on the terminal you're using.
+    You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
+    This command along with the batch & review commands share a flexible argument scheme for getting card information.
+    Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
+    '''
     _, board = BoardTool.start(config)
-    if json:
-        display = JSONDisplay(config.color)
-    else:
-        li, la = BoardTool.list_and_label_length(board)
-        display = TableDisplay(config.color, li, la)
+    display = Display(config.color)
     if config.banner:
         display.banner()
     if showtype == 'lists':
-        lnames = [l.name for l in board.get_lists('open')]
-        with display:
-            display.show_list(lnames)
+        display.show_raw([l.name for l in board.get_lists('open')])
     elif showtype == 'tags':
-        tnames = [t.name for t in board.get_labels()]
-        with display:
-            display.show_list(tnames)
+        display.show_raw([t.name for t in board.get_labels()])
     else:
         cards = BoardTool.filter_cards(
             board,
@@ -196,9 +210,7 @@ def show(config, showtype, json, tags, no_tags, match, listname, attachments, ha
             has_attachments=attachments,
             has_due_date=has_due
         )
-        with display:
-            for card in cards:
-                display.show(card)
+        display.show_cards(cards, use_json=json, tsv=tsv)
 
 
 @cli.group()
@@ -207,21 +219,28 @@ def add():
     pass
 
 
-@add.command()
-@click.argument('title')
+@add.command(short_help='Add a new card')
+@click.argument('title', required=False)
 @click.option('-m', '--message', help='Description for a new card')
 @click.option('--edit', is_flag=True, help="Edit the card as soon as it's created")
 @pass_config
 def card(config, title, message, edit):
-    '''Add a new card'''
+    '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
     connection, board = BoardTool.start(config)
-    display = TextDisplay(config.color)
     inbox = BoardTool.get_inbox_list(connection, config)
+    if not title:
+        title = click.edit(require_save=True, text='Change this buffer to the title for your card')
+        if title is None:  # No changes were made in $EDITOR
+            click.echo('No title entered for the new card!')
+            raise GTDException(1)
+        else:
+            title = title.strip()
     returned = inbox.add_card(name=title, desc=message)
     if edit:
+        display = Display(config.color)
         list_lookup = BoardTool.list_lookup(board)
         label_lookup = BoardTool.label_lookup(board)
-        CardTool.smart_menu(returned, display.show, list_lookup, label_lookup, Colors.yellow)
+        CardTool.smart_menu(returned, display.show_card, list_lookup, label_lookup, Colors.yellow)
     else:
         click.echo('Successfully added card {0}!'.format(returned))
 
@@ -247,30 +266,39 @@ def list(config, listname):
     click.echo('Successfully added list {0}!'.format(l))
 
 
-@cli.command()
-@click.argument('pattern')
+@cli.command(short_help='egrep through titles of cards')
+@click.argument('pattern', required=False)
 @click.option('-i', '--insensitive', is_flag=True, help='Ignore case')
 @click.option('-c', '--count', is_flag=True, help='Output the count of matching cards')
+@click.option('-e', '--regexp', help='Specify multiple patterns to match against the titles of cards', multiple=True)
 @pass_config
-def grep(config, pattern, insensitive, count):
-    '''egrep through titles of cards'''
+def grep(config, pattern, insensitive, count, regexp):
+    '''egrep through titles of cards on this board. This command attemps to replicate a couple of grep flags
+    faithfully, so if you're a power-user of grep this command will feel familiar.
+    '''
+    if not (pattern or regexp):
+        click.echo('No pattern provided to grep: use either the argument or -e')
+        raise GTDException(1)
+    # Merge together the different regex arguments
+    final_pattern = '|'.join(regexp) if regexp else ''
+    if pattern and final_pattern:
+        final_pattern = final_pattern + '|' + pattern
+    elif pattern:
+        final_pattern = pattern
     flags = re.I if insensitive else 0
     connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
-        title_regex=pattern,
+        title_regex=final_pattern,
         regex_flags=flags
     )
     if count:
-        print(len(list(cards)))
-        return
-    li, la = BoardTool.list_and_label_length(board)
-    display = TableDisplay(config.color, li, la)
+        print(sum(1 for _ in cards))
+        raise GTDException(0)
+    display = Display(config.color)
     if config.banner:
         display.banner()
-    with display:
-        for card in cards:
-            display.show(card)
+    display.show_cards(cards)
 
 
 @cli.command()
@@ -297,48 +325,47 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
     list_lookup = BoardTool.list_lookup(board)
     label_lookup = BoardTool.label_lookup(board)
 
-    display = TextDisplay(config.color)
+    display = Display(config.color)
     if config.banner:
         display.banner()
-    with display:
-        if batchtype == 'move':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Want to move this one?', True):
-                    CardTool.move_to_list(card, list_lookup)
-        elif batchtype == 'delete':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Should we delete this card?'):
-                    card.delete()
-                    click.echo('Card deleted!')
-        elif batchtype == 'due':
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Set due date?'):
-                    CardTool.set_due_date(card)
-        elif batchtype == 'attach':
-            cards = BoardTool.filter_cards(
-                board,
-                tags=tags,
-                no_tags=no_tags,
-                title_regex='https?://',
-                list_regex=listname,
-                has_attachments=attachments,
-                has_due_date=has_due
-            )
-            for card in cards:
-                display.show(card)
-                if prompt_for_confirmation('Attach title?', True):
-                    CardTool.title_to_link(card)
-        else:
-            for card in cards:
-                display.show(card)
-                CardTool.add_labels(card, label_lookup)
+    if batchtype == 'move':
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Want to move this one?', True):
+                CardTool.move_to_list(card, list_lookup)
+    elif batchtype == 'delete':
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Should we delete this card?'):
+                card.delete()
+                click.echo('Card deleted!')
+    elif batchtype == 'due':
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Set due date?'):
+                CardTool.set_due_date(card)
+    elif batchtype == 'attach':
+        cards = BoardTool.filter_cards(
+            board,
+            tags=tags,
+            no_tags=no_tags,
+            title_regex='https?://',
+            list_regex=listname,
+            has_attachments=attachments,
+            has_due_date=has_due
+        )
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Attach title?', True):
+                CardTool.title_to_link(card)
+    else:
+        for card in cards:
+            display.show_card(card)
+            CardTool.add_labels(card, label_lookup)
     click.echo('Batch completed, have a great day!')
 
 
-@cli.command(short_help='Use a smart CLI menu')
+@cli.command(short_help='Use a smart shell-like menu')
 @click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
 @click.option('--no-tags', is_flag=True, default=False, help='Only use cards which have no tags')
 @click.option('-m', '--match', help='Only use cards whose title matches this regular expression', default=None)
@@ -363,11 +390,11 @@ def review(config, tags, no_tags, match, listname, attachments, has_due):
     )
     list_lookup = BoardTool.list_lookup(board)
     label_lookup = BoardTool.label_lookup(board)
-    display = TextDisplay(config.color)
+    display = Display(config.color)
     if config.banner:
         display.banner()
     for card in cards:
-        CardTool.smart_menu(card, display.show, list_lookup, label_lookup, Colors.yellow)
+        CardTool.smart_menu(card, display.show_card, list_lookup, label_lookup, Colors.yellow)
     click.echo('All done, have a great day!')
 
 

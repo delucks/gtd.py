@@ -3,240 +3,64 @@ import shutil
 import trello
 import datetime
 import itertools
+import prettytable
+from collections import OrderedDict
+from click import get_terminal_size
 
+from todo.exceptions import GTDException
 from todo import __version__, __author__
-from todo.misc import Colors
+from todo.misc import Colors, get_banner
 
 
 class Display:
-    '''base class for different card display modes
+    '''This class is responsible for displaying cards, lists, and other pieces of data from Trello in a visually appealing way.
+    It replaces a polymorphic hierarchy that was a poor fit for this operation.
+    Different functions are useful for displaying cards in JSON, a table, and in a set of pretty-printed lines.
 
-    :param bool coloration: use color for the output of this session
+    Needs:
+    - json & text displays must be interchangeable for noninteractive commands
+    - table display must have more columns / ability to select only certain columns
+    - the "show lists/show tags" thing should have way more bits of metadata it can display. we should ideally have a method that just dumps the names of
+      something to stdout
+    - banner should have more ascii art options :D
     '''
-    def __init__(self, coloration, *kwargs):
-        self.coloration = coloration
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, etype, evalue, tb):
-        pass
+    def __init__(self, color=True, primary_color=Colors.blue):
+        self.color = color
+        self.primary = primary_color
 
     def banner(self):
-        '''display a banner for the beginning of program run, if supported'''
-        on = self.primary if self.coloration else ''
-        off = Colors.reset if self.coloration else ''
-        banner = (
-            ' __|_ _| ._     version {on}{0}{off}\n'
-            '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
-            ' _|      |  /\n').format(__version__, __author__, on=on, off=off)
-        print(banner)
+        '''Display an ASCII art banner for the beginning of program run'''
+        print(get_banner(use_color=self.color))
 
-    def show(self, card, *kwargs):
-        '''output the state for a single card
-
-        :param trello.Card card: card to display
+    def show_raw(self, data, use_json=False):
+        '''this shows random datastructures
+        supports the following features
+            show lists
+            show tags
+            show boards
         '''
-        raise NotImplemented()
+        if isinstance(data, list):
+            for l in data:
+                self.show_raw(l)
+        elif isinstance(data, dict):
+            for k, v in data.items():
+                print(k, end=' ')
+                self.show_raw(v)
+        elif isinstance(data, trello.Board):
+            print(data)
+        elif isinstance(data, trello.List):
+            print(data)
+        elif isinstance(data, trello.Label):
+            print(data)
+        elif isinstance(data, trello.Card):
+            print(data)
+        else:
+            print(data)
 
-    def show_list(self, iterable):
-        '''output a normal list of strings in the display manner this class handles
+    def _force_json(self, for_json):
+        '''force objects held in datastructures to be json-serializable by name only
+        :param List|Label|Board|bytes|list|dict|datetime for_json: object to be encoded
         '''
-        raise NotImplemented()
-
-
-class TableDisplay(Display):
-    '''outputs cards in a terminal-width optimized manner
-    Column Layout:
-
-    | Name | List | Create Date | Due Date | Tags | Attachments |
-
-    All column widths should be precomputed so we can output each card consistently
-    '''
-    def __init__(self, coloration, max_list_length=10, max_label_length=10, per_row_divider=True, size_override=None):
-        super(TableDisplay, self).__init__(coloration)
-        if isinstance(size_override, tuple) and all(isinstance(x, int) for x in size_override):
-            self.width, self.height = size_override
-        else:
-            self.width, self.height = shutil.get_terminal_size()
-        num_columns = 5
-        self.time_format_string = '%d/%m/%y %H:%M'
-        self.sz_list = max_list_length
-        self.sz_label = max_label_length
-        self.sz_due = self.sz_created = len(self.time_format_string)
-        self.primary = Colors.green
-        total = self.sz_created + self.sz_due + self.sz_label + self.sz_list + 3*num_columns + 1
-        self.sz_name = self.width - total
-        self.per_row_divider = per_row_divider
-        self.fmt_str = '| {on}{name: <{sz_name}}{off} | {on}{listname: <{sz_list}}{off} | {on}{ctime: <{sz_created}}{off} | {on}{tags: <{sz_tags}}{off} | {on}{cdue: <{sz_due}}{off} |'
-
-    def __enter__(self):
-        on = self.primary if self.coloration else ''
-        off = Colors.reset if self.coloration else ''
-        self.__show_divider()
-        print(self.fmt_str.format(
-            name='Name', sz_name=self.sz_name,
-            listname='List', sz_list=self.sz_list,
-            ctime='Creation', sz_created=self.sz_created,
-            cdue='Due Date', sz_due=self.sz_due,
-            tags='Tags', sz_tags=self.sz_label,
-            on=on, off=off
-        ))
-        if not self.per_row_divider:
-            self.__show_divider()
-        return self
-
-    def __exit__(self, etype, evalue, tb):
-        self.__show_divider()
-
-    def __show_divider(self):
-        print('+{0}+{1}+{2}+{3}+{4}+'.format(
-            '-'*(self.sz_name+2),
-            '-'*(self.sz_list+2),
-            '-'*(self.sz_created+2),
-            '-'*(self.sz_label+2),
-            '-'*(self.sz_due+2)
-        ))
-
-    def _wrap_long_string(self, towrap, maxwidth):
-        '''turn a string of length greater than a column width into
-        a list of multiple substrings, optimistically split by word'''
-        result = []
-        current = ''
-        for chunk in towrap.split():
-            if len(chunk) > maxwidth:
-                # split a long word up into multiple words
-                if current:
-                    result.append(current)
-                # split it the first time
-                result.append(chunk[:maxwidth])
-                new = chunk[maxwidth:]
-                while len(new) > maxwidth:
-                    # if we still have more to do...
-                    result.append(new[:maxwidth])
-                    new = new[maxwidth:]
-                current = new
-            elif (len(chunk) + len(current) + 1) > maxwidth:
-                result.append(current)
-                current = chunk
-            else:
-                # our current word plus the current unwrapped one does not exceed the max length
-                if current:
-                    current = current + ' ' + chunk
-                else:
-                    current = chunk
-        result.append(current)  # final chunk
-        return result
-
-    def show(self, card, *kwargs):
-        '''Perform the logic to split a card's fields up into multiple columns, showing them side by side.
-        If there is not anything to be printed in one of the columns, print ' '*width
-        '''
-        if self.per_row_divider:
-            self.__show_divider()
-        # Set up lists of the contents of each column
-        rawname = card.name
-        if len(rawname) > self.sz_name:
-            name = self._wrap_long_string(rawname, self.sz_name)
-        else:
-            name = [rawname]
-        try:
-            create = [card.card_created_date.strftime(self.time_format_string)]
-        except IndexError:
-            create = ['Repeating']
-        tags = [l.name for l in card.list_labels] if card.list_labels else []
-        due = [card.due_date.strftime(self.time_format_string)] if card.due_date else []
-        listname = [card.get_list().name]
-        # Take one element at a time each column's contents, print it
-        for group in itertools.zip_longest(name, listname, create, tags, due, fillvalue=''):
-            print(self.fmt_str.format(
-                name=group[0], sz_name=self.sz_name,
-                listname=group[1], sz_list=self.sz_list,
-                ctime=group[2], sz_created=self.sz_created,
-                tags=group[3], sz_tags=self.sz_label,
-                cdue=group[4], sz_due=self.sz_due,
-                on='', off=''
-            ))
-
-    def show_list(self, iterable):
-        for l in iterable:
-            print(l)
-
-
-class TextDisplay(Display):
-    '''controls the color and output detail for an interactive
-    session of gtd.py
-
-    :param bool coloration: use color for the output of this session
-    :param str primary: unix escape for the primary accent color
-    '''
-    def __init__(self, coloration, primary=Colors.red):
-        super(TextDisplay, self).__init__(coloration)
-        self.primary = primary
-        self.maxwidth = shutil.get_terminal_size().columns
-
-    def _colorize(self, lbl, msg, colorstring):
-        return '{0}{1}{2} {3}'.format(colorstring, lbl, Colors.reset, msg)
-
-    def _p(self, lbl, msg, colorstring=Colors.blue):
-        if self.coloration:
-            print(self._colorize(lbl, msg, colorstring))
-        else:
-            print('{0} {1}'.format(lbl, msg))
-
-    def show(self, card, *kwargs):
-        self._p('Card', card.id)
-        self._p('  Name:', card.name)
-        try:
-            created = card.card_created_date
-            self._p('  Created on:', '{0} ({1})'.format(created, created.timestamp()))
-            self._p('  Age:', datetime.datetime.now() - created)
-        except IndexError:
-            # this happens when the card is created by the repeating cards trello power-up
-            print('  Repeating Creation Date')
-        if card.list_labels:
-            self._p('  Tags:', ','.join([l.name for l in card.list_labels]))
-        if card.get_attachments():
-            self._p('  Attachments:', ','.join(a.name for a in card.get_attachments()))
-        if card.due:
-            self._p('  Due:', card.due_date)
-            try:
-                diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
-                if diff < datetime.timedelta(0):
-                    display = Colors.red
-                elif diff < datetime.timedelta(weeks=2):
-                    display = Colors.yellow
-                else:
-                    display = self.primary
-                print('  {0}Remaining: {1}{2}'.format(display, diff, Colors.reset))
-            except TypeError:
-                # fucking datetime throws exceptions about bullshit
-                pass
-        if card.description:
-            self._p('  Description', '')
-            for line in card.description.splitlines():
-                print(' '*4 + line)
-        self._p('  List:', '{0}'.format(card.get_list().name))
-
-    def show_list(self, iterable):
-        for l in iterable:
-            print(l)
-
-
-class JSONDisplay(Display):
-    '''collects all returned objects into an array then dumps them to json
-
-    :param bool coloration: unused
-    '''
-    def __init__(self, coloration=False):
-        super(JSONDisplay, self).__init__(coloration)
-        self.items = []
-
-    def __enter__(self):
-        return self
-
-    def _normalize(self, for_json):
-        '''force things to be json-serializable by name only'''
         if isinstance(for_json, trello.List):
             return for_json.name
         elif isinstance(for_json, trello.Label):
@@ -246,29 +70,122 @@ class JSONDisplay(Display):
         elif isinstance(for_json, bytes):
             return for_json.decode('utf8')
         elif isinstance(for_json, list):
-            return list(map(self._normalize, for_json))
+            return list(map(self._force_json, for_json))
+        elif isinstance(for_json, dict):
+            return {k: self._force_json(v) for k, v in for_json.items()}
         elif isinstance(for_json, datetime.datetime):
             return str(for_json)
         else:
             return for_json
 
-    def __exit__(self, etype, evalue, tb):
-        items = self.items[0] if len(self.items) == 1 else self.items
+    def show_cards(self, cards, use_json=False, tsv=False, table_fields=[], field_blacklist=[]):
+        '''Display an iterable of cards all at once.
+        Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
+        Supports the following cli commands:
+            show cards
+            grep
+
+        :param list(trello.Card)|iterable(trello.Card) cards: cards to show
+        :param bool use_json: display all metadata of these cards in JSON format
+        :param bool tsv: display these cards using a tab-separated value format
+        :param list table_fields: display only these fields (overrides field_blacklist)
+        :param list field_blacklist: display all except these fields
+        '''
+        if use_json:
+            sanitized_cards = list(map(
+                lambda d: d.pop('client') and d,
+                [c.__dict__.copy() for c in cards]
+            ))
+            tostr = self._force_json(sanitized_cards)
+            print(json.dumps(tostr, sort_keys=True, indent=2))
+        else:
+            # TODO implement a custom sorting functions so the table can be sorted by multiple columns
+            fields = OrderedDict()
+            # This is done repetitively to establish column order
+            fields['name'] = lambda c: c.name
+            fields['list'] = lambda c: c.get_list().name
+            fields['tags'] = lambda c: '\n'.join([l.name for l in c.list_labels]) if c.list_labels else ''
+            fields['desc'] = lambda c: c.desc
+            fields['due'] = lambda c: c.due or ''
+            fields['last activity'] = lambda c: getattr(c, 'dateLastActivity')
+            fields['board'] = lambda c: c.board.name
+            fields['id'] = lambda c: getattr(c, 'id')
+            fields['url'] = lambda c: getattr(c, 'shortUrl')
+            table = prettytable.PrettyTable()
+            table.field_names = fields.keys()
+            table.align = 'l'
+            if tsv:
+                table.set_style(prettytable.PLAIN_COLUMNS)
+            else:
+                table.hrules = prettytable.FRAME
+            for card in cards:
+                table.add_row([x(card) for x in fields.values()])
+            try:
+                table[0]
+            except IndexError:
+                print('No cards match!')
+                raise GTDException(1)
+            if table_fields:
+                print(self.resize_and_get_table(table, table_fields))
+            elif field_blacklist:
+                print(self.resize_and_get_table(table, f))
+            else:
+                print(self.resize_and_get_table(table, fields.keys()))
+
+    def resize_and_get_table(self, table, fields):
+        '''Remove columns from the table until it fits in your terminal'''
+        maxwidth = get_terminal_size()[0]
+        possible = table.get_string(fields=fields, sortby='last activity')
+        fset = set(fields)
+        # Fields in increasing order of importance
+        to_remove = ['desc', 'id', 'board', 'url', 'last activity', 'list']
+        # Wait until we're under max width or until we can't discard more fields
+        while len(possible.splitlines()[0]) >= maxwidth and to_remove:
+            # Remove a field one at a time
+            fset.remove(to_remove.pop(0))
+            possible = table.get_string(fields=list(fset), sortby='last activity')
+        return possible
+
+    def show_card(self, card):
+        '''Display only one card in a format that doesn't take up too much space or depend on external styling.
+        Supports the following cli commands:
+            review
+            batch
+
+        :param trello.Card card: card to display
+        '''
+        indent_print = lambda m, d: print('  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off))
+        on = self.primary if self.color else ''
+        off = Colors.reset if self.color else ''
+        print('{on}Card{off}'.format(on=on, off=off), card.id)
+        indent_print('Name:', card.name)
+        indent_print('List:', '{0}'.format(card.get_list().name))
+        if card.list_labels:
+            indent_print('Tags:', ','.join([l.name for l in card.list_labels]))
         try:
-            print(json.dumps(items))
-        except TypeError:
-            print(items)
-            raise
-
-    def banner(self):
-        pass
-
-    def show(self, card, *kwargs):
-        result = {}
-        for k, v in card.__dict__.items():
-            if k != 'client':
-                result[k] = self._normalize(v)
-        self.items.append(result)
-
-    def show_list(self, iterable):
-        self.items = list(iterable)
+            created = card.card_created_date
+            indent_print('Created:', '{0} ({1})'.format(created, created.timestamp()))
+            indent_print('Age:', datetime.datetime.now() - created)
+        except IndexError:
+            # this happens when the card is created by the repeating cards trello power-up
+            indent_print('Created:', 'Repeating Creation Date')
+        if card.get_attachments():
+            indent_print('Attachments:', ','.join(a.name for a in card.get_attachments()))
+        if card.due:
+            indent_print('Due:', card.due_date)
+            try:
+                diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
+                if diff < datetime.timedelta(0):
+                    display = Colors.red
+                elif diff < datetime.timedelta(weeks=2):
+                    display = Colors.yellow
+                else:
+                    display = Colors.green
+                indent_print('Remaining:', '{0}{1}{2}'.format(display, diff, Colors.reset))
+            except TypeError:
+                # fucking datetime throws exceptions about bullshit
+                pass
+        if card.description:
+            indent_print('Description', '')
+            for line in card.description.splitlines():
+                print(' '*4 + line)
