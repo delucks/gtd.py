@@ -2,6 +2,7 @@
 import re
 import sys
 import tty
+import click
 import string
 import trello
 import shutil
@@ -146,6 +147,7 @@ class CardTool:
             'archive': 'mark this card as closed',
             'delete': 'permanently delete this card',
             'duedate': 'add a due date or change the due date',
+            'description': 'change the description of this card',
             'help': 'display this help output',
             'move': 'move to a different list',
             'next': 'move on to the next card',
@@ -167,6 +169,9 @@ class CardTool:
             elif user_input in ['o', 'open']:
                 for l in [a['name'] for a in card.get_attachments()]:
                     webbrowser.open(l)
+            elif user_input in ['desc', 'description']:
+                if CardTool.change_description(card):
+                    print('Description changed!')
             elif user_input == 'delete':
                 card.delete()
                 print('Card deleted')
@@ -240,6 +245,14 @@ class CardTool:
         else:
             print('Skipping!')
             return None
+
+    @staticmethod
+    def change_description(card):
+        old_desc = card.desc or ''
+        new_desc = click.edit(text=old_desc)
+        if new_desc is not None:
+            card.set_description(new_desc)
+        return new_desc
 
 
 class BoardTool:

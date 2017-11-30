@@ -221,8 +221,8 @@ def add():
 
 @add.command(short_help='Add a new card')
 @click.argument('title', required=False)
-@click.option('-m', '--message', help='Description for a new card')
-@click.option('--edit', is_flag=True, help="Edit the card as soon as it's created")
+@click.option('-m', '--message', help='Description for the new card')
+@click.option('-e', '--edit', is_flag=True, help="Edit the card as soon as it's created")
 @pass_config
 def card(config, title, message, edit):
     '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
