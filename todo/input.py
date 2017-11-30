@@ -97,7 +97,7 @@ class CardTool:
     '''
     # TODO add type hints
     @staticmethod
-    def add_labels(card, label_choices):
+    def add_labels(card, label_choices=None):
         '''Give the user a way to toggle labels on this card by their
         name rather than by a numeric selection interface. Using
         prompt_toolkit, we have automatic completion which makes
@@ -106,17 +106,20 @@ class CardTool:
         :param trello.Card card: the card to modify
         :param dict label_choices: str->trello.Label, the names and objects of labels on this board
         '''
-        label_names = [l for l in label_choices.keys()]
-        label_completer = WordCompleter(label_names, ignore_case=True)
+        label_choices = label_choices or BoardTool.label_lookup(card.board)
+        label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
         while True:
-            userinput = prompt('tag name (blank exits) > ', completer=label_completer).strip()
+            userinput = prompt('tag name (blank to exit) > ', completer=label_completer).strip()
             if userinput == '':
                 break
             elif userinput == 'ls':
-                triple_column_print(label_names)
-            elif userinput not in label_names:
-                # TODO put a prompt here to create the tag name if it does not exist
-                print('Unrecognized tag name {0}, try again'.format(userinput))
+                triple_column_print(label_choices.keys())
+            elif userinput not in label_choices.keys():
+                if prompt_for_confirmation('Unrecognized tag name {0}, would you like to create it?'.format(userinput), False):
+                    label = card.board.add_label(userinput, 'black')
+                    click.echo('Successfully added tag {0}!'.format(label))
+                    label_choices = BoardTool.label_lookup(card.board)
+                    label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
             else:
                 label_obj = label_choices[userinput]
                 try:
