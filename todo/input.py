@@ -340,6 +340,12 @@ class BoardTool:
         # Regular expression on trello.Card.name
         title_regex = kwargs.get('title_regex', None)
         regex_flags = kwargs.get('regex_flags', 0)
+        def search_for_regex(card):
+            try:
+                re.search(title_regex, card.name, regex_flags)
+            except re.error as e:
+                click.secho('Invalid regular expression "{1}" passed: {0}'.format(str(e), title_regex), fg='red')
+                raise GTDException(1)
         # boolean queries about whether the card has things
         has_attachments = kwargs.get('has_attachments', None)
         no_tags = kwargs.get('no_tags', False)
@@ -355,7 +361,7 @@ class BoardTool:
         if no_tags:
             filters.append(lambda c: not c.list_labels)
         if title_regex:
-            filters.append(lambda c: re.search(title_regex, c.name, regex_flags))
+            filters.append(search_for_regex)
         if filter_funcs:
             if callable(filter_funcs):
                 filters.append(filter_funcs)
