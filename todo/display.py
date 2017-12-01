@@ -172,7 +172,9 @@ class Display:
             # this happens when the card is created by the repeating cards trello power-up
             indent_print('Created:', 'Repeating Creation Date')
         if card.get_attachments():
-            indent_print('Attachments:', ','.join(a.name for a in card.get_attachments()))
+            indent_print('Attachments:', '')
+            for a in card.get_attachments():
+                print(' '*4 + a.name)
         if card.due:
             indent_print('Due:', card.due_date)
             try:
