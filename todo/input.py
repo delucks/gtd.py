@@ -122,7 +122,7 @@ class CardTool:
                 if prompt_for_confirmation('Unrecognized tag name {0}, would you like to create it?'.format(userinput), False):
                     label = card.board.add_label(userinput, 'black')
                     card.add_label(label)
-                    click.echo('Successfully added tag {0} to board {1} and card {2}!'.format(label.name, card.board.name, card.title))
+                    click.echo('Successfully added tag {0} to board {1} and card {2}!'.format(label.name, card.board.name, card.name))
                     label_choices = BoardTool.label_lookup(card.board)
                     label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
             else:
