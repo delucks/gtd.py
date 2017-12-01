@@ -115,6 +115,13 @@ Setup
 
 The ``onboard`` command will assist you through the process of getting a Trello API key for use with this program and putting it in the correct file. This will happen automatically if you run a command that requires authentication without having your API keys set.
 
+If you'd like to enable automatic bash completion for gtd.py, add the following line to your ~/.bashrc:
+
+::
+
+  eval "$(_GTD_COMPLETE=source gtd)"
+
+This relies on ``click``'s internal bash completion engine, so it does not work on other shells like ``sh``, ``csh``, or ``zsh``.
 
 Configuration
 --------------
