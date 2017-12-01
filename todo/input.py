@@ -205,7 +205,7 @@ class CardTool:
     def title_to_link(card):
         # assumes card.name is the link you want
         links = [n for n in card.name.split() if 'http' in n]
-        existing_attachments = [a['name'] for a in card.get_attachments()]
+        existing_attachments = [a.name for a in card.get_attachments()]
         for l in links:
             if l not in existing_attachments:
                 card.attach(url=l)

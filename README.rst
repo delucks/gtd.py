@@ -151,7 +151,7 @@ This configuration file can be put in a variety of locations within your home fo
 Notes
 ------
 
-* The code is not heavily tested. Please (please!) report bugs if you find them.
+* The code is manually tested. Please (please!) report bugs if you find them.
 * This has only been used on Linux and Mac OSX
 * Windows is not supported.
 * Some naming conventions differ from Trello, most notably "label" is called "tag"
