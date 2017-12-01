@@ -16,7 +16,7 @@ import arrow
 from prompt_toolkit import prompt
 from prompt_toolkit.contrib.completers import WordCompleter
 
-from todo.misc import get_title_of_webpage, Colors
+from todo.misc import get_title_of_webpage, Colors, DevNullRedirect, VALID_URL_REGEX
 from todo.exceptions import GTDException
 from todo.connection import TrelloConnection
 from todo import __version__
@@ -65,7 +65,7 @@ def single_select(options):
         assigned = all_keys[idx]
         lookup[assigned] = idx
         print('[{0}] {1}'.format(assigned, chunk))
-    print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+C to cancel')
+    print('Press the character corresponding to your choice, selection will happen immediately. Enter to cancel')
     result = lookup.get(getch(), None)
     if result is not None:
         return list(options)[int(result)]
@@ -109,7 +109,7 @@ class CardTool:
         :param trello.Card card: the card to modify
         :param dict label_choices: str->trello.Label, the names and objects of labels on this board
         '''
-        print('Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, blank input to exit')
+        print('Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit')
         label_choices = label_choices or BoardTool.label_lookup(card.board)
         label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
         while True:
@@ -143,9 +143,10 @@ class CardTool:
         f_display(card)
         if card.get_attachments():
             if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
-                for l in [a.name for a in card.get_attachments()]:
-                    webbrowser.open(l)
-        if re.search('https?://', card.name):
+                with DevNullRedirect():
+                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
+                        webbrowser.open(url)
+        if re.search(VALID_URL_REGEX, card.name):
             if prompt_for_confirmation('{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True):
                 CardTool.title_to_link(card)
         if not card.list_labels:
@@ -153,21 +154,22 @@ class CardTool:
             CardTool.add_labels(card, label_choices)
         commands = {
             'archive': 'mark this card as closed',
+            'attach': 'add, delete, or open attachments',
             'delete': 'permanently delete this card',
             'duedate': 'add a due date or change the due date',
-            'description': 'change the description of this card',
-            'help': 'display this help output',
-            'move': 'move to a different list',
-            'next': 'move on to the next card',
-            'open': 'open all links on this card',
-            'print': 'display this card',
+            'description': 'change the description of this card (desc)',
+            'help': 'display this help output (h)',
+            'move': 'move to a different list (m)',
+            'next': 'move on to the next card (n)',
+            'open': 'open all links on this card (o)',
+            'print': 'display this card (p)',
             'rename': 'change title of this card',
-            'tag': 'add or remove tags on this card',
+            'tag': 'add or remove tags on this card (t)',
             'quit': 'exit program'
         }
         command_completer = WordCompleter(commands.keys())
         while True:
-            user_input = prompt('> ', completer=command_completer)
+            user_input = prompt('gtd.py > ', completer=command_completer)
             if user_input in ['q', 'quit']:
                 raise GTDException(0)
             elif user_input in ['n', 'next']:
@@ -175,8 +177,9 @@ class CardTool:
             elif user_input in ['p', 'print']:
                 f_display(card)
             elif user_input in ['o', 'open']:
-                for l in [a['name'] for a in card.get_attachments()]:
-                    webbrowser.open(l)
+                with DevNullRedirect():
+                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
+                        webbrowser.open(url)
             elif user_input in ['desc', 'description']:
                 if CardTool.change_description(card):
                     print('Description changed!')
@@ -184,6 +187,8 @@ class CardTool:
                 card.delete()
                 print('Card deleted')
                 break
+            elif user_input == 'attach':
+                CardTool.manipulate_attachments(card)
             elif user_input == 'archive':
                 card.set_closed(True)
                 print('Card archived')
@@ -196,7 +201,7 @@ class CardTool:
                 CardTool.set_due_date(card)
             elif user_input in ['h', 'help']:
                 for cname, cdesc in commands.items():
-                    print('{0:<13}: {1}{2}{3}'.format(cname, on, cdesc, off))
+                    print('{0:<16}| {1}{2}{3}'.format(cname, on, cdesc, off))
             elif user_input in ['m', 'move']:
                 if CardTool.move_to_list(card, list_choices):
                     break
@@ -217,6 +222,38 @@ class CardTool:
             CardTool.rename(card, default=possible_title)
         else:
             CardTool.rename(card)
+
+    @staticmethod
+    def manipulate_attachments(card):
+        '''Give the user a CRUD interface for attachments on this card'''
+        print('Enter a URL, "delete", "open", "print", or Enter to exit')
+        user_input = 'Nothing really'
+        attachment_completer = WordCompleter(['delete', 'print', 'open', 'http://', 'https://'], ignore_case=True)
+        while user_input != '':
+            user_input = prompt('attach > ', completer=attachment_completer).strip()
+            if re.search(VALID_URL_REGEX, user_input):
+                # attach this link
+                card.attach(url=user_input)
+                print('Attached {0}'.format(user_input))
+            elif user_input in ['delete', 'open']:
+                attachment_opts = {a.name: a for a in card.get_attachments()}
+                if not attachment_opts:
+                    print('No attachments')
+                    continue
+                dest = single_select(attachment_opts.keys())
+                if dest is not None:
+                    target = attachment_opts[dest]
+                    if user_input == 'delete':
+                        card.remove_attachment(target.id)
+                    elif user_input == 'open':
+                        with DevNullRedirect():
+                            webbrowser.open(target.url)
+            elif user_input == 'print':
+                existing_attachments = card.get_attachments()
+                if existing_attachments:
+                    print('Attachments:')
+                    for a in existing_attachments:
+                        print('  ' + a.name)
 
     @staticmethod
     def rename(card, default=None):
@@ -242,6 +279,7 @@ class CardTool:
             except KeyboardInterrupt:
                 return
         card.set_due(input_datetime)
+        card.fetch()  # Needed to pick up the new due date
         print('Due date set')
         return input_datetime
 

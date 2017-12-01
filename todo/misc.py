@@ -8,6 +8,9 @@ except OSError:
     choice = lambda n: n.pop()
 
 
+VALID_URL_REGEX = 'https?://.*\.'
+
+
 class Colors:
     esc = '\033'
     black = esc + '[0;30m'
