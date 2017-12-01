@@ -46,10 +46,10 @@ def cli(ctx, board, no_color, no_banner):
         click.echo('Could not find a valid config file for gtd.')
         if click.confirm('Would you like to create it interactively?'):
             ctx.invoke(onboard)
-            click.echo('Try again')
+            click.secho('Re-run your command', fg='green')
             raise GTDException(0)
         else:
-            click.echo('Put your config file in one of the following locations:')
+            click.secho('Put your config file in one of the following locations:', fg='red')
             for l in Configuration.all_config_locations():
                 print('  ' + l)
             raise
@@ -59,6 +59,7 @@ def cli(ctx, board, no_color, no_banner):
         config.color = False
     if no_banner:
         config.banner = False
+    ctx.color = config.color
     ctx.obj = config
 
 
@@ -68,7 +69,7 @@ def cli(ctx, board, no_color, no_banner):
 def info(workflow, banner):
     '''Learn more about gtd.py'''
     if workflow:
-        click.echo(WORKFLOW_TEXT)
+        click.secho(WORKFLOW_TEXT, fg='yellow')
         raise GTDException(0)
     elif banner:
         print(get_banner())
@@ -86,7 +87,7 @@ def config(edit):
             click.edit(filename=Configuration.find_config_file())
         except GTDException:
             # There is no configuration file
-            click.echo("Could not find config file! Please run onboard if you haven't already")
+            click.secho("Could not find config file! Please run onboard if you haven't already", fg='red')
     else:
         print(Configuration.from_file())
 
@@ -127,7 +128,7 @@ def onboard(no_open, output_path=None):
     try:
         response = session.fetch_request_token(request_token_url)
     except TokenRequestDenied:
-        click.echo('Invalid API key/secret provided: {0} / {1}'.format(api_key, api_secret))
+        click.secho('Invalid API key/secret provided: {0} / {1}'.format(api_key, api_secret), fg='red')
         sys.exit(1)
     resource_owner_key, resource_owner_secret = response.get('oauth_token'), response.get('oauth_token_secret')
     '''Step 2: Redirect to the provider. Since this is a CLI script we do not
@@ -237,7 +238,7 @@ def card(config, title, message, edit):
     if not title:
         title = click.edit(require_save=True, text='Change this buffer to the title for your card')
         if title is None:  # No changes were made in $EDITOR
-            click.echo('No title entered for the new card!')
+            click.secho('No title entered for the new card!', fg='red')
             raise GTDException(1)
         else:
             title = title.strip()
@@ -248,7 +249,7 @@ def card(config, title, message, edit):
         label_lookup = BoardTool.label_lookup(board)
         CardTool.smart_menu(returned, display.show_card, list_lookup, label_lookup, Colors.yellow)
     else:
-        click.echo('Successfully added card {0}!'.format(returned))
+        click.secho('Successfully added card {0}!'.format(returned), fg='green')
 
 
 @add.command()
@@ -259,7 +260,7 @@ def tag(config, tagname, color):
     '''Add a new tag'''
     connection, board = BoardTool.start(config)
     label = board.add_label(tagname, color)
-    click.echo('Successfully added tag {0}!'.format(label))
+    click.secho('Successfully added tag {0}!'.format(label), color='green')
 
 
 @add.command()
@@ -269,7 +270,7 @@ def list(config, listname):
     '''Add a new list'''
     connection, board = BoardTool.start(config)
     l = board.add_list(listname)
-    click.echo('Successfully added list {0}!'.format(l))
+    click.secho('Successfully added list {0}!'.format(l), color='green')
 
 
 @cli.command(short_help='egrep through titles of cards')
@@ -283,7 +284,7 @@ def grep(config, pattern, insensitive, count, regexp):
     faithfully, so if you're a power-user of grep this command will feel familiar.
     '''
     if not (pattern or regexp):
-        click.echo('No pattern provided to grep: use either the argument or -e')
+        click.secho('No pattern provided to grep: use either the argument or -e', fg='red')
         raise GTDException(1)
     # Merge together the different regex arguments
     final_pattern = '|'.join(regexp) if regexp else ''
@@ -339,7 +340,7 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
             display.show_card(card)
             if prompt_for_confirmation('Should we delete this card?'):
                 card.delete()
-                click.echo('Card deleted!')
+                click.secho('Card deleted!', fg='red')
     elif batchtype == 'due':
         for card in cards:
             display.show_card(card)
@@ -398,13 +399,12 @@ def main():
     try:
         cli()
     except requests.exceptions.ConnectionError:
-        print('[FATAL] Connection lost to the Trello API!')
+        click.secho('[FATAL] Connection lost to the Trello API!', fg='red')
         sys.exit(1)
     except GTDException as e:
         if e.errno == 0:
             sys.exit(0)
         else:
-            print('Quitting due to error')
             sys.exit(1)
 
 

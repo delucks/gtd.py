@@ -3,9 +3,10 @@ import shutil
 import trello
 import datetime
 import itertools
-import prettytable
 from collections import OrderedDict
-from click import get_terminal_size
+
+import click
+import prettytable
 
 from todo.exceptions import GTDException
 from todo import __version__, __author__
@@ -118,12 +119,13 @@ class Display:
                 table.set_style(prettytable.PLAIN_COLUMNS)
             else:
                 table.hrules = prettytable.FRAME
-            for card in cards:
-                table.add_row([x(card) for x in fields.values()])
+            with click.progressbar(list(cards), label='Fetching cards', width=0) as pg:
+                for card in pg:
+                    table.add_row([x(card) for x in fields.values()])
             try:
                 table[0]
             except IndexError:
-                print('No cards match!')
+                click.secho('No cards match!', fg='red')
                 raise GTDException(1)
             if table_fields:
                 print(self.resize_and_get_table(table, table_fields))
@@ -134,7 +136,7 @@ class Display:
 
     def resize_and_get_table(self, table, fields):
         '''Remove columns from the table until it fits in your terminal'''
-        maxwidth = get_terminal_size()[0]
+        maxwidth = click.get_terminal_size()[0]
         possible = table.get_string(fields=fields, sortby='last activity')
         fset = set(fields)
         # Fields in increasing order of importance
