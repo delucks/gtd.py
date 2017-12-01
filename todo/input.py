@@ -109,10 +109,11 @@ class CardTool:
         :param trello.Card card: the card to modify
         :param dict label_choices: str->trello.Label, the names and objects of labels on this board
         '''
+        print('Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, blank input to exit')
         label_choices = label_choices or BoardTool.label_lookup(card.board)
         label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
         while True:
-            userinput = prompt('tag name (blank to exit) > ', completer=label_completer).strip()
+            userinput = prompt('tag > ', completer=label_completer).strip()
             if userinput == '':
                 break
             elif userinput == 'ls':
@@ -120,18 +121,19 @@ class CardTool:
             elif userinput not in label_choices.keys():
                 if prompt_for_confirmation('Unrecognized tag name {0}, would you like to create it?'.format(userinput), False):
                     label = card.board.add_label(userinput, 'black')
-                    click.echo('Successfully added tag {0}!'.format(label))
+                    card.add_label(label)
+                    click.echo('Successfully added tag {0} to board {1} and card {2}!'.format(label.name, card.board.name, card.title))
                     label_choices = BoardTool.label_lookup(card.board)
                     label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
             else:
                 label_obj = label_choices[userinput]
                 try:
                     card.add_label(label_obj)
-                    print('Added label {0}'.format(Colors.green + userinput + Colors.reset))
+                    print('Added tag {0}'.format(Colors.green + userinput + Colors.reset))
                 except trello.exceptions.ResourceUnavailable:
                     # This label already exists on the card so remove it
                     card.remove_label(label_obj)
-                    print('Removed label {0}'.format(Colors.red + userinput + Colors.reset))
+                    print('Removed tag {0}'.format(Colors.red + userinput + Colors.reset))
 
     @staticmethod
     def smart_menu(card, f_display, list_choices, label_choices, color=None):
