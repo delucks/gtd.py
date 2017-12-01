@@ -21,6 +21,17 @@ from todo import __version__
 pass_config = click.make_pass_decorator(Configuration)
 
 
+def filtering_command(f):
+    '''Add common options to a click function that will filter Trello cards'''
+    f = click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')(f)
+    f = click.option('--no-tags', is_flag=True, default=False, help='Only show cards which have no tags')(f)
+    f = click.option('-m', '--match', help='Filter cards to this regex on their title', default=None)(f)
+    f = click.option('-l', '--listname', help='Only show cards from this list', default=None)(f)
+    f = click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)(f)
+    f = click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)(f)
+    return f
+
+
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.version_option(__version__)
 @click.option('-b', '--board', default=None, help='Name of the board to work with for this session')
@@ -175,15 +186,10 @@ def onboard(no_open, output_path=None):
 
 
 @cli.command(short_help='Display cards, tags, or lists on this board')
+@filtering_command
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
 @click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')
 @click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
-@click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
-@click.option('--no-tags', is_flag=True, default=False, help='Only show cards which have no tags')
-@click.option('-m', '--match', help='Filter cards to this regex on their title', default=None)
-@click.option('-l', '--listname', help='Only show cards from this list', default=None)
-@click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)
-@click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)
 @pass_config
 def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachments, has_due):
     '''Display cards, tags, or lists on this board.
@@ -302,13 +308,8 @@ def grep(config, pattern, insensitive, count, regexp):
 
 
 @cli.command()
+@filtering_command
 @click.argument('batchtype', type=click.Choice(['move', 'delete', 'tag', 'due', 'attach']))
-@click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
-@click.option('--no-tags', is_flag=True, default=False, help='Only use cards which have no tags')
-@click.option('-m', '--match', help='Only use cards whose title matches this regular expression', default=None)
-@click.option('-l', '--listname', help='Only use cards from this list', default=None)
-@click.option('--attachments', is_flag=True, help='Only use cards which have attachments', default=None)
-@click.option('--has-due', is_flag=True, help='Only use cards which have due dates', default=None)
 @pass_config
 def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_due):
     '''Perform one action on many cards'''
@@ -366,12 +367,7 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
 
 
 @cli.command(short_help='Use a smart shell-like menu')
-@click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')
-@click.option('--no-tags', is_flag=True, default=False, help='Only use cards which have no tags')
-@click.option('-m', '--match', help='Only use cards whose title matches this regular expression', default=None)
-@click.option('-l', '--listname', help='Only use cards from this list', default=None)
-@click.option('--attachments', is_flag=True, help='Only use cards which have attachments', default=None)
-@click.option('--has-due', is_flag=True, help='Only use cards which have due dates', default=None)
+@filtering_command
 @pass_config
 def review(config, tags, no_tags, match, listname, attachments, has_due):
     '''show a smart, command-line based menu for each card selected.
