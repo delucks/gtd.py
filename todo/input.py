@@ -11,9 +11,12 @@ import datetime
 import itertools
 import webbrowser
 from functools import partial
+
+import arrow
 from prompt_toolkit import prompt
-from todo.misc import get_title_of_webpage, Colors
 from prompt_toolkit.contrib.completers import WordCompleter
+
+from todo.misc import get_title_of_webpage, Colors
 from todo.exceptions import GTDException
 from todo.connection import TrelloConnection
 from todo import __version__
@@ -224,13 +227,20 @@ class CardTool:
 
     @staticmethod
     def set_due_date(card):
-        # prompt for the date
-        input_date = ''
-        while not re.match('^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$', input_date):
-            input_date = input('Input a due date in the format of DD/MM/YYYY, May 1st = 01/05/2017: ').strip()
-        date_args = [int(x) for x in input_date.split('/')[::-1]]
-        input_datetime = datetime.datetime(*date_args, tzinfo=datetime.timezone.utc)
+        '''prompt for the date to set this card due as'''
+        finished = False
+        print('Enter a date in the format of a 3-letter month, followed by the day, followed by the year, e.g. Jul 19 2018')
+        while not finished:
+            try:
+                user_input = prompt('date > ')
+                input_datetime = arrow.get(user_input, 'MMM D YYYY')
+                finished = True
+            except arrow.parser.ParserError:
+                print('Invalid date format! Use a date like "Feb 15 1996"')
+            except KeyboardInterrupt:
+                return
         card.set_due(input_datetime)
+        print('Due date set')
         return input_datetime
 
     @staticmethod
