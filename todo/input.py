@@ -342,7 +342,7 @@ class BoardTool:
         regex_flags = kwargs.get('regex_flags', 0)
         def search_for_regex(card):
             try:
-                re.search(title_regex, card.name, regex_flags)
+                return re.search(title_regex, card.name, regex_flags)
             except re.error as e:
                 click.secho('Invalid regular expression "{1}" passed: {0}'.format(str(e), title_regex), fg='red')
                 raise GTDException(1)
