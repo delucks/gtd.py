@@ -201,7 +201,7 @@ def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachment
     '''
     _, board = BoardTool.start(config)
     display = Display(config.color)
-    if config.banner:
+    if config.banner and not json:
         display.banner()
     if showtype == 'lists':
         display.show_raw([l.name for l in board.get_lists('open')])
