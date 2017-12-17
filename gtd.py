@@ -14,7 +14,7 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import Display
 from todo.exceptions import GTDException
-from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner
+from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner, VALID_URL_REGEX
 from todo.configuration import Configuration
 from todo import __version__
 
@@ -170,7 +170,7 @@ def onboard(no_open, output_path=None):
         'api_key': api_key,
         'api_secret': api_secret,
         'color': True,
-        'banner': True
+        'banner': False
     }
     # Ensure we have a folder to put this in, if it's in a nested config location
     output_folder = os.path.dirname(output_file)
@@ -405,7 +405,7 @@ def batch_due(config, tags, no_tags, match, listname, attachments, has_due):
 def batch_attach(config):
     '''Extract HTTP links from card titles'''
     connection, board = BoardTool.start(config)
-    cards = BoardTool.filter_cards(board, title_regex='https?://')
+    cards = BoardTool.filter_cards(board, title_regex=VALID_URL_REGEX)
     display = Display(config.color)
     if config.banner:
         display.banner()

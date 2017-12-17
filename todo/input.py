@@ -1,4 +1,4 @@
-'''user interface, user interaction functions'''
+'''This is most of the user interface and helper functions'''
 import re
 import sys
 import tty
