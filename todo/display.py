@@ -37,7 +37,9 @@ class Display:
             show tags
             show boards
         '''
-        if isinstance(data, list):
+        if use_json:
+            print(json.dumps(self._force_json(data), sort_keys=True, indent=2))
+        elif isinstance(data, list):
             for l in data:
                 self.show_raw(l)
         elif isinstance(data, dict):

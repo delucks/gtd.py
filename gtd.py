@@ -32,6 +32,10 @@ def filtering_command(f):
     return f
 
 
+def json_option(f):
+    return click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')(f)
+
+
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.version_option(__version__)
 @click.option('-b', '--board', default=None, help='Name of the board to work with for this session')
@@ -190,16 +194,50 @@ def onboard(no_open, output_path=None):
 
 
 # onboard }}}
+# show {{{
 
 
-@cli.command(short_help='Display cards, tags, or lists on this board')
+@cli.group(short_help='Display cards, tags, or lists on this board')
+def show():
+    '''Display cards, tags, or lists on this board.'''
+    pass
+
+
+@show.command('lists')
+@json_option
+@click.option('-a', '--show-all', is_flag=True, default=False, help='Show open & archived lists')
+@pass_config
+def show_lists(config, json, show_all):
+    '''Display all lists on this board'''
+    _, board = BoardTool.start(config)
+    display = Display(config.color)
+    if config.banner and not json:
+        display.banner()
+    list_filter = 'all' if show_all else 'open'
+    list_names = [l.name for l in board.get_lists(list_filter)]
+    display.show_raw(list_names, use_json=json)
+
+
+@show.command('tags')
+@json_option
+@pass_config
+def show_tags(config, json):
+    '''Display all tags on this board'''
+    _, board = BoardTool.start(config)
+    display = Display(config.color)
+    if config.banner and not json:
+        display.banner()
+    tag_names = [t.name for t in board.get_labels()]
+    display.show_raw(tag_names, use_json=json)
+
+
+@show.command('cards')
 @filtering_command
-@click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
-@click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')
+@json_option
 @click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
 @pass_config
-def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachments, has_due):
-    '''Display cards, tags, or lists on this board.
+def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, has_due):
+    '''Display cards
     The show command prints a table of all the cards with fields that will fit on the terminal you're using.
     You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
     This command along with the batch & review commands share a flexible argument scheme for getting card information.
@@ -209,23 +247,19 @@ def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachment
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
-    if showtype == 'lists':
-        display.show_raw([l.name for l in board.get_lists('open')])
-    elif showtype == 'tags':
-        display.show_raw([t.name for t in board.get_labels()])
-    else:
-        cards = BoardTool.filter_cards(
-            board,
-            tags=tags,
-            no_tags=no_tags,
-            title_regex=match,
-            list_regex=listname,
-            has_attachments=attachments,
-            has_due_date=has_due
-        )
-        display.show_cards(cards, use_json=json, tsv=tsv)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due
+    )
+    display.show_cards(cards, use_json=json, tsv=tsv)
 
 
+# show }}}
 # add {{{
 
 
