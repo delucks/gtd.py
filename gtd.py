@@ -308,12 +308,19 @@ def grep(config, pattern, insensitive, count, regexp):
     display.show_cards(cards)
 
 
-@cli.command()
+@cli.group(short_help='Perform one action on many cards')
+def batch():
+    '''Perform one action on many cards at once. These commands are all interactive; they will prompt you before taking destructive action.
+    If your combination of flags result in no cards matching, no output will be produced. You can tell this is not an error by the 0 return code.
+    '''
+    pass
+
+
+@batch.command('move')
 @filtering_command
-@click.argument('batchtype', type=click.Choice(['move', 'delete', 'tag', 'due', 'attach']))
 @pass_config
-def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_due):
-    '''Perform one action on many cards'''
+def batch_move(config, tags, no_tags, match, listname, attachments, has_due):
+    '''Change the list of each card selected'''
     connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
         board,
@@ -324,47 +331,100 @@ def batch(config, batchtype, tags, no_tags, match, listname, attachments, has_du
         has_attachments=attachments,
         has_due_date=has_due
     )
-    list_lookup = BoardTool.list_lookup(board)
-    label_lookup = BoardTool.label_lookup(board)
-
     display = Display(config.color)
     if config.banner:
         display.banner()
-    if batchtype == 'move':
-        for card in cards:
-            display.show_card(card)
-            if prompt_for_confirmation('Want to move this one?', True):
-                CardTool.move_to_list(card, list_lookup)
-    elif batchtype == 'delete':
-        for card in cards:
-            display.show_card(card)
-            if prompt_for_confirmation('Should we delete this card?'):
-                card.delete()
-                click.secho('Card deleted!', fg='red')
-    elif batchtype == 'due':
-        for card in cards:
-            display.show_card(card)
-            if prompt_for_confirmation('Set due date?'):
-                CardTool.set_due_date(card)
-    elif batchtype == 'attach':
-        cards = BoardTool.filter_cards(
-            board,
-            tags=tags,
-            no_tags=no_tags,
-            title_regex='https?://',
-            list_regex=listname,
-            has_attachments=attachments,
-            has_due_date=has_due
-        )
-        for card in cards:
-            display.show_card(card)
-            if prompt_for_confirmation('Attach title?', True):
-                CardTool.title_to_link(card)
-    else:
-        for card in cards:
-            display.show_card(card)
-            CardTool.add_labels(card, label_lookup)
-    click.echo('Batch completed, have a great day!')
+    for card in cards:
+        display.show_card(card)
+        if prompt_for_confirmation('Want to move this one?', True):
+            CardTool.move_to_list(card)
+
+
+@batch.command('tag')
+@filtering_command
+@pass_config
+def batch_tag(config, tags, no_tags, match, listname, attachments, has_due):
+    '''Change tags on each card selected'''
+    connection, board = BoardTool.start(config)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due
+    )
+    display = Display(config.color)
+    if config.banner:
+        display.banner()
+    for card in cards:
+        display.show_card(card)
+        CardTool.add_labels(card)
+
+
+@batch.command('due')
+@filtering_command
+@pass_config
+def batch_due(config, tags, no_tags, match, listname, attachments, has_due):
+    '''Set due date for all cards selected'''
+    connection, board = BoardTool.start(config)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due
+    )
+    display = Display(config.color)
+    if config.banner:
+        display.banner()
+    for card in cards:
+        display.show_card(card)
+        if prompt_for_confirmation('Set due date?'):
+            CardTool.set_due_date(card)
+
+
+@batch.command('attach')
+@pass_config
+def batch_attach(config):
+    '''Extract HTTP links from card titles'''
+    connection, board = BoardTool.start(config)
+    cards = BoardTool.filter_cards(board, title_regex='https?://')
+    display = Display(config.color)
+    if config.banner:
+        display.banner()
+    for card in cards:
+        display.show_card(card)
+        if prompt_for_confirmation('Attach title?', True):
+            CardTool.title_to_link(card)
+
+
+@batch.command('delete')
+@filtering_command
+@pass_config
+def batch_delete(config, tags, no_tags, match, listname, attachments, has_due):
+    '''Interactively delete all cards selected'''
+    connection, board = BoardTool.start(config)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due
+    )
+    display = Display(config.color)
+    if config.banner:
+        display.banner()
+    for card in cards:
+        display.show_card(card)
+        if prompt_for_confirmation('Should we delete this card?'):
+            card.delete()
+            click.secho('Card deleted!', fg='red')
 
 
 @cli.command(short_help='Use a smart shell-like menu')

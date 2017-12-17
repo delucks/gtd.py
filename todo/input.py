@@ -284,11 +284,12 @@ class CardTool:
         return input_datetime
 
     @staticmethod
-    def move_to_list(card, list_choices):
+    def move_to_list(card, list_choices=None):
         '''Select labels to add to this card
         :param trello.Card card: the card to modify
         :param dict list_choices: str->trello.List, the names and objects of lists on this board
         '''
+        list_choices = list_choices or BoardTool.list_lookup(card.board)
         dest = single_select(sorted(list_choices.keys()))
         if dest is not None:
             destination_list = list_choices[dest]
