@@ -7,7 +7,6 @@ import string
 import trello
 import shutil
 import termios
-import datetime
 import itertools
 import webbrowser
 from functools import partial
@@ -19,7 +18,6 @@ from prompt_toolkit.contrib.completers import WordCompleter
 from todo.misc import get_title_of_webpage, Colors, DevNullRedirect, VALID_URL_REGEX
 from todo.exceptions import GTDException
 from todo.connection import TrelloConnection
-from todo import __version__
 
 
 def prompt_for_confirmation(message, default=False):
@@ -87,7 +85,7 @@ def tags_on_card(card, tags):
 def triple_column_print(iterable):
     chunk_count = 3
     max_width = shutil.get_terminal_size().columns
-    chunk_size = (max_width-4) // chunk_count
+    chunk_size = (max_width - 4) // chunk_count
     args = [iter(iterable)] * chunk_count
     for triplet in itertools.zip_longest(fillvalue='', *args):
         print('  {0:<{width}}{1:^{width}}{2:>{width}}  '.format(width=chunk_size, *triplet))

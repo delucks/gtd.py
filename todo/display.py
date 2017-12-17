@@ -1,15 +1,12 @@
 import json
-import shutil
 import trello
 import datetime
-import itertools
 from collections import OrderedDict
 
 import click
 import prettytable
 
 from todo.exceptions import GTDException
-from todo import __version__, __author__
 from todo.misc import Colors, get_banner
 
 
@@ -130,7 +127,8 @@ class Display:
             if table_fields:
                 print(self.resize_and_get_table(table, table_fields))
             elif field_blacklist:
-                print(self.resize_and_get_table(table, f))
+                f = set(fields.keys()) - set(field_blacklist)
+                print(self.resize_and_get_table(table, list(f)))
             else:
                 print(self.resize_and_get_table(table, fields.keys()))
 

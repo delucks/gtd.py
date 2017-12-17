@@ -92,6 +92,9 @@ def config(edit):
         print(Configuration.from_file())
 
 
+# onboard {{{
+
+
 @cli.command(short_help='Obtain Trello API credentials')
 @click.option('-n', '--no-open', is_flag=True, default=False, help='Do not automatically open URLs in a web browser')
 def onboard(no_open, output_path=None):
@@ -186,6 +189,9 @@ def onboard(no_open, output_path=None):
     click.echo('Use the "config" command to view or edit your configuration file')
 
 
+# onboard }}}
+
+
 @cli.command(short_help='Display cards, tags, or lists on this board')
 @filtering_command
 @click.argument('showtype', type=click.Choice(['lists', 'tags', 'cards']))
@@ -218,6 +224,9 @@ def show(config, showtype, json, tsv, tags, no_tags, match, listname, attachment
             has_due_date=has_due
         )
         display.show_cards(cards, use_json=json, tsv=tsv)
+
+
+# add {{{
 
 
 @cli.group()
@@ -306,6 +315,10 @@ def grep(config, pattern, insensitive, count, regexp):
     if config.banner:
         display.banner()
     display.show_cards(cards)
+
+
+# add }}}
+# batch {{{
 
 
 @cli.group(short_help='Perform one action on many cards')
@@ -425,6 +438,9 @@ def batch_delete(config, tags, no_tags, match, listname, attachments, has_due):
         if prompt_for_confirmation('Should we delete this card?'):
             card.delete()
             click.secho('Card deleted!', fg='red')
+
+
+# batch }}}
 
 
 @cli.command(short_help='Use a smart shell-like menu')
