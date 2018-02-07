@@ -209,17 +209,19 @@ class CardTool:
     @staticmethod
     def title_to_link(card):
         # assumes card.name is the link you want
-        links = [n for n in card.name.split() if 'http' in n]
+        sp = card.name.split()
+        links = [n for n in sp if 'http' in n]
         existing_attachments = [a.name for a in card.get_attachments()]
         for l in links:
             if l not in existing_attachments:
                 card.attach(url=l)
-        # attempt to get the title of the link
+        # attempt to get the title of the link for a HTML page
         possible_title = get_title_of_webpage(links[0])
         if possible_title:
             CardTool.rename(card, default=possible_title)
         else:
-            CardTool.rename(card)
+            reconstructed = ' '.join([n for n in sp if not 'http' in n])
+            CardTool.rename(card, default=reconstructed)
 
     @staticmethod
     def manipulate_attachments(card):
