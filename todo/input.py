@@ -208,20 +208,23 @@ class CardTool:
 
     @staticmethod
     def title_to_link(card):
-        # assumes card.name is the link you want
+        # This assumes your link is in card.name somewhere
         sp = card.name.split()
-        links = [n for n in sp if 'http' in n]
+        links = [n for n in sp if VALID_URL_REGEX.search(n)]
         existing_attachments = [a.name for a in card.get_attachments()]
-        for l in links:
-            if l not in existing_attachments:
-                card.attach(url=l)
-        # attempt to get the title of the link for a HTML page
-        possible_title = get_title_of_webpage(links[0])
-        if possible_title:
-            CardTool.rename(card, default=possible_title)
-        else:
-            reconstructed = ' '.join([n for n in sp if not 'http' in n])
-            CardTool.rename(card, default=reconstructed)
+        user_parameters = {'oldname': card.name}
+        for idx, link_name in enumerate(links):
+            # Attach this link
+            if link_name not in existing_attachments:
+                card.attach(url=link_name)
+            # Get the URL & title of the link for the user to access in the renaming interface
+            user_parameters['link{}'.format(idx)] = link_name
+            possible_title = get_title_of_webpage(link_name)
+            if possible_title:
+                user_parameters['title{}'.format(idx)] = possible_title
+        # Give the user a default title without the link, but allow them to use the title of the page from a link as a var instead
+        reconstructed = ' '.join([n for n in sp if not VALID_URL_REGEX.search(n)])
+        CardTool.rename(card, reconstructed, user_parameters)
 
     @staticmethod
     def manipulate_attachments(card):
@@ -256,11 +259,20 @@ class CardTool:
                         print('  ' + a.name)
 
     @staticmethod
-    def rename(card, default=None):
+    def rename(card, default=None, variables={}):
+        if variables:
+            print('You can use the following variables in your new card title:')
+            for k, v in variables.items():
+                print('  ${}: {}'.format(k, v))
         newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name)).strip()
         if newname:
+            for k, v in variables.items():
+                expansion = '${}'.format(k)
+                if expansion in newname:
+                    newname = newname.replace(expansion, v)
             card.set_name(newname)
         else:
+            # If there wasn't a default set for the card name, leave the card name unchanged
             if default:
                 card.set_name(default)
 

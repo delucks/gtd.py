@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from todo import __version__, __author__
 try:
@@ -8,7 +9,7 @@ except OSError:
     choice = lambda n: n.pop()
 
 
-VALID_URL_REGEX = 'https?://.*\.'
+VALID_URL_REGEX = re.compile('https?://.*\.')
 
 
 class Colors:
