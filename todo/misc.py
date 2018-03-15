@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from todo import __version__, __author__
 try:
@@ -8,7 +9,7 @@ except OSError:
     choice = lambda n: n.pop()
 
 
-VALID_URL_REGEX = 'https?://.*\.'
+VALID_URL_REGEX = re.compile('https?://.*\.')
 
 
 class Colors:
@@ -32,6 +33,8 @@ def get_title_of_webpage(url):
     headers = {'User-Agent': 'gtd.py version ' + __version__}
     try:
         resp = requests.get(url, headers=headers)
+        if 'text/html' not in resp.headers.get('Content-Type', ''):
+            return None
         as_text = resp.text
         return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
     except requests.exceptions.ConnectionError:
