@@ -20,6 +20,23 @@ from todo.exceptions import GTDException
 from todo.connection import TrelloConnection
 
 
+def parse_user_date_input(user_input):
+    accepted_formats = [
+        'MMM D YYYY',
+        'MM/DD/YYYY',
+        'DD/MM/YYYY',
+    ]
+    for fmt in accepted_formats:
+        try:
+            input_datetime = arrow.get(user_input, fmt)
+            return input_datetime
+        except arrow.parser.ParserError:
+            continue
+        except ValueError:
+            continue
+    return None
+
+
 def prompt_for_confirmation(message, default=False):
     while True:
         options = ' (Y/n)' if default else ' (y/N)'
@@ -279,21 +296,21 @@ class CardTool:
     @staticmethod
     def set_due_date(card):
         '''prompt for the date to set this card due as'''
-        finished = False
-        print('Enter a date in the format of a 3-letter month, followed by the day, followed by the year, e.g. Jul 19 2018')
-        while not finished:
+        print('Enter a date in format "Jun 15 2018", "06/15/2018" or "15/06/2018"')
+        while True:
             try:
                 user_input = prompt('date > ')
-                input_datetime = arrow.get(user_input, 'MMM D YYYY')
-                finished = True
-            except arrow.parser.ParserError:
-                print('Invalid date format! Use a date like "Feb 15 1996"')
             except KeyboardInterrupt:
                 return
-        card.set_due(input_datetime)
+            result = parse_user_date_input(user_input)
+            if result is None:
+                print('Invalid date format!')
+            else:
+                break
+        card.set_due(result)
         card.fetch()  # Needed to pick up the new due date
         print('Due date set')
-        return input_datetime
+        return result
 
     @staticmethod
     def move_to_list(card, list_choices=None):
