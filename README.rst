@@ -166,7 +166,7 @@ Notes
 License
 --------
 
-BSD. There is a copy included with the software as LICENSE.txt
+BSD. There is a copy included with the software as LICENSE
 
 Copyright 2018 Jamie Luck (delucks)
 
