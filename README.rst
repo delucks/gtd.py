@@ -168,7 +168,7 @@ License
 
 BSD. There is a copy included with the software as LICENSE.txt
 
-Copyright 2017 Jamie Luck (delucks)
+Copyright 2018 Jamie Luck (delucks)
 
 
 .. _GTD: https://en.wikipedia.org/wiki/Getting_Things_Done
