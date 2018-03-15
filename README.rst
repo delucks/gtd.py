@@ -79,8 +79,8 @@ Frequently it's useful to move a whole bunch of cards at once, tag cards that ma
   # Move all cards in your "Inbox" list
   $ gtd batch move -l Inbox
 
-  # Delete all cards whose titles match this regular expression
-  $ gtd batch delete -m 'on T(hurs|ues)day'
+  # Archive all cards whose titles match this regular expression
+  $ gtd delete cards -m 'on T(hurs|ues)day'
 
   # Set the due dates for all cards in a list containing the substring "Week"
   $ gtd batch due -l Week

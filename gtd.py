@@ -260,6 +260,54 @@ def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, h
 
 
 # show }}}
+# delete {{{
+
+
+@cli.group()
+def delete():
+    '''Archive/delete cards, tags, or lists'''
+    pass
+
+
+@delete.command('cards')
+@click.option('-f', '--force', is_flag=True, default=False, help='Delete the card rather than archiving it')
+@click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt the user')
+@filtering_command
+@pass_config
+def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
+    '''Delete a set of cards specified
+    '''
+    _, board = BoardTool.start(config)
+    display = Display(config.color)
+    if config.banner and not json:
+        display.banner()
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due
+    )
+    method = 'delete' if force else 'archive'
+    if noninteractive:
+        if force:
+            [c.delete() for c in cards]
+        else:
+            [c.set_closed(True) for c in cards]
+    else:
+        for card in cards:
+            display.show_card(card)
+            if prompt_for_confirmation('Delete this card?'):
+                if force:
+                    card.delete()
+                else:
+                    card.set_closed(True)
+                click.secho('Card {}d!'.format(method), fg='red')
+
+
+# delete }}}
 # add {{{
 
 
@@ -447,31 +495,6 @@ def batch_attach(config):
         display.show_card(card)
         if prompt_for_confirmation('Attach title?', True):
             CardTool.title_to_link(card)
-
-
-@batch.command('delete')
-@filtering_command
-@pass_config
-def batch_delete(config, tags, no_tags, match, listname, attachments, has_due):
-    '''Interactively delete all cards selected'''
-    connection, board = BoardTool.start(config)
-    cards = BoardTool.filter_cards(
-        board,
-        tags=tags,
-        no_tags=no_tags,
-        title_regex=match,
-        list_regex=listname,
-        has_attachments=attachments,
-        has_due_date=has_due
-    )
-    display = Display(config.color)
-    if config.banner:
-        display.banner()
-    for card in cards:
-        display.show_card(card)
-        if prompt_for_confirmation('Should we delete this card?'):
-            card.delete()
-            click.secho('Card deleted!', fg='red')
 
 
 # batch }}}
