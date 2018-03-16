@@ -175,6 +175,10 @@ class Display:
             indent_print('Attachments:', '')
             for a in card.get_attachments():
                 print(' '*4 + a.name)
+        if card.comments:
+            indent_print('Comments:', '')
+            for c in card.comments:
+                print('    {}: {}'.format(c['memberCreator']['username'], c['data']['text']))
         if card.due:
             indent_print('Due:', card.due_date)
             try:

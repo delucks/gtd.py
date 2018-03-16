@@ -345,7 +345,7 @@ def add_card(config, title, message, edit):
     connection, board = BoardTool.start(config)
     inbox = BoardTool.get_inbox_list(connection, config)
     if not title:
-        title = click.edit(require_save=True, text='Change this buffer to the title for your card')
+        title = click.edit(require_save=True, text='<Title here>')
         if title is None:  # No changes were made in $EDITOR
             click.secho('No title entered for the new card!', fg='red')
             raise GTDException(1)

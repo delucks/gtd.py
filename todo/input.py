@@ -155,6 +155,7 @@ class CardTool:
         '''make assumptions about what you want to do with a card and ask the user if they want to'''
         on = color if color else ''
         off = Colors.reset if color else ''
+        card.fetch()
         f_display(card)
         if card.get_attachments():
             if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
@@ -170,6 +171,7 @@ class CardTool:
         commands = {
             'archive': 'mark this card as closed',
             'attach': 'add, delete, or open attachments',
+            'comment': 'add a comment to this card',
             'delete': 'permanently delete this card',
             'duedate': 'add a due date or change the due date',
             'description': 'change the description of this card (desc)',
@@ -190,6 +192,7 @@ class CardTool:
             elif user_input in ['n', 'next']:
                 break
             elif user_input in ['p', 'print']:
+                card.fetch()
                 f_display(card)
             elif user_input in ['o', 'open']:
                 with DevNullRedirect():
@@ -220,6 +223,12 @@ class CardTool:
             elif user_input in ['m', 'move']:
                 if CardTool.move_to_list(card, list_choices):
                     break
+            elif user_input == 'comment':
+                new_comment = click.edit(text='<Comment here>', require_save=True)
+                if new_comment:
+                    card.comment(new_comment)
+                else:
+                    click.secho('Change the text & save to post the comment', fg='red')
             else:
                 print('{0}{1}{2} is not a command, type "{0}help{2}" to view available commands'.format(on, user_input, off))
 
