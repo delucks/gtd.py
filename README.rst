@@ -63,6 +63,22 @@ The command you'll probably use most frequently is ``add card``. Here are some c
 
 The other subcommands for ``add`` (``add list`` and ``add tag``) are self-explanatory.
 
+Deleting Things
+^^^^^^^^^^^^^^^
+
+The ``delete`` subcommand allows you to get rid of lists & cards. By default, cards are archived rather than deleted. You can override this behavior with the ``-f/--force`` flag to ``delete cards``. Lists may not be deleted, so they are archived when you run ``delete list``.
+
+::
+  # Archive all cards whose titles match this regular expression
+  $ gtd delete cards -m 'on T(hurs|ues)day'
+
+  # Delete without intervention all cards containing the string "testblah"
+  $ gtd delete cards --noninteractive --force -m 'testblah'
+
+  # Delete the list named "Temporary work"
+  $ gtd delete list "Temporary work"
+
+
 Manipulating Cards in Bulk
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -78,9 +94,6 @@ Frequently it's useful to move a whole bunch of cards at once, tag cards that ma
 
   # Move all cards in your "Inbox" list
   $ gtd batch move -l Inbox
-
-  # Archive all cards whose titles match this regular expression
-  $ gtd delete cards -m 'on T(hurs|ues)day'
 
   # Set the due dates for all cards in a list containing the substring "Week"
   $ gtd batch due -l Week
