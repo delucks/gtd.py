@@ -69,6 +69,7 @@ Deleting Things
 The ``delete`` subcommand allows you to get rid of lists & cards. By default, cards are archived rather than deleted. You can override this behavior with the ``-f/--force`` flag to ``delete cards``. Lists may not be deleted, so they are archived when you run ``delete list``.
 
 ::
+
   # Archive all cards whose titles match this regular expression
   $ gtd delete cards -m 'on T(hurs|ues)day'
 
