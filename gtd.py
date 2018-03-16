@@ -269,9 +269,27 @@ def delete():
     pass
 
 
+@delete.command('list')
+@click.argument('name')
+@click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
+@pass_config
+def delete_lists(config, name, noninteractive):
+    '''Delete lists containing the substring <name>
+    '''
+    _, board = BoardTool.start(config)
+    lists = [l for l in board.get_lists('open') if name in l.name]
+    if noninteractive:
+        [l.set_closed() for l in lists]
+    else:
+        for l in lists:
+            if prompt_for_confirmation('Close this list?'):
+                l.set_closed()
+                click.secho('Closed!', fg='green')
+
+
 @delete.command('cards')
 @click.option('-f', '--force', is_flag=True, default=False, help='Delete the card rather than archiving it')
-@click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt the user')
+@click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
 @filtering_command
 @pass_config
 def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
@@ -317,12 +335,12 @@ def add():
     pass
 
 
-@add.command(short_help='Add a new card')
+@add.command('card', short_help='Add a new card')
 @click.argument('title', required=False)
 @click.option('-m', '--message', help='Description for the new card')
 @click.option('-e', '--edit', is_flag=True, help="Edit the card as soon as it's created")
 @pass_config
-def card(config, title, message, edit):
+def add_card(config, title, message, edit):
     '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
     connection, board = BoardTool.start(config)
     inbox = BoardTool.get_inbox_list(connection, config)
@@ -343,21 +361,21 @@ def card(config, title, message, edit):
         click.secho('Successfully added card {0}!'.format(returned), fg='green')
 
 
-@add.command()
+@add.command('tag')
 @click.argument('tagname')
 @click.option('-c', '--color', help='color to create this tag with', default='black')
 @pass_config
-def tag(config, tagname, color):
+def add_tag(config, tagname, color):
     '''Add a new tag'''
     connection, board = BoardTool.start(config)
     label = board.add_label(tagname, color)
     click.secho('Successfully added tag {0}!'.format(label), color='green')
 
 
-@add.command()
+@add.command('list')
 @click.argument('listname')
 @pass_config
-def list(config, listname):
+def add_list(config, listname):
     '''Add a new list'''
     connection, board = BoardTool.start(config)
     l = board.add_list(listname)
