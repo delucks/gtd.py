@@ -382,6 +382,15 @@ def add_list(config, listname):
     click.secho('Successfully added list {0}!'.format(l), color='green')
 
 
+@add.command('board')
+@click.argument('boardname')
+@pass_config
+def add_board(config, boardname):
+    connection, _ = BoardTool.start(config)
+    if connection.trello.add_board(boardname):
+        click.secho('Added board {}'.format(boardname), fg='green')
+
+
 @cli.command(short_help='egrep through titles of cards')
 @click.argument('pattern', required=False)
 @click.option('-i', '--insensitive', is_flag=True, help='Ignore case')
