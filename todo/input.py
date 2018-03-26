@@ -358,7 +358,8 @@ class BoardTool:
     def start(config):
         connection = TrelloConnection(config)
         board = BoardTool.get_main_board(connection, config)
-        return connection, board
+        current_user = BoardTool.get_current_user(connection, config)
+        return connection, board, current_user
 
     @staticmethod
     def take_cards_from_lists(board, list_regex):
@@ -389,12 +390,29 @@ class BoardTool:
         has_attachments = kwargs.get('has_attachments', None)
         no_tags = kwargs.get('no_tags', False)
         has_due_date = kwargs.get('has_due_date', None)
+        # flag that sets whether to filter by assigned cards or not
+        assigned = kwargs.get('assigned', False)
+        # Value of current user. Used in assigned and completed filter
+        current_user = kwargs.get('current_user', None)
+
+        #flag that shows archived and non-archived cards
+        include_closed = kwargs.get('is_closed', False)
+
+        #flag that shows only completed cards for user
+        completed = kwargs.get('completed', False)
+
         # comma-separated string of tags to filter on
         tags = kwargs.get('tags', None)
         # custom user-supplied callable functions to filter a card on
         filter_funcs = kwargs.get('filter_funcs', None)
         # Parse arguments into callables
         filters = []
+        if completed:
+            filters.append(lambda c: current_user.id in c.member_id and c.get_list().name.lower() == 'done')
+        if assigned:
+            filters.append(lambda c: current_user.id in c.member_id)
+        if not include_closed:
+            filters.append(lambda c: not c.closed)
         if tags:
             filters.append(partial(tags_on_card, tags=tags))
         if no_tags:
@@ -439,6 +457,11 @@ class BoardTool:
                 return connection.trello.list_boards('open')[0]
 
     @staticmethod
+    def get_current_user(connection, config):
+        '''use the configuration to get the main board & return it'''
+        return connection.trello.get_member('me')
+
+    @staticmethod
     def get_inbox_list(connection, config):
         '''use the configuration to get the main board & list from
         Trello, return the list where new cards should go.
@@ -456,3 +479,5 @@ class BoardTool:
     @staticmethod
     def label_lookup(board):
         return {o.name: o for o in board.get_labels()}
+
+

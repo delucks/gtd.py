@@ -1,3 +1,3 @@
 '''gtd.py'''
-__version__ = '0.6.12'
-__author__  = 'delucks'
+__version__ = '0.7.16'
+__author__  = 'whitef0x0'

@@ -134,13 +134,80 @@ class Display:
             else:
                 print(self.resize_and_get_table(table, fields.keys()))
 
+    def show_comments(self, comments, use_json=False, tsv=False, table_fields=[], field_blacklist=[]):
+        '''Display an iterable of cards all at once.
+        Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
+        Supports the following cli commands:
+            show unresponded
+
+        :param list(trello.Card)|iterable(trello.Card) cards: cards to show
+        :param bool use_json: display all metadata of these cards in JSON format
+        :param bool tsv: display these cards using a tab-separated value format
+        :param list table_fields: display only these fields (overrides field_blacklist)
+        :param list field_blacklist: display all except these fields
+        '''
+        if use_json:
+            sanitized_comments = list(map(
+                lambda d: d.pop('client') and d,
+                [c.__dict__.copy() for c in comments]
+            ))
+            tostr = self._force_json(sanitized_comments)
+            print(json.dumps(tostr, sort_keys=True, indent=2))
+        else:
+            # TODO implement a custom sorting functions so the table can be sorted by multiple columns
+            fields = OrderedDict()
+            # This is done repetitively to establish column order
+            fields['comment'] = lambda c: c['text']
+            fields['card'] = lambda c: c['card']['name']
+            fields['creator'] = lambda c: '@' + c['creator']['username']
+            fields['last activity'] = lambda c: c['date']
+            fields['board'] = lambda c: c['board']['name']
+            fields['id'] = lambda c: c['id']
+            fields['url'] = lambda c: 'trello.com/c/' + c['card']['shortLink']
+            table = prettytable.PrettyTable()
+            table.field_names = fields.keys()
+            table.align = 'l'
+            if tsv:
+                table.set_style(prettytable.PLAIN_COLUMNS)
+            else:
+                table.hrules = prettytable.FRAME
+            with click.progressbar(list(comments), label='Fetching comments', width=0) as pg:
+                for comment in pg:
+                    table.add_row([x(comment) for x in fields.values()])
+            try:
+                table[0]
+            except IndexError:
+                click.secho('No comments match!', fg='red')
+                raise GTDException(1)
+            if table_fields:
+                print(self.resize_and_get_comment_table(table, table_fields))
+            elif field_blacklist:
+                f = set(fields.keys()) - set(field_blacklist)
+                print(self.resize_and_get_comment_table(table, list(f)))
+            else:
+                print(self.resize_and_get_comment_table(table, fields.keys()))
+
+    def resize_and_get_comment_table(self, table, fields):
+        '''Remove columns from the table until it fits in your terminal'''
+        maxwidth = click.get_terminal_size()[0]
+        possible = table.get_string(fields=fields, sortby='last activity')
+        fset = set(fields)
+        # Fields in increasing order of importance
+        to_remove = ['board', 'card', 'last activity', 'id', 'url']
+        # Wait until we're under max width or until we can't discard more fields
+        while len(possible.splitlines()[0]) >= maxwidth and to_remove:
+            # Remove a field one at a time
+            fset.remove(to_remove.pop(0))
+            possible = table.get_string(fields=list(fset))
+        return possible
+
     def resize_and_get_table(self, table, fields):
         '''Remove columns from the table until it fits in your terminal'''
         maxwidth = click.get_terminal_size()[0]
         possible = table.get_string(fields=fields, sortby='last activity')
         fset = set(fields)
         # Fields in increasing order of importance
-        to_remove = ['desc', 'id', 'board', 'url', 'last activity', 'list']
+        to_remove = ['tags', 'due', 'desc', 'id', 'board', 'last activity', 'list']
         # Wait until we're under max width or until we can't discard more fields
         while len(possible.splitlines()[0]) >= maxwidth and to_remove:
             # Remove a field one at a time

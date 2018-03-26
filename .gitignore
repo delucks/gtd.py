@@ -11,3 +11,4 @@ share/*
 build/*
 dist/*
 *egg-info*
+.env
