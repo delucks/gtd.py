@@ -1,4 +1,4 @@
-gtd.py
+Mello
 =======
 
 A Fast Command-line Interface for Trello
@@ -6,7 +6,17 @@ A Fast Command-line Interface for Trello
 
 This is a command-line tool that enables you to add, sort, and review cards on Trello rapidly. It is designed to reduce the amount of friction between your thoughts and your TODO list, especially if you never leave the terminal.
 
-The project is named "gtd.py" because it was initially built as a tool for me to maintain a Trello board using the GTD_ task tracking method. I've been actively using this tool for GTD since the first commit; if you're trying to use GTD with Trello this is the tool for you.
+Installation
+------------
+
+When installing, make sure to use pip3 if you your machine defaults to python2.7
+1. Install via pip
+`pip3 install mello`
+
+1.1 (Optional) Add python3 bin to PATH if you haven't already done so
+
+2. Setup OAuth credentials
+`mello reconfigure`
 
 
 Usage
@@ -25,24 +35,24 @@ The ``show`` command will return all the cards which match your supplied argumen
 ::
 
   # Show cards from the list "Inbox" matching a regular expression on their titles
-  $ gtd show cards -l Inbox -m 'https?'
+  $ mello show cards -l Inbox -m 'https?'
 
   # Show cards which have no tags but have due dates, in pretty-printed JSON format
-  $ gtd show cards --no-tags --has-due -j
+  $ mello show cards --no-tags --has-due -j
 
 
-``grep`` faithfully implements some flags from the venerable utility, including -c, -i, and -e! An invocation of this command is similar to a longer invocation of ``show``: ``gtd grep 'some_pattern'`` is equivalent to ``gtd show cards -m 'some_pattern'``.
+``grep`` faithfully implements some flags from the venerable utility, including -c, -i, and -e! An invocation of this command is similar to a longer invocation of ``show``: ``mello grep 'some_pattern'`` is equivalent to ``mello show cards -m 'some_pattern'``.
 
 ::
 
   # Filter all cards based on a regex
-  $ gtd grep 'http.*amazon'
+  $ mello grep 'http.*amazon'
 
   # or multiple regexes!
-  $ gtd grep -e '[Jj]ob' -e 'career' -e '[oO]pportunity?'
+  $ mello grep -e '[Jj]ob' -e 'career' -e '[oO]pportunity?'
 
   # Use other popular grep flags!
-  $ gtd grep -ci 'meeting'
+  $ mello grep -ci 'meeting'
 
 Creating Things
 ^^^^^^^^^^^^^^^^
@@ -58,13 +68,13 @@ The command you'll probably use most frequently is ``add card``. Here are some c
 ::
 
   # Add a new card with title "foo"
-  $ gtd add card foo
+  $ mello add card foo
 
   # Specify a description with the card title
-  $ gtd add card foo -m 'Description for my new card'
+  $ mello add card foo -m 'Description for my new card'
 
   # Open $EDITOR so you can write the card title
-  $ gtd add card
+  $ mello add card
 
 The other subcommands for ``add`` (``add list`` and ``add tag``) are self-explanatory.
 
@@ -76,13 +86,13 @@ The ``delete`` subcommand allows you to get rid of lists & cards. By default, ca
 ::
 
   # Archive all cards whose titles match this regular expression
-  $ gtd delete cards -m 'on T(hurs|ues)day'
+  $ mello delete cards -m 'on T(hurs|ues)day'
 
   # Delete without intervention all cards containing the string "testblah"
-  $ gtd delete cards --noninteractive --force -m 'testblah'
+  $ mello delete cards --noninteractive --force -m 'testblah'
 
   # Delete the list named "Temporary work"
-  $ gtd delete list "Temporary work"
+  $ mello delete list "Temporary work"
 
 
 Manipulating Cards in Bulk
@@ -93,35 +103,35 @@ Frequently it's useful to move a whole bunch of cards at once, tag cards that ma
 ::
 
   # Tag all cards that have no tags
-  $ gtd batch tag --no-tags
+  $ mello batch tag --no-tags
 
   # Find all cards with a URL in their title and move those URLs into their attachments
-  $ gtd batch attach
+  $ mello batch attach
 
   # Move all cards in your "Inbox" list
-  $ gtd batch move -l Inbox
+  $ mello batch move -l Inbox
 
   # Set the due dates for all cards in a list containing the substring "Week"
-  $ gtd batch due -l Week
+  $ mello batch due -l Week
 
   # Change the due date for all cards that have one already
-  $ gtd batch due --has-due
+  $ mello batch due --has-due
 
 
 Bringing It all Together
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-What if you don't know what kind of action you want to take on a card before you invoke ``gtd``? Well, we provide a nice menu for you to work on each card in turn. The menu is kinda REPL-like so if you're a terminal power user (truly, why would you use this tool unless you're already a terminal power-user) it'll feel familiar. The menu is built using ``python-prompt-toolkit`` so it has nice tab-completion on every command available within it. You can type ``help`` at any time to view all the commands available within the REPL.
+What if you don't know what kind of action you want to take on a card before you invoke ``mello``? Well, we provide a nice menu for you to work on each card in turn. The menu is kinda REPL-like so if you're a terminal power user (truly, why would you use this tool unless you're already a terminal power-user) it'll feel familiar. The menu is built using ``python-prompt-toolkit`` so it has nice tab-completion on every command available within it. You can type ``help`` at any time to view all the commands available within the REPL.
 
 Seeing is believing, so until I record a terminal session of me using it I'd highly encourage you to play around with this menu. It does some detection on the title of your card and will prompt you to move links out into attachments if appropriate. If the card doesn't have any tags yet, it'll prompt you to add some.
 
 ::
 
   # Work through cards in the "Inbox" list one at a time
-  $ gtd review -l Inbox
+  $ mello review -l Inbox
 
   # Review only cards from the "Today" list that have due dates
-  $ gtd review -l Today --has-due
+  $ mello review -l Today --has-due
 
 
 Setup
@@ -129,16 +139,16 @@ Setup
 
 ::
 
-  $ pip install gtd.py
-  $ gtd onboard
+  $ pip install mello.py
+  $ mello onboard
 
 The ``onboard`` command will assist you through the process of getting a Trello API key for use with this program and putting it in the correct file. This will happen automatically if you run a command that requires authentication without having your API keys set.
 
-If you'd like to enable automatic bash completion for gtd.py, add the following line to your ~/.bashrc:
+If you'd like to enable automatic bash completion for mello.py, add the following line to your ~/.bashrc:
 
 ::
 
-  eval "$(_GTD_COMPLETE=source gtd)"
+  eval "$(_GTD_COMPLETE=source mello)"
 
 This relies on ``click``'s internal bash completion engine, so it does not work on other shells like ``sh``, ``csh``, or ``zsh``.
 
@@ -161,18 +171,18 @@ There are other optional settings you can define inside your yaml configuration 
 
   board: "Name of the Trello board you want to work with (case sensitive)"
   color: True   # Do you want to show ANSI colors in the terminal?
-  banner: True  # Do you want to see the "gtd.py" banner on each program run?
+  banner: True  # Do you want to see the "mello.py" banner on each program run?
 
 
 All of these can be overridden on the command-line with the ``-b``, ``--no-color``, and ``--no-banner`` flags.
 
-This configuration file can be put in a variety of locations within your home folder. The ``onboard`` command will help you with platform detection, putting the configuration file where appropriate given your operating system. When running, ``gtd``` will check all possible locations out of this list:
+This configuration file can be put in a variety of locations within your home folder. The ``onboard`` command will help you with platform detection, putting the configuration file where appropriate given your operating system. When running, ``mello``` will check all possible locations out of this list:
 
-* ``~/.gtd.yaml``
-* ``~/.config/gtd/gtd.yaml``
-* ``~/Library/Application Support/gtd/gtd.yaml``
-* ``~/.local/etc/gtd.yaml``
-* ``~/.local/etc/gtd/gtd.yaml``
+* ``~/.mello.yaml``
+* ``~/.config/mello/mello.yaml``
+* ``~/Library/Application Support/mello/mello.yaml``
+* ``~/.local/etc/mello.yaml``
+* ``~/.local/etc/mello/mello.yaml``
 
 Notes
 ------

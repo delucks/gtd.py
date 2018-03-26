@@ -17,10 +17,10 @@ setup(
     version=__version__,
     install_requires=reqs,
     packages=['todo'],
-    py_modules=['gtd'],
+    py_modules=['mello'],
     entry_points={
         'console_scripts': [
-            'mello = gtd:main'
+            'mello = mello:main'
         ]
     },
     python_requires='>=3',
