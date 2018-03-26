@@ -11,7 +11,7 @@ with open('README.rst') as f:
     readme_contents = f.read()
 
 setup(
-    name='gtd.py',
+    name='mello',
     description='A Fast Command-line Interface for Trello',
     long_description=readme_contents,
     version=__version__,
@@ -20,15 +20,15 @@ setup(
     py_modules=['gtd'],
     entry_points={
         'console_scripts': [
-            'gtd = gtd:main'
+            'mello = gtd:main'
         ]
     },
     python_requires='>=3',
-    author = 'James Luck',
-    author_email = 'me@jamesluck.com',
+    author = 'David Baldwynn',
+    author_email = 'david@countable.ca',
     license='BSD 3-clause',
-    url = 'https://github.com/delucks/gtd.py',
-    download_url = 'https://github.com/delucks/gtd.py/tarball/{}'.format(__version__),
+    url = 'https://github.com/whitef0x0/gtd.py',
+    download_url = 'https://github.com/whitef0x0/gtd.py/tarball/{}'.format(__version__),
     keywords = ['productivity', 'cli', 'trello', 'gtd', 'getting things done'],
     classifiers = [
         'Development Status :: 4 - Beta',

@@ -201,9 +201,9 @@ def onboard(no_open, output_path=None):
 # show {{{
 
 
-@cli.group(short_help='Display cards, tags, or lists on this board')
+@cli.group(short_help='Display cards, tags, comments or lists on this board')
 def show():
-    '''Display cards, tags, or lists on this board.'''
+    '''Display cards, tags, comments or lists on this board.'''
     pass
 
 
@@ -280,7 +280,7 @@ def get_unresponded_comments(connection, current_user):
 @json_option
 @pass_config
 def show_unresponded(config, json):
-    '''Display all lists on this board'''
+    '''Display all unresponded comments for current account'''
     connection, _, current_user = BoardTool.start(config)
     display = Display(config.color)
     if config.banner and not json:

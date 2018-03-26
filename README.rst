@@ -12,6 +12,11 @@ The project is named "gtd.py" because it was initially built as a tool for me to
 Usage
 -----
 
+Displaying Unresponded Comments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``show unresponded`` command will return all comments that mention your username that you have not responded to yet.
+
 Displaying Cards
 ^^^^^^^^^^^^^^^^
 
