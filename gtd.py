@@ -9,6 +9,7 @@ import shutil
 import requests
 import readline  # noqa
 import webbrowser
+from datetime import datetime
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
@@ -29,6 +30,9 @@ def filtering_command(f):
     f = click.option('-l', '--listname', help='Only show cards from this list', default=None)(f)
     f = click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)(f)
     f = click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)(f)
+    f = click.option('-a', '--assigned', is_flag=True, help='Only show cards assigned to you')(f)
+    f = click.option('-c', '--completed', is_flag=True, help='Only show cards assigned and completed by you')(f)
+    f = click.option('--include_closed', is_flag=True, help='Include archived cards', default=None)(f)
     return f
 
 
@@ -209,7 +213,7 @@ def show():
 @pass_config
 def show_lists(config, json, show_all):
     '''Display all lists on this board'''
-    _, board = BoardTool.start(config)
+    _, board, _ = BoardTool.start(config)
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
@@ -218,12 +222,79 @@ def show_lists(config, json, show_all):
     display.show_raw(list_names, use_json=json)
 
 
+def get_mentions_from_text(text):
+    trello_username_re = re.compile(r'@([A-Za-z0-9_]+)')
+    return trello_username_re.findall(text)
+
+def has_replied_to_comment(connection, original_comment_text, creator_username, mentioned_username, card_id):
+    current_card = connection.trello.get_card(card_id)
+    comments = current_card.fetch_comments(force=True)
+    has_response = False
+    selected_comment_i = None
+
+    for i, comment in enumerate(comments):
+        # If creator of previous comment is mentoined in comment text and 
+        # previously mentioned username is creator of this comment, we have
+        # found reply to original comment
+        comment_text = comment["data"]["text"]
+        usernames_in_comment = get_mentions_from_text(comment["data"]["text"])
+
+        if mentioned_username in usernames_in_comment:
+            has_response = True
+        if original_comment_text == comment_text:
+            selected_comment_i = i
+            break
+
+    if selected_comment_i is not None and has_response is True:
+        return True
+    return False
+
+def get_unresponded_comments(connection, current_user):
+    notifications = connection.trello.fetch_json('/members/me/notifications',
+            query_params={'filter': ",".join(['mentionedOnCard'])})
+
+    unresponded_comments = []
+    for notif in notifications:
+        comment_creator = notif["memberCreator"]
+        comment_text = notif["data"]["text"]
+        comment_card = notif["data"]["card"]
+        comment_board = notif["data"]["board"]
+        comment_date = datetime.strptime(notif["date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+
+        if not has_replied_to_comment(connection, comment_text, current_user.username, comment_creator['username'], comment_card['id']):
+            unresponded_comments.append({
+                "creator": comment_creator,
+                "text": comment_text,
+                "card": comment_card,
+                "board": comment_board,
+                "date": comment_date,
+                "id": notif["id"]
+            })
+
+            date_str = "{:%b %d, %Y}".format(comment_date)
+
+    return unresponded_comments
+
+
+@show.command('unresponded')
+@json_option
+@pass_config
+def show_unresponded(config, json):
+    '''Display all lists on this board'''
+    connection, _, current_user = BoardTool.start(config)
+    display = Display(config.color)
+    if config.banner and not json:
+        display.banner()
+    comments = get_unresponded_comments(connection, current_user)
+    display.show_comments(comments, use_json=json)
+
+
 @show.command('tags')
 @json_option
 @pass_config
 def show_tags(config, json):
     '''Display all tags on this board'''
-    _, board = BoardTool.start(config)
+    _, board, _ = BoardTool.start(config)
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
@@ -236,14 +307,14 @@ def show_tags(config, json):
 @json_option
 @click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
 @pass_config
-def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, has_due):
+def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, has_due, assigned, completed, include_closed):
     '''Display cards
     The show command prints a table of all the cards with fields that will fit on the terminal you're using.
     You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
     This command along with the batch & review commands share a flexible argument scheme for getting card information.
     Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
     '''
-    _, board = BoardTool.start(config)
+    _, board, current_user = BoardTool.start(config)
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
@@ -251,10 +322,14 @@ def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, h
         board,
         tags=tags,
         no_tags=no_tags,
+        current_user=current_user,
         title_regex=match,
         list_regex=listname,
         has_attachments=attachments,
-        has_due_date=has_due
+        has_due_date=has_due,
+        assigned=assigned,
+        completed=completed,
+        include_closed=include_closed
     )
     display.show_cards(cards, use_json=json, tsv=tsv)
 
@@ -276,7 +351,7 @@ def delete():
 def delete_lists(config, name, noninteractive):
     '''Delete lists containing the substring <name>
     '''
-    _, board = BoardTool.start(config)
+    _, board, _ = BoardTool.start(config)
     lists = [l for l in board.get_lists('open') if name in l.name]
     if noninteractive:
         [l.set_closed() for l in lists]
@@ -295,7 +370,7 @@ def delete_lists(config, name, noninteractive):
 def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
     '''Delete a set of cards specified
     '''
-    _, board = BoardTool.start(config)
+    _, board, _ = BoardTool.start(config)
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
