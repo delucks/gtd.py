@@ -290,7 +290,8 @@ class CardTool:
             print('You can use the following variables in your new card title:')
             for k, v in variables.items():
                 print('  ${}: {}'.format(k, v))
-        newname = input('Input new name for this card (blank for "{0}"): '.format(default or card.name)).strip()
+        suggestion = variables.get('title0', None) or card.name
+        newname = input('Input new name for this card (blank for "{0}"): '.format(default or suggestion)).strip()
         if newname:
             for k, v in variables.items():
                 expansion = '${}'.format(k)
