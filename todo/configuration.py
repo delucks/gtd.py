@@ -81,6 +81,7 @@ class Configuration:
                 print('A required property {0} in your configuration was not found!'.format(prop))
                 print('Check the file {0}'.format(filename))
                 raise GTDException(1)
+        # Hardcoded defaults are in the final 3 file_config.get() calls
         return Configuration(
             file_config['api_key'],
             file_config['api_secret'],

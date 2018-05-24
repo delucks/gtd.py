@@ -250,7 +250,7 @@ class CardTool:
                 user_parameters['title{}'.format(idx)] = possible_title
         # Give the user a default title without the link, but allow them to use the title of the page from a link as a var instead
         reconstructed = ' '.join([n for n in sp if not VALID_URL_REGEX.search(n)])
-        CardTool.rename(card, reconstructed, user_parameters)
+        CardTool.rename(card, variables=user_parameters)
 
     @staticmethod
     def manipulate_attachments(card):
@@ -300,8 +300,7 @@ class CardTool:
             card.set_name(newname)
         else:
             # If there wasn't a default set for the card name, leave the card name unchanged
-            if default:
-                card.set_name(default)
+            card.set_name(default or suggestion)
 
     @staticmethod
     def set_due_date(card):
@@ -456,4 +455,4 @@ class BoardTool:
 
     @staticmethod
     def label_lookup(board):
-        return {o.name: o for o in board.get_labels()}
+        return {o.name: o for o in board.get_labels(limit=1000)}
