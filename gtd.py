@@ -21,6 +21,27 @@ from todo import __version__
 pass_config = click.make_pass_decorator(Configuration)
 
 
+def validate_fields(ctx, param, value):
+    valid = Display.build_fields().keys()
+    possible = value.split(',') if value else []
+    for field in possible:
+        if field not in valid:
+            raise click.BadParameter('Field {} is not a valid field! Use {}'.format(field, ','.join(valid)))
+    return possible
+
+
+def validate_sort(ctx, param, value):
+    if value and value not in Display.build_fields().keys():
+        raise click.BadParameter('Sort parameter {} is not a valid field!'.format(value))
+    return value
+
+
+def sorting_fields_command(f):
+    f = click.option('--fields', callback=validate_fields, help='Choose fields to display by name, comma-separated')(f)
+    f = click.option('--by', default='last activity', callback=validate_sort, help='Choose field to sort')(f)
+    return f
+
+
 def filtering_command(f):
     '''Add common options to a click function that will filter Trello cards'''
     f = click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')(f)
@@ -235,8 +256,9 @@ def show_tags(config, json):
 @filtering_command
 @json_option
 @click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
+@sorting_fields_command
 @pass_config
-def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, has_due):
+def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, has_due, by, fields):
     '''Display cards
     The show command prints a table of all the cards with fields that will fit on the terminal you're using.
     You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
@@ -256,7 +278,7 @@ def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, h
         has_attachments=attachments,
         has_due_date=has_due
     )
-    display.show_cards(cards, use_json=json, tsv=tsv)
+    display.show_cards(cards, use_json=json, tsv=tsv, sort=by, table_fields=fields)
 
 
 # show }}}
@@ -386,6 +408,7 @@ def add_list(config, listname):
 @click.argument('boardname')
 @pass_config
 def add_board(config, boardname):
+    '''Add a new board'''
     connection, _ = BoardTool.start(config)
     if connection.trello.add_board(boardname):
         click.secho('Added board {}'.format(boardname), fg='green')
@@ -396,8 +419,9 @@ def add_board(config, boardname):
 @click.option('-i', '--insensitive', is_flag=True, help='Ignore case')
 @click.option('-c', '--count', is_flag=True, help='Output the count of matching cards')
 @click.option('-e', '--regexp', help='Specify multiple patterns to match against the titles of cards', multiple=True)
+@sorting_fields_command
 @pass_config
-def grep(config, pattern, insensitive, count, regexp):
+def grep(config, pattern, insensitive, count, regexp, by, fields):
     '''egrep through titles of cards on this board. This command attemps to replicate a couple of grep flags
     faithfully, so if you're a power-user of grep this command will feel familiar.
     '''
@@ -423,7 +447,7 @@ def grep(config, pattern, insensitive, count, regexp):
     display = Display(config.color)
     if config.banner:
         display.banner()
-    display.show_cards(cards)
+    display.show_cards(cards, sort=by, table_fields=fields)
 
 
 # add }}}

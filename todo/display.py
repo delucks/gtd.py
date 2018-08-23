@@ -25,6 +25,26 @@ class Display:
     def __init__(self, color=True, primary_color=Colors.blue):
         self.color = color
         self.primary = primary_color
+        self.fields = Display.build_fields()
+
+    @staticmethod
+    def build_fields():
+        '''This creates the dictionary of field name -> getter function that's used to translate the JSON
+        response into a table. It's created once and bound to this object so the CLI functions can check if their
+        --field arguments are valid field names before invoking the functions that output onto the screen
+        '''
+        fields = OrderedDict()
+        # This is done repetitively to establish column order
+        fields['name'] = lambda c: c.name
+        fields['list'] = lambda c: c.get_list().name
+        fields['tags'] = lambda c: '\n'.join([l.name for l in c.list_labels]) if c.list_labels else ''
+        fields['desc'] = lambda c: c.desc
+        fields['due'] = lambda c: c.due or ''
+        fields['last activity'] = lambda c: getattr(c, 'dateLastActivity')
+        fields['board'] = lambda c: c.board.name
+        fields['id'] = lambda c: getattr(c, 'id')
+        fields['url'] = lambda c: getattr(c, 'shortUrl')
+        return fields
 
     def banner(self):
         '''Display an ASCII art banner for the beginning of program run'''
@@ -78,7 +98,7 @@ class Display:
         else:
             return for_json
 
-    def show_cards(self, cards, use_json=False, tsv=False, table_fields=[], field_blacklist=[]):
+    def show_cards(self, cards, use_json=False, tsv=False, sort='last activity', table_fields=[]):
         '''Display an iterable of cards all at once.
         Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
         Supports the following cli commands:
@@ -88,8 +108,8 @@ class Display:
         :param list(trello.Card)|iterable(trello.Card) cards: cards to show
         :param bool use_json: display all metadata of these cards in JSON format
         :param bool tsv: display these cards using a tab-separated value format
-        :param list table_fields: display only these fields (overrides field_blacklist)
-        :param list field_blacklist: display all except these fields
+        :param str sort: the field name to sort by (must be a valid field name in this table)
+        :param list table_fields: display only these fields
         '''
         if use_json:
             sanitized_cards = list(map(
@@ -100,19 +120,8 @@ class Display:
             print(json.dumps(tostr, sort_keys=True, indent=2))
         else:
             # TODO implement a custom sorting functions so the table can be sorted by multiple columns
-            fields = OrderedDict()
-            # This is done repetitively to establish column order
-            fields['name'] = lambda c: c.name
-            fields['list'] = lambda c: c.get_list().name
-            fields['tags'] = lambda c: '\n'.join([l.name for l in c.list_labels]) if c.list_labels else ''
-            fields['desc'] = lambda c: c.desc
-            fields['due'] = lambda c: c.due or ''
-            fields['last activity'] = lambda c: getattr(c, 'dateLastActivity')
-            fields['board'] = lambda c: c.board.name
-            fields['id'] = lambda c: getattr(c, 'id')
-            fields['url'] = lambda c: getattr(c, 'shortUrl')
             table = prettytable.PrettyTable()
-            table.field_names = fields.keys()
+            table.field_names = self.fields.keys()
             table.align = 'l'
             if tsv:
                 table.set_style(prettytable.PLAIN_COLUMNS)
@@ -120,24 +129,21 @@ class Display:
                 table.hrules = prettytable.FRAME
             with click.progressbar(list(cards), label='Fetching cards', width=0) as pg:
                 for card in pg:
-                    table.add_row([x(card) for x in fields.values()])
+                    table.add_row([x(card) for x in self.fields.values()])
             try:
                 table[0]
             except IndexError:
                 click.secho('No cards match!', fg='red')
                 raise GTDException(1)
             if table_fields:
-                print(self.resize_and_get_table(table, table_fields))
-            elif field_blacklist:
-                f = set(fields.keys()) - set(field_blacklist)
-                print(self.resize_and_get_table(table, list(f)))
+                print(table.get_string(fields=table_fields, sortby=sort))
             else:
-                print(self.resize_and_get_table(table, fields.keys()))
+                print(self.resize_and_get_table(table, self.fields.keys(), sort))
 
-    def resize_and_get_table(self, table, fields):
+    def resize_and_get_table(self, table, fields, sort):
         '''Remove columns from the table until it fits in your terminal'''
         maxwidth = click.get_terminal_size()[0]
-        possible = table.get_string(fields=fields, sortby='last activity')
+        possible = table.get_string(fields=fields, sortby=sort)
         fset = set(fields)
         # Fields in increasing order of importance
         to_remove = ['desc', 'id', 'board', 'url', 'last activity', 'list']
@@ -145,7 +151,7 @@ class Display:
         while len(possible.splitlines()[0]) >= maxwidth and to_remove:
             # Remove a field one at a time
             fset.remove(to_remove.pop(0))
-            possible = table.get_string(fields=list(fset), sortby='last activity')
+            possible = table.get_string(fields=list(fset), sortby=sort)
         return possible
 
     def show_card(self, card):
