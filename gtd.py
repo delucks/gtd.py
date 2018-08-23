@@ -305,7 +305,7 @@ def delete_lists(config, name, noninteractive):
     else:
         for l in lists:
             if prompt_for_confirmation('Close this list?'):
-                l.set_closed()
+                l.close()
                 click.secho('Closed!', fg='green')
 
 
