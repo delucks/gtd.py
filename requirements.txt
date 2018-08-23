@@ -1,7 +1,7 @@
-PyYAML
+PyYAML==3.12
 py-trello==0.9.0
 pytest==2.9.2
-click>=6.7
-prompt_toolkit
+click==6.7
+prompt_toolkit==1.0.15
 prettytable==0.7.2
-arrow
+arrow==0.12.1
