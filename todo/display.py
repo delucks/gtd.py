@@ -119,6 +119,7 @@ class Display:
             tostr = self._force_json(sanitized_cards)
             print(json.dumps(tostr, sort_keys=True, indent=2))
         else:
+            # TODO construct the table dynamically instead of filtering down an already-constructed table
             # TODO implement a custom sorting functions so the table can be sorted by multiple columns
             table = prettytable.PrettyTable()
             table.field_names = self.fields.keys()

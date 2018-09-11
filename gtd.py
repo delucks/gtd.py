@@ -57,6 +57,10 @@ def json_option(f):
     return click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')(f)
 
 
+def tsv_option(f):
+    return click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')(f)
+
+
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.version_option(__version__)
 @click.option('-b', '--board', default=None, help='Name of the board to work with for this session')
@@ -255,7 +259,7 @@ def show_tags(config, json):
 @show.command('cards')
 @filtering_command
 @json_option
-@click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')
+@tsv_option
 @sorting_fields_command
 @pass_config
 def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, has_due, by, fields):
@@ -279,6 +283,22 @@ def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, h
         has_due_date=has_due
     )
     display.show_cards(cards, use_json=json, tsv=tsv, sort=by, table_fields=fields)
+
+
+@show.command('soon')
+@json_option
+@tsv_option
+@pass_config
+def show_soon(config, json, tsv):
+    _, board = BoardTool.start(config)
+    display = Display(config.color)
+    if config.banner and not json:
+        display.banner()
+    cards = BoardTool.filter_cards(
+        board,
+        has_due_date=True
+    )
+    display.show_cards(cards, use_json=json, tsv=tsv, sort='due')
 
 
 # show }}}
@@ -553,22 +573,27 @@ def batch_attach(config):
 
 @cli.command(short_help='Use a smart shell-like menu')
 @filtering_command
+@click.option('--by-due', help='review cards that are due soon', is_flag=True)
 @pass_config
-def review(config, tags, no_tags, match, listname, attachments, has_due):
+def review(config, tags, no_tags, match, listname, attachments, has_due, by_due):
     '''show a smart, command-line based menu for each card selected.
     This menu will prompt you to add tags to untagged cards, to attach the title
     of cards which have a link in the title, and gives you all the other functionality combined.
     '''
     connection, board = BoardTool.start(config)
-    cards = BoardTool.filter_cards(
-        board,
-        tags=tags,
-        no_tags=no_tags,
-        title_regex=match,
-        list_regex=listname,
-        has_attachments=attachments,
-        has_due_date=has_due
-    )
+    if by_due:
+        cards = BoardTool.filter_cards(board, has_due_date=True)
+        cards = sorted(cards, key=lambda c: c.due)
+    else:
+        cards = BoardTool.filter_cards(
+            board,
+            tags=tags,
+            no_tags=no_tags,
+            title_regex=match,
+            list_regex=listname,
+            has_attachments=attachments,
+            has_due_date=has_due
+        )
     list_lookup = BoardTool.list_lookup(board)
     label_lookup = BoardTool.label_lookup(board)
     display = Display(config.color)
