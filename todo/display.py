@@ -22,6 +22,7 @@ class Display:
       something to stdout
     - banner should have more ascii art options :D
     '''
+
     def __init__(self, color=True, primary_color=Colors.blue):
         self.color = color
         self.primary = primary_color
@@ -112,10 +113,7 @@ class Display:
         :param list table_fields: display only these fields
         '''
         if use_json:
-            sanitized_cards = list(map(
-                lambda d: d.pop('client') and d,
-                [c.__dict__.copy() for c in cards]
-            ))
+            sanitized_cards = list(map(lambda d: d.pop('client') and d, [c.__dict__.copy() for c in cards]))
             tostr = self._force_json(sanitized_cards)
             print(json.dumps(tostr, sort_keys=True, indent=2))
         else:
@@ -181,7 +179,7 @@ class Display:
         if card.get_attachments():
             indent_print('Attachments:', '')
             for a in card.get_attachments():
-                print(' '*4 + a.name)
+                print(' ' * 4 + a.name)
         if card.comments:
             indent_print('Comments:', '')
             for c in card.comments:
@@ -203,4 +201,4 @@ class Display:
         if card.description:
             indent_print('Description', '')
             for line in card.description.splitlines():
-                print(' '*4 + line)
+                print(' ' * 4 + line)

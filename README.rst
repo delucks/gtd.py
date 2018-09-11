@@ -447,6 +447,17 @@ This configuration file can be put in a variety of locations within your home fo
 * ``~/.local/etc/gtd.yaml``
 * ``~/.local/etc/gtd/gtd.yaml``
 
+Contributing
+------------
+
+Contributions would be great! If you think something could be improved just go change it and ask!
+
+I use ``black`` to format the source code but keep some of my conventions kept in this source since the beginning. I've been using single-quotes for strings and wrapping at 160 character line length, so I use the following command to do the formatting. Please apply it when giving patches.
+
+::
+
+ black -l 160 -S gtd.py todo/
+
 Notes
 ------
 

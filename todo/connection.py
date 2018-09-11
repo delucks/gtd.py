@@ -11,6 +11,7 @@ class TrelloConnection:
 
     :param bool autoconnect: should we make a network connection to Trello immediately?
     '''
+
     def __init__(self, config, autoconnect=True):
         self.autoconnect = autoconnect
         self.config = config
@@ -42,9 +43,6 @@ class TrelloConnection:
         :returns: trello.TrelloClient client
         '''
         trello_client = trello.TrelloClient(
-            api_key=config.api_key,
-            api_secret=config.api_secret,
-            token=config.oauth_token,
-            token_secret=config.oauth_token_secret
+            api_key=config.api_key, api_secret=config.api_secret, token=config.oauth_token, token_secret=config.oauth_token_secret
         )
         return trello_client

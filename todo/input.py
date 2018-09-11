@@ -21,11 +21,7 @@ from todo.connection import TrelloConnection
 
 
 def parse_user_date_input(user_input):
-    accepted_formats = [
-        'MMM D YYYY',
-        'MM/DD/YYYY',
-        'DD/MM/YYYY',
-    ]
+    accepted_formats = ['MMM D YYYY', 'MM/DD/YYYY', 'DD/MM/YYYY']
     for fmt in accepted_formats:
         try:
             input_datetime = arrow.get(user_input, fmt)
@@ -113,6 +109,7 @@ class CardTool:
     These methods are used inside of the user interaction parts of the codebase as a way of doing the same operation across
     different UI components.
     '''
+
     # TODO add type hints
     @staticmethod
     def add_labels(card, label_choices=None):
@@ -182,7 +179,7 @@ class CardTool:
             'print': 'display this card (p)',
             'rename': 'change title of this card',
             'tag': 'add or remove tags on this card (t)',
-            'quit': 'exit program'
+            'quit': 'exit program',
         }
         command_completer = WordCompleter(commands.keys())
         while True:
@@ -354,6 +351,7 @@ class BoardTool:
     this should replace the existing BoardTool class and the init_and_filter method, which is really just
     doing some boilerplate that can be handled in this class
     '''
+
     @staticmethod
     def start(config):
         connection = TrelloConnection(config)
@@ -363,10 +361,7 @@ class BoardTool:
     @staticmethod
     def take_cards_from_lists(board, list_regex):
         pattern = re.compile(list_regex, flags=re.I)
-        target_lists = filter(
-            lambda x: pattern.search(x.name),
-            board.get_lists('open')
-        )
+        target_lists = filter(lambda x: pattern.search(x.name), board.get_lists('open'))
         for cardlist in target_lists:
             for card in cardlist.list_cards():
                 yield card
@@ -379,12 +374,14 @@ class BoardTool:
         # Regular expression on trello.Card.name
         title_regex = kwargs.get('title_regex', None)
         regex_flags = kwargs.get('regex_flags', 0)
+
         def search_for_regex(card):
             try:
                 return re.search(title_regex, card.name, regex_flags)
             except re.error as e:
                 click.secho('Invalid regular expression "{1}" passed: {0}'.format(str(e), title_regex), fg='red')
                 raise GTDException(1)
+
         # boolean queries about whether the card has things
         has_attachments = kwargs.get('has_attachments', None)
         no_tags = kwargs.get('no_tags', False)

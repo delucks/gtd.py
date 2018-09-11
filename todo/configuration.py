@@ -9,6 +9,7 @@ class Configuration:
     arguments of the properties we need to connect to the Trello API and some
     other properties that modify global state during each run
     '''
+
     def __init__(self, api_key, api_secret, oauth_token, oauth_token_secret, **kwargs):
         self.api_key = api_key
         self.api_secret = api_secret
@@ -19,16 +20,18 @@ class Configuration:
         self.color = kwargs.get('color', True)
 
     def __repr__(self):
-        return '\n'.join([
-            'GTD Configuration:',
-            '  API key: ' + self.api_key,
-            '  API secret: ' + self.api_secret,
-            '  OAuth token: ' + self.oauth_token,
-            '  OAuth secret: ' + self.oauth_token_secret,
-            '  Primary board: '.format(self.board),
-            '  Banner? '.format(self.banner),
-            '  Use ANSI color? {0}'.format(self.color),
-        ])
+        return '\n'.join(
+            [
+                'GTD Configuration:',
+                '  API key: ' + self.api_key,
+                '  API secret: ' + self.api_secret,
+                '  OAuth token: ' + self.oauth_token,
+                '  OAuth secret: ' + self.oauth_token_secret,
+                '  Primary board: '.format(self.board),
+                '  Banner? '.format(self.banner),
+                '  Use ANSI color? {0}'.format(self.color),
+            ]
+        )
 
     def __str__(self):
         return repr(self)
@@ -50,13 +53,16 @@ class Configuration:
 
     @staticmethod
     def all_config_locations():
-        return [os.path.expanduser(x) for x in [
-            '~/.gtd.yaml',
-            '~/.config/gtd/gtd.yaml',
-            '~/Library/Application Support/gtd/gtd.yaml',
-            '~/.local/etc/gtd.yaml',
-            '~/.local/etc/gtd/gtd.yaml',
-        ]]
+        return [
+            os.path.expanduser(x)
+            for x in [
+                '~/.gtd.yaml',
+                '~/.config/gtd/gtd.yaml',
+                '~/Library/Application Support/gtd/gtd.yaml',
+                '~/.local/etc/gtd.yaml',
+                '~/.local/etc/gtd/gtd.yaml',
+            ]
+        ]
 
     @staticmethod
     def find_config_file():
@@ -89,5 +95,5 @@ class Configuration:
             file_config['oauth_token_secret'],
             board=file_config.get('board', None),
             color=file_config.get('color', True),
-            banner=file_config.get('banner', True)
+            banner=file_config.get('banner', True),
         )

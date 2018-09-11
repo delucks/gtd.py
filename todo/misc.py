@@ -2,6 +2,7 @@ import os
 import re
 import requests
 from todo import __version__, __author__
+
 try:
     from random import choice
 except OSError:
@@ -36,7 +37,7 @@ def get_title_of_webpage(url):
         if 'text/html' not in resp.headers.get('Content-Type', ''):
             return None
         as_text = resp.text
-        return as_text[as_text.find('<title>') + 7:as_text.find('</title>')]
+        return as_text[as_text.find('<title>') + 7 : as_text.find('</title>')]
     except requests.exceptions.ConnectionError:
         return None
 
@@ -44,6 +45,7 @@ def get_title_of_webpage(url):
 class DevNullRedirect:
     '''Temporarily eat stdout/stderr to allow no output.
     This is used to suppress browser messages in webbrowser.open'''
+
     def __enter__(self):
         self.old_stderr = os.dup(2)
         self.old_stdout = os.dup(1)
@@ -83,11 +85,7 @@ def get_banner(version=__version__, author=__author__, use_color=True):
         off = Colors.reset
     else:
         on = off = ''
-    b1 = (
-        ' __|_ _| ._     version {on}{0}{off}\n'
-        '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n'
-        ' _|      |  /\n'
-    ).format(version, author, on=on, off=off)
+    b1 = (' __|_ _| ._     version {on}{0}{off}\n' '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n' ' _|      |  /\n').format(version, author, on=on, off=off)
     b2 = (
         '  ___  ____  ____    ____  _  _\n'
         ' / __)(_  _)(  _ \  (  _ \( \/ )\n'
