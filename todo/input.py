@@ -442,7 +442,7 @@ class BoardTool:
         '''
         board = BoardTool.get_main_board(connection, config)
         if getattr(config, 'inbox_list', False):
-            return [l for l in board.open_lists() if l.name == bytes(config.inbox_list, 'utf8')][0]
+            return [l for l in board.open_lists() if l.name == config.inbox_list][0]
         else:
             return board.open_lists()[0]
 
