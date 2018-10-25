@@ -27,8 +27,8 @@ class Configuration:
                 '  API secret: ' + self.api_secret,
                 '  OAuth token: ' + self.oauth_token,
                 '  OAuth secret: ' + self.oauth_token_secret,
-                '  Primary board: '.format(self.board),
-                '  Banner? '.format(self.banner),
+                '  Primary board: {0}'.format(self.board),
+                '  Banner? {0}'.format(self.banner),
                 '  Use ANSI color? {0}'.format(self.color),
             ]
         )
