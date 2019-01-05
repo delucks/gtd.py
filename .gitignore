@@ -10,4 +10,5 @@ share/*
 .cache/*
 build/*
 dist/*
+venv/
 *egg-info*
