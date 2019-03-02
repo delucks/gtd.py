@@ -131,10 +131,16 @@ class CardTool:
             elif userinput == 'ls':
                 triple_column_print(label_choices.keys())
             elif userinput not in label_choices.keys():
-                if prompt_for_confirmation('Unrecognized tag name {0}, would you like to create it?'.format(userinput), False):
+                if prompt_for_confirmation(
+                    'Unrecognized tag name {0}, would you like to create it?'.format(userinput), False
+                ):
                     label = card.board.add_label(userinput, 'black')
                     card.add_label(label)
-                    click.echo('Successfully added tag {0} to board {1} and card {2}!'.format(label.name, card.board.name, card.name))
+                    click.echo(
+                        'Successfully added tag {0} to board {1} and card {2}!'.format(
+                            label.name, card.board.name, card.name
+                        )
+                    )
                     label_choices = BoardTool.label_lookup(card.board)
                     label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
             else:
@@ -160,7 +166,9 @@ class CardTool:
                     for url in [a.url for a in card.get_attachments() if a.url is not None]:
                         webbrowser.open(url)
         if re.search(VALID_URL_REGEX, card.name):
-            if prompt_for_confirmation('{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True):
+            if prompt_for_confirmation(
+                '{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True
+            ):
                 CardTool.title_to_link(card)
         if not card.list_labels:
             print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
@@ -227,7 +235,11 @@ class CardTool:
                 else:
                     click.secho('Change the text & save to post the comment', fg='red')
             else:
-                print('{0}{1}{2} is not a command, type "{0}help{2}" to view available commands'.format(on, user_input, off))
+                print(
+                    '{0}{1}{2} is not a command, type "{0}help{2}" to view available commands'.format(
+                        on, user_input, off
+                    )
+                )
 
     @staticmethod
     def title_to_link(card):

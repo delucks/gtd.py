@@ -167,7 +167,11 @@ def onboard(no_open, output_path=None):
     redirect. In a web application you would redirect the user to the URL
     below.'''
     user_confirmation_url = '{authorize_url}?oauth_token={oauth_token}&scope={scope}&expiration={expiration}&name={name}'.format(
-        authorize_url=authorize_url, oauth_token=resource_owner_key, expiration='never', scope='read,write', name='gtd.py'
+        authorize_url=authorize_url,
+        oauth_token=resource_owner_key,
+        expiration='never',
+        scope='read,write',
+        name='gtd.py',
     )
     click.echo('Visit the following URL in your web browser to authorize gtd.py to access your account:')
     click.echo('  ' + user_confirmation_url)
@@ -273,7 +277,15 @@ def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, h
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
-    cards = BoardTool.filter_cards(board, tags=tags, no_tags=no_tags, title_regex=match, list_regex=listname, has_attachments=attachments, has_due_date=has_due)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due,
+    )
     display.show_cards(cards, use_json=json, tsv=tsv, sort=by, table_fields=fields)
 
 
@@ -330,7 +342,15 @@ def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, 
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
-    cards = BoardTool.filter_cards(board, tags=tags, no_tags=no_tags, title_regex=match, list_regex=listname, has_attachments=attachments, has_due_date=has_due)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due,
+    )
     method = 'delete' if force else 'archive'
     if noninteractive:
         if force:
@@ -465,7 +485,15 @@ def batch():
 def batch_move(config, tags, no_tags, match, listname, attachments, has_due):
     '''Change the list of each card selected'''
     connection, board = BoardTool.start(config)
-    cards = BoardTool.filter_cards(board, tags=tags, no_tags=no_tags, title_regex=match, list_regex=listname, has_attachments=attachments, has_due_date=has_due)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due,
+    )
     display = Display(config.color)
     if config.banner:
         display.banner()
@@ -481,7 +509,15 @@ def batch_move(config, tags, no_tags, match, listname, attachments, has_due):
 def batch_tag(config, tags, no_tags, match, listname, attachments, has_due):
     '''Change tags on each card selected'''
     connection, board = BoardTool.start(config)
-    cards = BoardTool.filter_cards(board, tags=tags, no_tags=no_tags, title_regex=match, list_regex=listname, has_attachments=attachments, has_due_date=has_due)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due,
+    )
     display = Display(config.color)
     if config.banner:
         display.banner()
@@ -496,7 +532,15 @@ def batch_tag(config, tags, no_tags, match, listname, attachments, has_due):
 def batch_due(config, tags, no_tags, match, listname, attachments, has_due):
     '''Set due date for all cards selected'''
     connection, board = BoardTool.start(config)
-    cards = BoardTool.filter_cards(board, tags=tags, no_tags=no_tags, title_regex=match, list_regex=listname, has_attachments=attachments, has_due_date=has_due)
+    cards = BoardTool.filter_cards(
+        board,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due,
+    )
     display = Display(config.color)
     if config.banner:
         display.banner()
@@ -539,7 +583,13 @@ def review(config, tags, no_tags, match, listname, attachments, has_due, by_due)
         cards = sorted(cards, key=lambda c: c.due)
     else:
         cards = BoardTool.filter_cards(
-            board, tags=tags, no_tags=no_tags, title_regex=match, list_regex=listname, has_attachments=attachments, has_due_date=has_due
+            board,
+            tags=tags,
+            no_tags=no_tags,
+            title_regex=match,
+            list_regex=listname,
+            has_attachments=attachments,
+            has_due_date=has_due,
         )
     list_lookup = BoardTool.list_lookup(board)
     label_lookup = BoardTool.label_lookup(board)

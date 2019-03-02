@@ -41,7 +41,9 @@ class Configuration:
         '''Do some platform detection and suggest a place for the users' config file to go'''
         system = platform.system()
         if system == 'Windows':
-            print('gtd.py support for Windows is rudimentary to none. Try to put your config file in $HOME/.gtd.yaml and run the script again')
+            print(
+                'gtd.py support for Windows is rudimentary to none. Try to put your config file in $HOME/.gtd.yaml and run the script again'
+            )
             raise GTDException(0)
         elif system == 'Darwin':
             preferred_location = os.path.expanduser('~/Library/Application Support/gtd/gtd.yaml')

@@ -43,6 +43,9 @@ class TrelloConnection:
         :returns: trello.TrelloClient client
         '''
         trello_client = trello.TrelloClient(
-            api_key=config.api_key, api_secret=config.api_secret, token=config.oauth_token, token_secret=config.oauth_token_secret
+            api_key=config.api_key,
+            api_secret=config.api_secret,
+            token=config.oauth_token,
+            token_secret=config.oauth_token_secret,
         )
         return trello_client

@@ -161,7 +161,9 @@ class Display:
 
         :param trello.Card card: card to display
         '''
-        indent_print = lambda m, d: print('  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off))
+        indent_print = lambda m, d: print(
+            '  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off)
+        )
         on = self.primary if self.color else ''
         off = Colors.reset if self.color else ''
         print('{on}Card{off}'.format(on=on, off=off), card.id)

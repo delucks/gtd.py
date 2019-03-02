@@ -85,7 +85,9 @@ def get_banner(version=__version__, author=__author__, use_color=True):
         off = Colors.reset
     else:
         on = off = ''
-    b1 = (' __|_ _| ._     version {on}{0}{off}\n' '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n' ' _|      |  /\n').format(version, author, on=on, off=off)
+    b1 = (
+        ' __|_ _| ._     version {on}{0}{off}\n' '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n' ' _|      |  /\n'
+    ).format(version, author, on=on, off=off)
     b2 = (
         '  ___  ____  ____    ____  _  _\n'
         ' / __)(_  _)(  _ \  (  _ \( \/ )\n'
