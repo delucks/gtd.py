@@ -18,6 +18,7 @@ class Configuration:
         self.board = kwargs.get('board', None)
         self.banner = kwargs.get('banner', True)
         self.color = kwargs.get('color', True)
+        self.inbox_list = kwargs.get('inbox_list', None)
 
     def __repr__(self):
         return '\n'.join(
@@ -28,6 +29,7 @@ class Configuration:
                 '  OAuth token: ' + self.oauth_token,
                 '  OAuth secret: ' + self.oauth_token_secret,
                 '  Primary board: {0}'.format(self.board),
+                '  Inbox list: {0}'.format(self.inbox_list),
                 '  Banner? {0}'.format(self.banner),
                 '  Use ANSI color? {0}'.format(self.color),
             ]
@@ -98,4 +100,5 @@ class Configuration:
             board=file_config.get('board', None),
             color=file_config.get('color', True),
             banner=file_config.get('banner', True),
+            inbox_list=file_config.get('inbox_list', None),
         )
