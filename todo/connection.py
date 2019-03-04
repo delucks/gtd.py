@@ -20,8 +20,8 @@ class TrelloConnection:
     def __connect(self, config):
         trello_client = self.initialize_trello(config)
         try:
-            # This is the first connection to the API made by the client
-            self.boards = trello_client.list_boards('open')
+            # A simple API call (data reused in BoardTool.get_main_board) to initiate connection & test our credentials etc
+            self.boards = trello_client.fetch_json('/members/me/boards/?filter=open')
             return trello_client
         except requests.exceptions.ConnectionError:
             print('[FATAL] Could not connect to the Trello API!')

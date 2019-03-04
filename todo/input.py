@@ -436,16 +436,21 @@ class BoardTool:
 
     @staticmethod
     def get_main_board(connection, config):
-        '''use the configuration to get the main board & return it'''
+        '''use the configuration to get the main board & return it
+        This function avoids py-trello's connection.list_boards() function as it produces O(N) network calls.
+        This function is guaranteed to only produce 1 network call, in the trello.Board initialization below.
+        '''
+        # connection.boards is a response from the trello API unpacked as a list of dicts
         if config.board is None:
             # If no board name is passed, default to the first board
-            return connection.boards[0]
+            board_json = connection.boards[0]
         else:
-            possible = [b for b in connection.boards if b.name == config.board]
+            possible = [b for b in connection.boards if b['name'] == config.board]
             if possible:
-                return possible[0]
+                board_json = possible[0]
             else:
-                return connection.boards[0]
+                board_json = connection.boards[0]
+        return trello.Board.from_json(connection.trello, json_obj=board_json)
 
     @staticmethod
     def get_inbox_list(connection, config):
