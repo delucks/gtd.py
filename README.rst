@@ -8,7 +8,7 @@ This is a command-line tool that enables you to add, sort, and review cards on T
 
 The project is named "gtd.py" because it was initially built as a tool for me to maintain a Trello board using the GTD_ task tracking method. I've been actively using this tool for GTD since the first commit; if you're trying to use GTD with Trello this is the tool for you.
 
-.. image:: https://raw.githubusercontent.com/delucks/gtd.py/master/demo.svg?sanitize=True
+.. image:: ./demo.svg
    :alt: Animated Demonstration
 
 Usage
