@@ -18,6 +18,8 @@ In the following examples I'll be working with a sample board, that I created li
 
    $ gtd add board PublicShowTest
    Added board PublicShowTest
+   $ gtd add list 'To Do'
+   Successfully added list <List To Do>!
    $ gtd add list 'Weekly Tasks'
    Successfully added list <List Weekly Tasks>!
    $ for task in 'Do dishes' 'Clean bathroom' 'Write some python' 'Eat a sandwich'; do gtd add card "$task"; done
