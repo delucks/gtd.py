@@ -21,7 +21,7 @@ class TrelloConnection:
         trello_client = self.initialize_trello(config)
         try:
             # This is the first connection to the API made by the client
-            self.boards = trello_client.list_boards()
+            self.boards = trello_client.list_boards('open')
             return trello_client
         except requests.exceptions.ConnectionError:
             print('[FATAL] Could not connect to the Trello API!')

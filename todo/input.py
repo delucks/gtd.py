@@ -439,13 +439,13 @@ class BoardTool:
         '''use the configuration to get the main board & return it'''
         if config.board is None:
             # If no board name is passed, default to the first board
-            return connection.trello.list_boards('open')[0]
+            return connection.boards[0]
         else:
-            possible = [b for b in connection.trello.list_boards('open') if b.name == config.board]
+            possible = [b for b in connection.boards if b.name == config.board]
             if possible:
                 return possible[0]
             else:
-                return connection.trello.list_boards('open')[0]
+                return connection.boards[0]
 
     @staticmethod
     def get_inbox_list(connection, config):
