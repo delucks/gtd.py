@@ -316,18 +316,32 @@ def delete():
 @click.argument('name')
 @click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
 @pass_config
-def delete_lists(config, name, noninteractive):
-    '''Delete lists containing the substring <name>
-    '''
+def delete_list(config, name, noninteractive):
+    '''Delete a list by name'''
     _, board = BoardTool.start(config)
-    lists = [l for l in board.get_lists('open') if name in l.name]
-    if noninteractive:
-        [l.set_closed() for l in lists]
-    else:
-        for l in lists:
-            if prompt_for_confirmation('Close this list?'):
-                l.close()
-                click.secho('Closed!', fg='green')
+    lists = [l for l in board.get_lists('open') if l.name == name]
+    if not lists:
+        click.secho('No such list {}'.format(name), fg='red')
+    for l in lists:
+        if noninteractive or prompt_for_confirmation('Close list "{}"?'.format(l.name)):
+            l.close()
+            click.secho('Closed {}!'.format(l.name), fg='green')
+
+
+@delete.command('tag')
+@click.argument('name')
+@click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
+@pass_config
+def delete_tag(config, name, noninteractive):
+    '''Delete a tag by name'''
+    _, board = BoardTool.start(config)
+    tags = [l for l in board.get_labels() if l.name == name]
+    if not tags:
+        click.secho('No such tag {}'.format(name), fg='red')
+    for t in tags:
+        if noninteractive or prompt_for_confirmation('Delete tag "{}"?'.format(t.name)):
+            board.delete_label(t.id)
+            click.secho('Deleted {}!'.format(t.name), fg='green')
 
 
 @delete.command('cards')
