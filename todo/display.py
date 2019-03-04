@@ -164,13 +164,23 @@ class Display:
         indent_print = lambda m, d: print(
             '  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off)
         )
+        label_color_correction = {
+            'purple': 'magenta',
+            'sky': 'cyan',
+            'orange': 'bright_yellow',
+            'lime': 'bright_green',
+            'pink': 'bright_magenta',
+        }
         on = self.primary if self.color else ''
         off = Colors.reset if self.color else ''
         print('{on}Card{off}'.format(on=on, off=off), card.id)
         indent_print('Name:', card.name)
         indent_print('List:', '{0}'.format(card.get_list().name))
         if card.list_labels:
-            indent_print('Tags:', ','.join([l.name for l in card.list_labels]))
+            click.echo('  {on}{name: <{fill}}{off}'.format(name='Tags:', fill='14', on=on, off=off), nl=False)
+            for l in card.list_labels:
+                click.secho(l.name + ' ', fg=label_color_correction.get(l.color, l.color) or 'green', nl=False)
+            print()
         try:
             created = card.card_created_date
             indent_print('Created:', '{0} ({1})'.format(created, created.timestamp()))
