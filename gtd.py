@@ -9,6 +9,7 @@ import shutil
 import requests
 import readline  # noqa
 import webbrowser
+import prettytable
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib.oauth1_session import TokenRequestDenied
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
@@ -230,6 +231,52 @@ def onboard(no_open, output_path=None):
 def show():
     '''Display cards, tags, or lists on this board.'''
     pass
+
+
+@show.command('boards')
+@json_option
+@tsv_option
+@click.option('--by', default='activity', help='Choose field to sort (when not using json output)')
+@click.option('-a', '--show-all', is_flag=True, default=False, help='Show closed boards')
+@pass_config
+def show_boards(config, json, tsv, by, show_all):
+    '''Show all boards your account can access'''
+    connection, board = BoardTool.start(config)
+    display = Display(config.color)
+    if config.banner and not json:
+        display.banner()
+    if show_all:
+        boards = connection.trello.fetch_json('/members/me/boards/?filter=all')
+    else:
+        boards = connection.boards
+    if json:
+        display.show_raw(boards, use_json=json)
+        return
+    # Set up a table to hold our boards
+    board_columns = [
+        'name',
+        'activity',
+        'members',
+        'permission',
+        'url',
+    ]
+    if by not in board_columns:
+        click.secho('Field {} is not a valid field: {}'.format(by, ','.join(board_columns)), fg='red')
+        raise GTDException(1)
+    table = prettytable.PrettyTable()
+    table.field_names = board_columns
+    table.align = 'l'
+    if tsv:
+        table.set_style(prettytable.PLAIN_COLUMNS)
+    else:
+        table.hrules = prettytable.FRAME
+    for b in boards:
+        table.add_row([b['name'], b['dateLastActivity'] or '', len(b['memberships']), b['prefs']['permissionLevel'], b['shortUrl']])
+    try:
+        table[0]
+    except IndexError:
+        click.secho('You have no boards!', fg='red')
+    print(table.get_string(sortby=by))
 
 
 @show.command('lists')
