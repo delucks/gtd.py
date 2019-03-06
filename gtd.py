@@ -109,9 +109,16 @@ def info(workflow, banner):
 
 
 @cli.command()
+@click.pass_context
+def help(ctx):
+    '''Show this message and exit.'''
+    print(cli.get_help(ctx))
+
+
+@cli.command()
 @click.option('-e', '--edit', is_flag=True, help='Open $EDITOR on the configuration file')
 def config(edit):
-    '''Show/modify user configuration'''
+    '''Show or modify user configuration'''
     if edit:
         try:
             click.edit(filename=Configuration.find_config_file())
