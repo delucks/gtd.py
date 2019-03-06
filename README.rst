@@ -446,16 +446,16 @@ All four of these properties are required, ``gtd`` will fail to run without them
 
 Here are all valid configuration properties with explanations of their behavior:
 
-=========================== ============ ============ =======
-Property                    Default      CLI Flag     Meaning
-=========================== ============ ============ =======
-board                       Latest board -b           Name of Trello board to use by default
-inbox_list                  First list                Name of the list to place new cards
-color                       True         --no-color   Use ANSI terminal colors?
-banner                      False        --banner     Print an ASCII art banner on each program run?
-prompt_for_open_attachments False                     Ask to open card attachments in ``gtd review``
-prompt_for_untagged_cards   True                      Ask to tag cards without any tags in ``gtd review``
-=========================== ============ ============ =======
+=============================== ============ ============== =======
+Property                        Default      CLI Override   Meaning
+=============================== ============ ============== =======
+``board``                       Latest board ``-b``         Name of Trello board to use by default
+``inbox_list``                  First list                  Name of the list to place new cards
+``color``                       True         ``--no-color`` Use ANSI terminal colors?
+``banner``                      False        ``--banner``   Print an ASCII art banner on each program run?
+``prompt_for_open_attachments`` False                       Ask to open card attachments in ``gtd review``
+``prompt_for_untagged_cards``   True                        Ask to tag cards without any tags in ``gtd review``
+=============================== ============ ============== =======
 
 This configuration file can be put in a variety of locations within your home folder. The ``onboard`` command will help you with platform detection, putting the configuration file where appropriate given your operating system. When running, ``gtd``` will check all possible locations out of this list:
 
