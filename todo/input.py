@@ -154,13 +154,26 @@ class CardTool:
                     print('Removed tag {0}'.format(Colors.red + userinput + Colors.reset))
 
     @staticmethod
-    def smart_menu(card, f_display, list_choices, label_choices, color=None):
-        '''make assumptions about what you want to do with a card and ask the user if they want to'''
+    def smart_menu(
+        card,
+        f_display,
+        list_choices,
+        label_choices,
+        color=None,
+        prompt_for_open_attachments=False,
+        prompt_for_untagged_cards=True,
+    ):
+        '''smart_menu is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
+        - Are there attachments? Maybe you want to open them.
+        - Does there appear to be a URL in the title? You might want to attach it.
+        - Are there no tags? Maybe you want to add some.
+        Then gives you a nice tab-completed menu that lets you do all common operations on a card.
+        '''
         on = color if color else ''
         off = Colors.reset if color else ''
         card.fetch()
         f_display(card)
-        if card.get_attachments():
+        if card.get_attachments() and prompt_for_open_attachments:
             if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
                 with DevNullRedirect():
                     for url in [a.url for a in card.get_attachments() if a.url is not None]:
@@ -170,7 +183,7 @@ class CardTool:
                 '{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True
             ):
                 CardTool.title_to_link(card)
-        if not card.list_labels:
+        if not card.list_labels and prompt_for_untagged_cards:
             print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
             CardTool.add_labels(card, label_choices)
         commands = {

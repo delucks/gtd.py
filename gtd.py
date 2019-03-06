@@ -66,9 +66,9 @@ def tsv_option(f):
 @click.version_option(__version__)
 @click.option('-b', '--board', default=None, help='Name of the board to work with for this session')
 @click.option('--no-color', is_flag=True, default=False, help='Disable ANSI terminal color?')
-@click.option('--no-banner', is_flag=True, default=False, help='Disable banner printing?')
+@click.option('--banner', is_flag=True, default=False, help='Print a gtd.py ascii art banner')
 @click.pass_context
-def cli(ctx, board, no_color, no_banner):
+def cli(ctx, board, no_color, banner):
     '''gtd.py'''
     try:
         config = Configuration.from_file()
@@ -87,8 +87,8 @@ def cli(ctx, board, no_color, no_banner):
         config.board = board
     if no_color:
         config.color = False
-    if no_banner:
-        config.banner = False
+    if banner:
+        config.banner = True
     ctx.color = config.color
     ctx.obj = config
 
@@ -253,13 +253,7 @@ def show_boards(config, json, tsv, by, show_all):
         display.show_raw(boards, use_json=json)
         return
     # Set up a table to hold our boards
-    board_columns = [
-        'name',
-        'activity',
-        'members',
-        'permission',
-        'url',
-    ]
+    board_columns = ['name', 'activity', 'members', 'permission', 'url']
     if by not in board_columns:
         click.secho('Field {} is not a valid field: {}'.format(by, ','.join(board_columns)), fg='red')
         raise GTDException(1)
@@ -271,7 +265,15 @@ def show_boards(config, json, tsv, by, show_all):
     else:
         table.hrules = prettytable.FRAME
     for b in boards:
-        table.add_row([b['name'], b['dateLastActivity'] or '', len(b['memberships']), b['prefs']['permissionLevel'], b['shortUrl']])
+        table.add_row(
+            [
+                b['name'],
+                b['dateLastActivity'] or '',
+                len(b['memberships']),
+                b['prefs']['permissionLevel'],
+                b['shortUrl'],
+            ]
+        )
     try:
         table[0]
     except IndexError:

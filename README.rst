@@ -406,7 +406,7 @@ Setup
 
 ::
 
-  $ pip install gtd.py
+  $ pip install -u gtd.py
   $ gtd onboard
 
 The ``onboard`` command will assist you through the process of getting a Trello API key for use with this program and putting it in the correct file. This will happen automatically if you run a command that requires authentication without having your API keys set.
@@ -422,7 +422,7 @@ This relies on ``click``'s internal bash completion engine, so it does not work 
 Configuration
 --------------
 
-The ``onboard`` command will help you create the configuration file interactively. If you prefer to do the process manually, Trello has a button on their website for temporarily creating an OAUTH key/token. That should be put in a yaml file formatted like this:
+The ``onboard`` command will help you create the configuration file interactively. If you prefer to do the process manually, Trello has a button on their website for temporarily creating an OAUTH key/token. Your API key and secret should be placed in a YAML file with the OAUTH key & token, like this example.
 
 ::
 
@@ -432,16 +432,30 @@ The ``onboard`` command will help you create the configuration file interactivel
   oauth_token_secret: "your-oauth-secret"
 
 
-There are other optional settings you can define inside your yaml configuration file:
+All four of these properties are required, ``gtd`` will fail to run without them. There are other optional settings you can define inside your yaml configuration file:
 
 ::
 
   board: "Name of the Trello board you want to work with (case sensitive)"
-  color: True   # Do you want to show ANSI colors in the terminal?
-  banner: True  # Do you want to see the "gtd.py" banner on each program run?
+  inbox_list: "Name of the list for new cards"
+  color: True
+  banner: False
+  prompt_for_untagged_cards: True
+  prompt_for_open_attachments: False
 
 
-All of these can be overridden on the command-line with the ``-b``, ``--no-color``, and ``--no-banner`` flags. All of the above examples were recorded with ``--no-color --no-banner``.
+Here are all valid configuration properties with explanations of their behavior:
+
+=========================== ============ ============ =======
+Property                    Default      CLI Flag     Meaning
+=========================== ============ ============ =======
+board                       Latest board -b           Name of Trello board to use by default
+inbox_list                  First list                Name of the list to place new cards
+color                       True         --no-color   Use ANSI terminal colors?
+banner                      False        --banner     Print an ASCII art banner on each program run?
+prompt_for_open_attachments False                     Ask to open card attachments in ``gtd review``
+prompt_for_untagged_cards   True                      Ask to tag cards without any tags in ``gtd review``
+=========================== ============ ============ =======
 
 This configuration file can be put in a variety of locations within your home folder. The ``onboard`` command will help you with platform detection, putting the configuration file where appropriate given your operating system. When running, ``gtd``` will check all possible locations out of this list:
 

@@ -19,6 +19,8 @@ class Configuration:
         self.banner = kwargs.get('banner', True)
         self.color = kwargs.get('color', True)
         self.inbox_list = kwargs.get('inbox_list', None)
+        self.prompt_for_open_attachments = kwargs.get('prompt_for_open_attachments', None)
+        self.prompt_for_untagged_cards = kwargs.get('prompt_for_untagged_cards', None)
 
     def __repr__(self):
         return '\n'.join(
@@ -32,6 +34,9 @@ class Configuration:
                 '  Inbox list: {0}'.format(self.inbox_list),
                 '  Banner? {0}'.format(self.banner),
                 '  Use ANSI color? {0}'.format(self.color),
+                '  Prompt for:',
+                '    Untagged cards? {0}'.format(self.prompt_for_untagged_cards),
+                '    Opening attachments? {0}'.format(self.prompt_for_open_attachments),
             ]
         )
 
@@ -91,14 +96,21 @@ class Configuration:
                 print('A required property {0} in your configuration was not found!'.format(prop))
                 print('Check the file {0}'.format(filename))
                 raise GTDException(1)
-        # Hardcoded defaults are in the final file_config.get() calls
         return Configuration(
             file_config['api_key'],
             file_config['api_secret'],
             file_config['oauth_token'],
             file_config['oauth_token_secret'],
+            # No default board: first board chosen
             board=file_config.get('board', None),
+            # Terminal color by default
             color=file_config.get('color', True),
+            # Don't print banner by default
             banner=file_config.get('banner', False),
+            # No default inbox_list: first list chosen
             inbox_list=file_config.get('inbox_list', None),
+            # By default, don't prompt user to open attachments of a card in review interface
+            prompt_for_open_attachments=file_config.get('prompt_for_open_attachments', False),
+            # By default, prompt user to add tags to untagged cards in review interface
+            prompt_for_untagged_cards=file_config.get('prompt_for_untagged_cards', True),
         )
