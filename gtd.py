@@ -638,7 +638,7 @@ def batch_attach(config):
 # batch }}}
 
 
-@cli.command(short_help='Use a smart shell-like menu')
+@cli.command(short_help='Use a smart repl-like menu')
 @filtering_command
 @click.option('--by-due', help='review cards that are due soon', is_flag=True)
 @pass_config
