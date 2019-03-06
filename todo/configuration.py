@@ -99,6 +99,6 @@ class Configuration:
             file_config['oauth_token_secret'],
             board=file_config.get('board', None),
             color=file_config.get('color', True),
-            banner=file_config.get('banner', True),
+            banner=file_config.get('banner', False),
             inbox_list=file_config.get('inbox_list', None),
         )
