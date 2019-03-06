@@ -272,7 +272,7 @@ class CardTool:
                 user_parameters['title{}'.format(idx)] = possible_title
         # Give the user a default title without the link, but allow them to use the title of the page from a link as a var instead
         reconstructed = ' '.join([n for n in sp if not VALID_URL_REGEX.search(n)])
-        CardTool.rename(card, variables=user_parameters)
+        CardTool.rename(card, variables=user_parameters, default=reconstructed)
 
     @staticmethod
     def manipulate_attachments(card):
