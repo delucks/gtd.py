@@ -4,8 +4,10 @@ import sys
 sys.path.extend('.')
 from todo import __version__
 
+test_require = ['flake8', 'black']
+
 with open('requirements.txt') as f:
-    reqs = [l.strip() for l in f]
+    reqs = [l.strip() for l in f if not any(l.startswith(t) for t in test_require)]
 
 with open('README.rst') as f:
     readme_contents = f.read()
@@ -16,6 +18,7 @@ setup(
     long_description=readme_contents,
     version=__version__,
     install_requires=reqs,
+    test_requires=test_require,
     packages=['todo'],
     py_modules=['gtd'],
     entry_points={
@@ -24,13 +27,13 @@ setup(
         ]
     },
     python_requires='>=3',
-    author = 'James Luck',
-    author_email = 'me@jamesluck.com',
+    author='James Luck',
+    author_email='me@jamesluck.com',
     license='BSD 3-clause',
-    url = 'https://github.com/delucks/gtd.py',
-    download_url = 'https://github.com/delucks/gtd.py/tarball/{}'.format(__version__),
-    keywords = ['productivity', 'cli', 'trello', 'gtd', 'getting things done'],
-    classifiers = [
+    url='https://github.com/delucks/gtd.py',
+    download_url='https://github.com/delucks/gtd.py/tarball/{}'.format(__version__),
+    keywords=['productivity', 'cli', 'trello', 'gtd', 'getting things done'],
+    classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
         'Intended Audience :: Developers',
