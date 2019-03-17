@@ -13,7 +13,8 @@ from functools import partial
 
 import arrow
 from prompt_toolkit import prompt
-from prompt_toolkit.contrib.completers import WordCompleter
+from prompt_toolkit.validation import Validator
+from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
 from todo.misc import get_title_of_webpage, Colors, DevNullRedirect, VALID_URL_REGEX
 from todo.exceptions import GTDException
@@ -123,7 +124,7 @@ class CardTool:
         '''
         print('Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit')
         label_choices = label_choices or BoardTool.label_lookup(card.board)
-        label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
+        label_completer = FuzzyWordCompleter(label_choices.keys())
         while True:
             userinput = prompt('tag > ', completer=label_completer).strip()
             if userinput == '':
@@ -142,7 +143,7 @@ class CardTool:
                         )
                     )
                     label_choices = BoardTool.label_lookup(card.board)
-                    label_completer = WordCompleter(label_choices.keys(), ignore_case=True)
+                    label_completer = FuzzyWordCompleter(label_choices.keys())
             else:
                 label_obj = label_choices[userinput]
                 try:
@@ -169,7 +170,7 @@ class CardTool:
         - Are there no tags? Maybe you want to add some.
         Then gives you a nice tab-completed menu that lets you do all common operations on a card.
         '''
-        on = color if color else ''
+        on = Colors.yellow if color else ''
         off = Colors.reset if color else ''
         card.fetch()
         f_display(card)
@@ -202,7 +203,7 @@ class CardTool:
             'tag': 'add or remove tags on this card (t)',
             'quit': 'exit program',
         }
-        command_completer = WordCompleter(commands.keys())
+        command_completer = FuzzyWordCompleter(commands.keys())
         while True:
             user_input = prompt('gtd.py > ', completer=command_completer)
             if user_input in ['q', 'quit']:
@@ -327,10 +328,16 @@ class CardTool:
     @staticmethod
     def set_due_date(card):
         '''prompt for the date to set this card due as'''
-        print('Enter a date in format "Jun 15 2018", "06/15/2018" or "15/06/2018"')
+        def validate_date(text):
+            return re.match(r'\d{2}\/\d{2}\/\d{4}', text) or re.match(r'[A-Z][a-z]{2} \d{2} \d{4}', text)
+        validator = Validator.from_callable(
+            validate_date,
+            error_message='Enter a date in format "Jun 15 2018", "06/15/2018" or "15/06/2018". Ctrl+C to go back',
+            move_cursor_to_end=True
+        )
         while True:
             try:
-                user_input = prompt('date > ')
+                user_input = prompt('date > ', validator=validator, validate_while_typing=True)
             except KeyboardInterrupt:
                 return
             result = parse_user_date_input(user_input)

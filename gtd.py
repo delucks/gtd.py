@@ -410,7 +410,7 @@ def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, 
     '''
     _, board = BoardTool.start(config)
     display = Display(config.color)
-    if config.banner and not json:
+    if config.banner:
         display.banner()
     cards = BoardTool.filter_cards(
         board,
@@ -444,7 +444,7 @@ def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, 
 
 @cli.group()
 def add():
-    '''Add a new card, tag, or list'''
+    '''Add a new card, tag, list or board'''
     pass
 
 
@@ -469,7 +469,7 @@ def add_card(config, title, message, edit):
         display = Display(config.color)
         list_lookup = BoardTool.list_lookup(board)
         label_lookup = BoardTool.label_lookup(board)
-        CardTool.smart_menu(returned, display.show_card, list_lookup, label_lookup, Colors.yellow)
+        CardTool.smart_menu(returned, display.show_card, list_lookup, label_lookup, color=config.color)
     else:
         click.secho('Successfully added card {0}!'.format(returned), fg='green')
 
@@ -667,7 +667,7 @@ def review(config, tags, no_tags, match, listname, attachments, has_due, by_due)
     if config.banner:
         display.banner()
     for card in cards:
-        CardTool.smart_menu(card, display.show_card, list_lookup, label_lookup, Colors.yellow)
+        CardTool.smart_menu(card, display.show_card, list_lookup, label_lookup, color=config.color)
     click.echo('All done, have a great day!')
 
 

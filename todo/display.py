@@ -169,7 +169,9 @@ class Display:
             'sky': 'cyan',
             'orange': 'bright_yellow',
             'lime': 'bright_green',
-            'pink': 'bright_magenta',
+            'pink': 'magenta',
+            # TODO allow this to be overridden
+            'black': 'white',
         }
         on = self.primary if self.color else ''
         off = Colors.reset if self.color else ''
