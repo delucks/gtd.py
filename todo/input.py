@@ -328,12 +328,14 @@ class CardTool:
     @staticmethod
     def set_due_date(card):
         '''prompt for the date to set this card due as'''
+
         def validate_date(text):
             return re.match(r'\d{2}\/\d{2}\/\d{4}', text) or re.match(r'[A-Z][a-z]{2} \d{2} \d{4}', text)
+
         validator = Validator.from_callable(
             validate_date,
             error_message='Enter a date in format "Jun 15 2018", "06/15/2018" or "15/06/2018". Ctrl+C to go back',
-            move_cursor_to_end=True
+            move_cursor_to_end=True,
         )
         while True:
             try:
