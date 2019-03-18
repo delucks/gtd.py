@@ -4,7 +4,7 @@ import sys
 sys.path.extend('.')
 from todo import __version__
 
-test_require = ['flake8', 'black']
+test_require = ['flake8', 'black', 'pytest']
 
 with open('requirements.txt') as f:
     reqs = [l.strip() for l in f if not any(l.startswith(t) for t in test_require)]

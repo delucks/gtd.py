@@ -16,6 +16,7 @@ class Configuration:
         self.oauth_token = oauth_token
         self.oauth_token_secret = oauth_token_secret
         self.board = kwargs.get('board', None)
+        self.test_board = kwargs.get('test_board', None)
         self.banner = kwargs.get('banner', True)
         self.color = kwargs.get('color', True)
         self.inbox_list = kwargs.get('inbox_list', None)
@@ -103,6 +104,8 @@ class Configuration:
             file_config['oauth_token_secret'],
             # No default board: first board chosen
             board=file_config.get('board', None),
+            # Only used in tests
+            test_board=file_config.get('test_board', None),
             # Terminal color by default
             color=file_config.get('color', True),
             # Don't print banner by default

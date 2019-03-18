@@ -492,7 +492,7 @@ def add_tag(config, tagname, color):
     '''Add a new tag'''
     connection, board = BoardTool.start(config)
     label = board.add_label(tagname, color)
-    click.secho('Successfully added tag {0}!'.format(label), color='green')
+    click.secho('Successfully added tag "{0}"!'.format(label.name), color='green')
 
 
 @add.command('list')
