@@ -452,11 +452,21 @@ def add():
 @click.argument('title', required=False)
 @click.option('-m', '--message', help='Description for the new card')
 @click.option('-e', '--edit', is_flag=True, help="Edit the card as soon as it's created")
+@click.option('-l', '--listname', default=None, help='List to place this card in. Defaults to inbox_list')
 @pass_config
-def add_card(config, title, message, edit):
+def add_card(config, title, message, edit, listname):
     '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
     connection, board = BoardTool.start(config)
-    inbox = BoardTool.get_inbox_list(connection, config)
+    if listname is None:
+        inbox = BoardTool.get_inbox_list(connection, config)
+    else:
+        pattern = re.compile(listname, flags=re.I)
+        target_lists = filter(lambda x: pattern.search(x.name), board.get_lists('open'))
+        try:
+            inbox = next(target_lists)
+        except StopIteration:
+            click.secho('No list names matched by {}'.format(listname), fg='red')
+            raise GTDException(1)
     if not title:
         title = click.edit(require_save=True, text='<Title here>')
         if title is None:  # No changes were made in $EDITOR
