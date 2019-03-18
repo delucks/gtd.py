@@ -185,7 +185,7 @@ class Display:
             print()
         try:
             created = card.card_created_date
-            indent_print('Created:', '{0} ({1})'.format(created, created.timestamp()))
+            indent_print('Created:', '{0} ({1})'.format(created, int(created.timestamp())))
             indent_print('Age:', datetime.datetime.now() - created)
         except IndexError:
             # this happens when the card is created by the repeating cards trello power-up
