@@ -2,7 +2,8 @@ import pytest
 import trello
 from todo.connection import TrelloConnection
 from todo.configuration import Configuration
-# from todo.input import BoardTool
+
+TEST_LIST_INBOX = 'gtd.py__INBOX'
 
 
 @pytest.fixture
@@ -27,3 +28,13 @@ def test_board(config, test_conn):
     else:
         board = test_conn.trello.add_board(config.test_board)
     return board
+
+
+@pytest.fixture
+def test_list(test_board):
+    target_lists = filter(lambda x: x.name == TEST_LIST_INBOX, test_board.get_lists('open'))
+    try:
+        inbox = next(target_lists)
+    except StopIteration:
+        inbox = test_board.add_list(TEST_LIST_INBOX)
+    return inbox

@@ -502,7 +502,7 @@ def add_list(config, listname):
     '''Add a new list'''
     connection, board = BoardTool.start(config)
     l = board.add_list(listname)
-    click.secho('Successfully added list {0}!'.format(l), color='green')
+    click.secho('Successfully added list "{0}"!'.format(l.name), color='green')
 
 
 @add.command('board')
