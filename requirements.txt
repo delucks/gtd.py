@@ -5,5 +5,5 @@ prompt_toolkit==2.0.9
 prettytable==0.7.2
 arrow==0.12.1
 flake8==3.7.7
-black>=18.9b0
+black>=19.3b0
 pytest==2.9.2

@@ -1,2 +1,2 @@
-args tests/*.py todo/*.py *.py README.rst
+args tests/*.py todo/*.py *.py README.rst Makefile
 edit gtd.py
