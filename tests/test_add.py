@@ -11,7 +11,6 @@ TEST_CARD_CREATION = 'gtd.py__CREATED_CARD'
 
 def test_add_board(config, test_conn):
     # This test creates a new board in your account because py-trello doesn't support board deletion yet
-    # TODO do not create duplicate boards
     runner = CliRunner()
     result = runner.invoke(cli, ['add', 'board', config.test_board])
     assert result.exit_code == 0
