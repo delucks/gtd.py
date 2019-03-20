@@ -40,8 +40,8 @@ class Display:
         fields['list'] = lambda c: c.get_list().name
         fields['tags'] = lambda c: '\n'.join([l.name for l in c.list_labels]) if c.list_labels else ''
         fields['desc'] = lambda c: c.desc
-        fields['due'] = lambda c: c.due or ''
-        fields['last activity'] = lambda c: getattr(c, 'dateLastActivity')
+        fields['due'] = lambda c: c.due[:10] if c.due is not None else ''
+        fields['activity'] = lambda c: c.dateLastActivity.strftime('%Y-%m-%d')
         fields['board'] = lambda c: c.board.name
         fields['id'] = lambda c: getattr(c, 'id')
         fields['url'] = lambda c: getattr(c, 'shortUrl')
@@ -99,7 +99,7 @@ class Display:
         else:
             return for_json
 
-    def show_cards(self, cards, use_json=False, tsv=False, sort='last activity', table_fields=[]):
+    def show_cards(self, cards, use_json=False, tsv=False, sort='activity', table_fields=[]):
         '''Display an iterable of cards all at once.
         Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
         Supports the following cli commands:
@@ -145,7 +145,7 @@ class Display:
         possible = table.get_string(fields=fields, sortby=sort)
         fset = set(fields)
         # Fields in increasing order of importance
-        to_remove = ['desc', 'id', 'board', 'url', 'last activity', 'list']
+        to_remove = ['desc', 'id', 'board', 'url', 'activity', 'list']
         # Wait until we're under max width or until we can't discard more fields
         while len(possible.splitlines()[0]) >= maxwidth and to_remove:
             # Remove a field one at a time

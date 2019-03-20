@@ -39,7 +39,7 @@ def validate_sort(ctx, param, value):
 
 def sorting_fields_command(f):
     f = click.option('--fields', callback=validate_fields, help='Choose fields to display by name, comma-separated')(f)
-    f = click.option('--by', default='last activity', callback=validate_sort, help='Choose field to sort')(f)
+    f = click.option('--by', default='activity', callback=validate_sort, help='Choose field to sort')(f)
     return f
 
 
