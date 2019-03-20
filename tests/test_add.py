@@ -74,9 +74,7 @@ def test_add_card(config, test_list):
     assert result.exit_code == 0
     assert len(test_list.list_cards()) == 2
     # Test the default no-flags behavior
-    result = runner.invoke(
-        cli, ['--board', config.test_board, 'add', 'card', TEST_CARD_CREATION]
-    )
+    result = runner.invoke(cli, ['--board', config.test_board, 'add', 'card', TEST_CARD_CREATION])
     assert result.exit_code == 0
     assert len(test_list.list_cards()) == 3
     # Clean up

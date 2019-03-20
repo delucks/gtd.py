@@ -4,7 +4,7 @@ gtd.py
 A Fast Command-line Interface for Trello
 ---------------------------------------
 
-This is a command-line tool that enables you to add, sort, and review cards on Trello rapidly. It is designed to reduce the amount of friction between your thoughts and your TODO list, especially if you never leave the terminal. gtd.py has tab-completion throughout, machine-readable ``--json`` and ``--tsv`` flags, and an interactive REPL mode.
+This is a command-line tool that enables you to add, sort, and review cards on Trello rapidly. It is designed to reduce the amount of friction between your thoughts and your TODO list. If you never leave the terminal, gtd.py will feel right at home. It has tab-completion throughout, machine-readable ``--json`` and ``--tsv`` flags, a ``grep`` subcommand, and an interactive REPL mode.
 
 The project is named "gtd.py" because it was initially built as a tool to maintain a Trello board using the GTD_ task tracking method. I've been actively using this tool for GTD since the first commit; if you're trying to use GTD with Trello this is the tool for you.
 
@@ -470,16 +470,26 @@ Contributing
 
 Contributions would be great! If you think something could be improved just go change it and ask!
 
+There are some tests for the command-line interface to make sure everything works properly. There are currently a few subcommands fully covered with more planned. To run these tests, first use the "onboard" command to create a configuration file. Then add a property `test_board` to the configuration file, with the name of a board you can dedicate to running these tests. The tests will destroy an existing board. Then, run:
+
+::
+
+ make tests
+ # OR,
+ python -m pytest tests/
+
 I use ``black`` to format the source code but keep some of my conventions kept in this source since the beginning. I've been using single-quotes for strings and wrapping at 120 character line length, so I use the following command to do the formatting. Please apply it when giving patches.
 
 ::
 
- black -l 120 -S gtd.py todo/
+ make black
+ # OR,
+ black -l 120 -S gtd.py todo/ tests/
 
 Notes
 ------
 
-* The code is manually tested. Please (please!) report bugs if you find them.
+* The code is lightly tested. Please (please!) report bugs if you find them.
 * This has only been used on Linux and Mac OSX
 * Windows is not supported.
 * Some naming conventions differ from Trello, most notably "label" is called "tag"
