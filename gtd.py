@@ -521,10 +521,12 @@ def add_board(config, boardname):
 @click.option('-c', '--count', is_flag=True, help='Output the count of matching cards')
 @click.option('-e', '--regexp', help='Specify multiple patterns to match against the titles of cards', multiple=True)
 @sorting_fields_command
+@json_option
 @pass_config
-def grep(config, pattern, insensitive, count, regexp, by, fields):
+def grep(config, pattern, insensitive, count, regexp, by, fields, json):
     '''egrep through titles of cards on this board. This command attemps to replicate a couple of grep flags
     faithfully, so if you're a power-user of grep this command will feel familiar.
+    One deviation from grep is the --json flag, which outputs all matching cards in full JSON format.
     '''
     if not (pattern or regexp):
         click.secho('No pattern provided to grep: use either the argument or -e', fg='red')
@@ -540,11 +542,11 @@ def grep(config, pattern, insensitive, count, regexp, by, fields):
     cards = BoardTool.filter_cards(board, title_regex=final_pattern, regex_flags=flags)
     if count:
         print(sum(1 for _ in cards))
-        raise GTDException(0)
+        return
     display = Display(config.color)
-    if config.banner:
+    if config.banner and not json:
         display.banner()
-    display.show_cards(cards, sort=by, table_fields=fields)
+    display.show_cards(cards, use_json=json, sort=by, table_fields=fields)
 
 
 # add }}}
