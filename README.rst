@@ -2,7 +2,7 @@ gtd.py
 =======
 
 A Fast Command-line Interface for Trello
----------------------------------------
+----------------------------------------
 
 This is a command-line tool that enables you to add, sort, and review cards on Trello rapidly. It is designed to reduce the amount of friction between your thoughts and your TODO list. If you never leave the terminal, gtd.py will feel right at home. It has tab-completion throughout, machine-readable ``--json`` and ``--tsv`` flags, a ``grep`` subcommand, and an interactive REPL mode.
 
