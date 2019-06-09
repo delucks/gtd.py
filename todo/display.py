@@ -38,7 +38,7 @@ class Display:
         # This is done repetitively to establish column order
         fields['name'] = lambda c: c.name
         fields['list'] = lambda c: c.get_list().name
-        fields['tags'] = lambda c: '\n'.join([l.name for l in c.list_labels]) if c.list_labels else ''
+        fields['tags'] = lambda c: '\n'.join([l.name for l in c.labels]) if c.labels else ''
         fields['desc'] = lambda c: c.desc
         fields['due'] = lambda c: c.due[:10] if c.due is not None else ''
         fields['activity'] = lambda c: c.dateLastActivity.strftime('%Y-%m-%d')
@@ -178,9 +178,9 @@ class Display:
         print('{on}Card{off}'.format(on=on, off=off), card.id)
         indent_print('Name:', card.name)
         indent_print('List:', '{0}'.format(card.get_list().name))
-        if card.list_labels:
+        if card.labels:
             click.echo('  {on}{name: <{fill}}{off}'.format(name='Tags:', fill='14', on=on, off=off), nl=False)
-            for l in card.list_labels:
+            for l in card.labels:
                 click.secho(l.name + ' ', fg=label_color_correction.get(l.color, l.color) or 'green', nl=False)
             print()
         try:

@@ -88,9 +88,9 @@ def single_select(options):
 def tags_on_card(card, tags):
     '''Take in a comma-sep list of tag names, and ensure that
     each is on this card'''
-    if card.list_labels:
+    if card.labels:
         user_tags = set(tags.split(','))
-        card_tags = set([l.name for l in card.list_labels])
+        card_tags = set([l.name for l in card.labels])
         return user_tags.issubset(card_tags)
     else:
         return False
@@ -184,7 +184,7 @@ class CardTool:
                 '{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True
             ):
                 CardTool.title_to_link(card)
-        if not card.list_labels and prompt_for_untagged_cards:
+        if not card.labels and prompt_for_untagged_cards:
             print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
             CardTool.add_labels(card, label_choices)
         commands = {
@@ -429,7 +429,7 @@ class BoardTool:
         if tags:
             filters.append(partial(tags_on_card, tags=tags))
         if no_tags:
-            filters.append(lambda c: not c.list_labels)
+            filters.append(lambda c: not c.labels)
         if title_regex:
             filters.append(search_for_regex)
         if filter_funcs:
