@@ -305,14 +305,24 @@ def show_lists(config, json, show_all):
 
 @show.command('tags')
 @json_option
+@click.option('-l', '--listname', default=None, help='Only show the tags present on this list')
 @pass_config
-def show_tags(config, json):
+def show_tags(config, json, listname):
     '''Display all tags on this board'''
     _, board = BoardTool.start(config)
     display = Display(config.color)
     if config.banner and not json:
         display.banner()
-    tag_names = [t.name for t in board.get_labels()]
+    if listname:
+        # Assemble a set of all tags on each card
+        tags = set()
+        cardsource = BoardTool.take_cards_from_lists(board, listname)
+        for card in cardsource:
+            if card.labels:
+                tags.update([l.name for l in card.labels])
+        tag_names = list(tags)
+    else:
+        tag_names = [t.name for t in board.get_labels()]
     display.show_raw(tag_names, use_json=json)
 
 
