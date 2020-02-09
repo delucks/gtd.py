@@ -167,8 +167,8 @@ class Display:
         label_color_correction = {
             'purple': 'magenta',
             'sky': 'cyan',
-            'orange': 'bright_yellow',
-            'lime': 'bright_green',
+            'orange': 'yellow',
+            'lime': 'green',
             'pink': 'magenta',
             # TODO allow this to be overridden
             'black': 'white',
