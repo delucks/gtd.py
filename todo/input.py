@@ -85,7 +85,7 @@ def single_select(options):
         return None
 
 
-def tags_on_card(card, tags):
+def apply_tags_to_card(card, tags):
     '''Take in a comma-sep list of tag names, and ensure that
     each is on this card'''
     if card.labels:
@@ -427,7 +427,7 @@ class BoardTool:
         # Parse arguments into callables
         filters = []
         if tags:
-            filters.append(partial(tags_on_card, tags=tags))
+            filters.append(partial(apply_tags_to_card, tags=tags))
         if no_tags:
             filters.append(lambda c: not c.labels)
         if title_regex:
