@@ -2,9 +2,7 @@
 import re
 import sys
 import tty
-import click
 import string
-import trello
 import shutil
 import termios
 import itertools
@@ -12,13 +10,14 @@ import webbrowser
 from functools import partial
 
 import arrow
+import click
+import trello
 from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
 from todo.misc import get_title_of_webpage, Colors, DevNullRedirect, VALID_URL_REGEX
 from todo.exceptions import GTDException
-from todo.connection import TrelloConnection
 
 
 def parse_user_date_input(user_input):
@@ -153,107 +152,6 @@ class CardTool:
                     # This label already exists on the card so remove it
                     card.remove_label(label_obj)
                     print('Removed tag {0}'.format(Colors.red + userinput + Colors.reset))
-
-    @staticmethod
-    def smart_menu(
-        card,
-        f_display,
-        list_choices,
-        label_choices,
-        color=None,
-        prompt_for_open_attachments=False,
-        prompt_for_untagged_cards=True,
-    ):
-        '''smart_menu is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
-        - Are there attachments? Maybe you want to open them.
-        - Does there appear to be a URL in the title? You might want to attach it.
-        - Are there no tags? Maybe you want to add some.
-        Then gives you a nice tab-completed menu that lets you do all common operations on a card.
-        '''
-        on = Colors.yellow if color else ''
-        off = Colors.reset if color else ''
-        card.fetch()
-        f_display(card)
-        if prompt_for_open_attachments and card.get_attachments():
-            if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
-                with DevNullRedirect():
-                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
-                        webbrowser.open(url)
-        if re.search(VALID_URL_REGEX, card.name):
-            if prompt_for_confirmation(
-                '{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True
-            ):
-                CardTool.title_to_link(card)
-        if prompt_for_untagged_cards and not card.labels:
-            print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
-            CardTool.add_labels(card, label_choices)
-        commands = {
-            'archive': 'mark this card as closed',
-            'attach': 'add, delete, or open attachments',
-            'comment': 'add a comment to this card',
-            'delete': 'permanently delete this card',
-            'duedate': 'add a due date or change the due date',
-            'description': 'change the description of this card (desc)',
-            'help': 'display this help output (h)',
-            'move': 'move to a different list (m)',
-            'next': 'move on to the next card (n)',
-            'open': 'open all links on this card (o)',
-            'print': 'display this card (p)',
-            'rename': 'change title of this card',
-            'tag': 'add or remove tags on this card (t)',
-            'quit': 'exit program',
-        }
-        command_completer = FuzzyWordCompleter(commands.keys())
-        while True:
-            user_input = prompt('gtd.py > ', completer=command_completer)
-            if user_input in ['q', 'quit']:
-                raise GTDException(0)
-            elif user_input in ['n', 'next']:
-                break
-            elif user_input in ['p', 'print']:
-                card.fetch()
-                f_display(card)
-            elif user_input in ['o', 'open']:
-                with DevNullRedirect():
-                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
-                        webbrowser.open(url)
-            elif user_input in ['desc', 'description']:
-                if CardTool.change_description(card):
-                    print('Description changed!')
-            elif user_input == 'delete':
-                card.delete()
-                print('Card deleted')
-                break
-            elif user_input == 'attach':
-                CardTool.manipulate_attachments(card)
-            elif user_input == 'archive':
-                card.set_closed(True)
-                print('Card archived')
-                break
-            elif user_input in ['t', 'tag']:
-                CardTool.add_labels(card, label_choices)
-            elif user_input == 'rename':
-                CardTool.rename(card)
-            elif user_input == 'duedate':
-                CardTool.set_due_date(card)
-            elif user_input in ['h', 'help']:
-                for cname, cdesc in commands.items():
-                    print('{0:<16}| {1}{2}{3}'.format(cname, on, cdesc, off))
-            elif user_input in ['m', 'move']:
-                if CardTool.move_to_list(card, list_choices):
-                    break
-            elif user_input == 'comment':
-                new_comment = click.edit(text='<Comment here>', require_save=True)
-                if new_comment:
-                    card.comment(new_comment)
-                else:
-                    click.secho('Change the text & save to post the comment', fg='red')
-            else:
-                print(
-                    '{0}{1}{2} is not a command, type "{0}help{2}" to view available commands'.format(
-                        on, user_input, off
-                    )
-                )
 
     @staticmethod
     def title_to_link(card):

@@ -9,10 +9,13 @@ import webbrowser
 
 import yaml
 import click
+import trello
 import requests
 import prettytable
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib.oauth1_session import TokenRequestDenied
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import FuzzyWordCompleter
 
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import Display
@@ -37,6 +40,104 @@ class CLIContext:
         self.config = config
         self.connection = TrelloConnection(config)
         self.display = Display(config)
+        # Cached state for card_repl
+        self._list_choices = BoardTool.list_lookup(self.connection.main_board())
+        self._label_choices = BoardTool.label_lookup(self.connection.main_board())
+
+    def card_repl(self, card: trello.Card):
+        '''smart_menu is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
+        - Are there attachments? Maybe you want to open them.
+        - Does there appear to be a URL in the title? You might want to attach it.
+        - Are there no tags? Maybe you want to add some.
+        Then gives you a nice tab-completed menu that lets you do all common operations on a card.
+        '''
+        on = Colors.yellow if self.config.color else ''
+        off = Colors.reset if self.config.color else ''
+        card.fetch()
+        self.display.show_card(card)
+        if self.config.prompt_for_open_attachments and card.get_attachments():
+            if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
+                with DevNullRedirect():
+                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
+                        webbrowser.open(url)
+        if re.search(VALID_URL_REGEX, card.name):
+            if prompt_for_confirmation(
+                '{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True
+            ):
+                CardTool.title_to_link(card)
+        if self.config.prompt_for_untagged_cards and not card.labels:
+            print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
+            CardTool.add_labels(card, self._label_choices)
+        commands = {
+            'archive': 'mark this card as closed',
+            'attach': 'add, delete, or open attachments',
+            'comment': 'add a comment to this card',
+            'delete': 'permanently delete this card',
+            'duedate': 'add a due date or change the due date',
+            'description': 'change the description of this card (desc)',
+            'help': 'display this help output (h)',
+            'move': 'move to a different list (m)',
+            'next': 'move on to the next card (n)',
+            'open': 'open all links on this card (o)',
+            'print': 'display this card (p)',
+            'rename': 'change title of this card',
+            'tag': 'add or remove tags on this card (t)',
+            'quit': 'exit program',
+        }
+        command_completer = FuzzyWordCompleter(commands.keys())
+        while True:
+            user_input = prompt('gtd.py > ', completer=command_completer)
+            if user_input in ['q', 'quit']:
+                raise GTDException(0)
+            elif user_input in ['n', 'next']:
+                break
+            elif user_input in ['p', 'print']:
+                card.fetch()
+                self.display.show_card(card)
+            elif user_input in ['o', 'open']:
+                with DevNullRedirect():
+                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
+                        webbrowser.open(url)
+            elif user_input in ['desc', 'description']:
+                if CardTool.change_description(card):
+                    print('Description changed!')
+            elif user_input == 'delete':
+                card.delete()
+                print('Card deleted')
+                break
+            elif user_input == 'attach':
+                CardTool.manipulate_attachments(card)
+            elif user_input == 'archive':
+                card.set_closed(True)
+                print('Card archived')
+                break
+            elif user_input in ['t', 'tag']:
+                CardTool.add_labels(card, self._label_choices)
+            elif user_input == 'rename':
+                # TODO optional form 'rename New name of card'
+                CardTool.rename(card)
+            elif user_input == 'duedate':
+                CardTool.set_due_date(card)
+            elif user_input in ['h', 'help']:
+                for cname, cdesc in commands.items():
+                    print('{0:<16}| {1}{2}{3}'.format(cname, on, cdesc, off))
+            elif user_input in ['m', 'move']:
+                # TODO Include between-board movement
+                if CardTool.move_to_list(card, self._list_choices):
+                    break
+            elif user_input == 'comment':
+                # TODO Optional form 'comment Contents of a comment'
+                new_comment = click.edit(text='<Comment here>', require_save=True)
+                if new_comment:
+                    card.comment(new_comment)
+                else:
+                    click.secho('Change the text & save to post the comment', fg='red')
+            else:
+                print(
+                    '{0}{1}{2} is not a command, type "{0}help{2}" to view available commands'.format(
+                        on, user_input, off
+                    )
+                )
 
 
 pass_context = click.make_pass_decorator(CLIContext)
@@ -500,9 +601,7 @@ def add_card(ctx, title, message, edit, listname):
             title = title.strip()
     returned = inbox.add_card(name=title, desc=message)
     if edit:
-        list_lookup = BoardTool.list_lookup(board)
-        label_lookup = BoardTool.label_lookup(board)
-        CardTool.smart_menu(returned, ctx.display.show_card, list_lookup, label_lookup, color=config.color)
+        ctx.card_repl(returned)
     else:
         click.secho('Successfully added card {0}!'.format(returned), fg='green')
 
@@ -682,11 +781,9 @@ def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
             has_attachments=attachments,
             has_due_date=has_due,
         )
-    list_lookup = BoardTool.list_lookup(ctx.board)
-    label_lookup = BoardTool.label_lookup(ctx.board)
     ctx.display.banner()
     for card in cards:
-        CardTool.smart_menu(card, ctx.display.show_card, list_lookup, label_lookup, color=config.color)
+        CardTool.card_repl(card)
     click.echo('All done, have a great day!')
 
 
