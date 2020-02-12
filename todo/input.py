@@ -389,7 +389,7 @@ class BoardTool:
     @staticmethod
     def start(config):
         connection = TrelloConnection(config)
-        board = BoardTool.get_main_board(connection, config)
+        board = connection.main_board()
         return connection, board
 
     @staticmethod
@@ -455,35 +455,6 @@ class BoardTool:
         for card in cardsource:
             if all(x(card) for x in filters):
                 yield card
-
-    @staticmethod
-    def get_main_board(connection, config):
-        '''use the configuration to get the main board & return it
-        This function avoids py-trello's connection.list_boards() function as it produces O(N) network calls.
-        This function is guaranteed to only produce 1 network call, in the trello.Board initialization below.
-        '''
-        # connection.boards is a response from the trello API unpacked as a list of dicts
-        if config.board is None:
-            # If no board name is passed, default to the first board
-            board_json = connection.boards[0]
-        else:
-            possible = [b for b in connection.boards if b['name'] == config.board]
-            if possible:
-                board_json = possible[0]
-            else:
-                board_json = connection.boards[0]
-        return trello.Board.from_json(connection.trello, json_obj=board_json)
-
-    @staticmethod
-    def get_inbox_list(connection, config):
-        '''use the configuration to get the main board & list from
-        Trello, return the list where new cards should go.
-        '''
-        board = BoardTool.get_main_board(connection, config)
-        if getattr(config, 'inbox_list', False):
-            return [l for l in board.open_lists() if l.name == config.inbox_list][0]
-        else:
-            return board.open_lists()[0]
 
     @staticmethod
     def list_lookup(board):

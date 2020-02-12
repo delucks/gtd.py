@@ -468,7 +468,7 @@ def add_card(config, title, message, edit, listname):
     '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
     connection, board = BoardTool.start(config)
     if listname is None:
-        inbox = BoardTool.get_inbox_list(connection, config)
+        inbox = connection.inbox_list()
     else:
         pattern = re.compile(listname, flags=re.I)
         target_lists = filter(lambda x: pattern.search(x.name), board.get_lists('open'))
