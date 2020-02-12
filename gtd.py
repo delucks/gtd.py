@@ -234,9 +234,9 @@ def onboard(no_open, output_path=None):
 # show {{{
 
 
-@cli.group(short_help='Display cards, tags, or lists on this board')
+@cli.group()
 def show():
-    '''Display cards, tags, or lists on this board.'''
+    '''Display cards, tags, lists, or boards'''
     pass
 
 
