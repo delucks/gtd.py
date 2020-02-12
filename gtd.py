@@ -3,26 +3,46 @@
 import re
 import os
 import sys
-import yaml
-import click
 import shutil
-import requests
 import readline  # noqa
 import webbrowser
+
+import yaml
+import click
+import requests
 import prettytable
 from requests_oauthlib import OAuth1Session
 from requests_oauthlib.oauth1_session import TokenRequestDenied
+
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import Display
 from todo.exceptions import GTDException
 from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner, VALID_URL_REGEX
 from todo.configuration import Configuration
 from todo import __version__
+from todo.connection import TrelloConnection
 
-pass_config = click.make_pass_decorator(Configuration)
+
+class CLIContext:
+    '''CLIContext is a container for the commonly used objects in each gtd command.
+    It is passed around as an argument injected by click after the cli() function runs.
+    Any reference to "ctx" as a parameter in this file is an instance of CLIContext.
+
+    config: todo.configuration.Configuration
+    connection: todo.connection.TrelloConnection
+    display: todo.display.Display
+    '''
+
+    def __init__(self, config: Configuration):
+        self.config = config
+        self.connection = TrelloConnection(config)
+        self.display = Display(config)
 
 
-def validate_fields(ctx, param, value):
+pass_context = click.make_pass_decorator(CLIContext)
+
+
+def validate_fields(command_context, param, value):
     valid = Display.build_fields().keys()
     possible = value.split(',') if value else []
     for field in possible:
@@ -31,7 +51,7 @@ def validate_fields(ctx, param, value):
     return possible
 
 
-def validate_sort(ctx, param, value):
+def validate_sort(command_context, param, value):
     if value and value not in Display.build_fields().keys():
         raise click.BadParameter('Sort parameter {} is not a valid field!'.format(value))
     return value
@@ -68,15 +88,15 @@ def tsv_option(f):
 @click.option('--no-color', is_flag=True, default=False, help='Disable ANSI terminal color?')
 @click.option('--banner', is_flag=True, default=False, help='Print a gtd.py ascii art banner')
 @click.pass_context
-def cli(ctx, board, no_color, banner):
+def cli(top_level_context, board, no_color, banner):
     '''gtd.py'''
     try:
         config = Configuration.from_file()
     except GTDException:
         click.echo('Could not find a valid config file for gtd.')
         if click.confirm('Would you like to create it interactively?'):
-            ctx.invoke(onboard)
-            click.secho('Re-run your command', fg='green')
+            top_level_context.invoke(onboard)
+            click.secho('Please re-run your command to pick up the credentials', fg='green')
             raise GTDException(0)
         else:
             click.secho('Put your config file in one of the following locations:', fg='red')
@@ -89,8 +109,9 @@ def cli(ctx, board, no_color, banner):
         config.color = False
     if banner:
         config.banner = True
-    ctx.color = config.color
-    ctx.obj = config
+    # Click's internal setting
+    top_level_context.color = config.color
+    top_level_context.obj = CLIContext(config)
 
 
 @cli.command()
@@ -110,9 +131,9 @@ def info(workflow, banner):
 
 @cli.command()
 @click.pass_context
-def help(ctx):
+def help(top_level_context):
     '''Show this message and exit.'''
-    print(cli.get_help(ctx))
+    print(cli.get_help(top_level_context))
 
 
 @cli.command()
@@ -245,19 +266,17 @@ def show():
 @tsv_option
 @click.option('--by', default='activity', help='Choose field to sort (when not using json output)')
 @click.option('-a', '--show-all', is_flag=True, default=False, help='Show closed boards')
-@pass_config
-def show_boards(config, json, tsv, by, show_all):
+@pass_context
+def show_boards(ctx, json, tsv, by, show_all):
     '''Show all boards your account can access'''
-    connection, board = BoardTool.start(config)
-    display = Display(config.color)
-    if config.banner and not json:
-        display.banner()
+    if not json:
+        ctx.display.banner()
     if show_all:
-        boards = connection.trello.fetch_json('/members/me/boards/?filter=all')
+        boards = ctx.connection.trello.fetch_json('/members/me/boards/?filter=all')
     else:
-        boards = connection.boards
+        boards = ctx.connection.boards
     if json:
-        display.show_raw(boards, use_json=json)
+        ctx.display.show_raw(boards, use_json=json)
         return
     # Set up a table to hold our boards
     board_columns = ['name', 'activity', 'members', 'permission', 'url']
@@ -291,28 +310,26 @@ def show_boards(config, json, tsv, by, show_all):
 @show.command('lists')
 @json_option
 @click.option('-a', '--show-all', is_flag=True, default=False, help='Show open & archived lists')
-@pass_config
-def show_lists(config, json, show_all):
+@pass_context
+def show_lists(ctx, json, show_all):
     '''Display all lists on this board'''
-    _, board = BoardTool.start(config)
-    display = Display(config.color)
-    if config.banner and not json:
-        display.banner()
+    board = ctx.connection.main_board()
+    if not json:
+        ctx.display.banner()
     list_filter = 'all' if show_all else 'open'
     list_names = [l.name for l in board.get_lists(list_filter)]
-    display.show_raw(list_names, use_json=json)
+    ctx.display.show_raw(list_names, use_json=json)
 
 
 @show.command('tags')
 @json_option
 @click.option('-l', '--listname', default=None, help='Only show the tags present on this list')
-@pass_config
-def show_tags(config, json, listname):
+@pass_context
+def show_tags(ctx, json, listname):
     '''Display all tags on this board'''
-    _, board = BoardTool.start(config)
-    display = Display(config.color)
-    if config.banner and not json:
-        display.banner()
+    board = ctx.connection.main_board()
+    if not json:
+        ctx.display.banner()
     if listname:
         # Assemble a set of all tags on each card
         tags = set()
@@ -323,7 +340,7 @@ def show_tags(config, json, listname):
         tag_names = list(tags)
     else:
         tag_names = [t.name for t in board.get_labels()]
-    display.show_raw(tag_names, use_json=json)
+    ctx.display.show_raw(tag_names, use_json=json)
 
 
 @show.command('cards')
@@ -331,18 +348,17 @@ def show_tags(config, json, listname):
 @json_option
 @tsv_option
 @sorting_fields_command
-@pass_config
-def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, has_due, by, fields):
+@pass_context
+def show_cards(ctx, json, tsv, tags, no_tags, match, listname, attachments, has_due, by, fields):
     '''Display cards
     The show command prints a table of all the cards with fields that will fit on the terminal you're using.
     You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
     This command along with the batch & review commands share a flexible argument scheme for getting card information.
     Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
     '''
-    _, board = BoardTool.start(config)
-    display = Display(config.color)
-    if config.banner and not json:
-        display.banner()
+    board = ctx.connection.main_board()
+    if not json:
+        ctx.display.banner()
     cards = BoardTool.filter_cards(
         board,
         tags=tags,
@@ -352,20 +368,19 @@ def show_cards(config, json, tsv, tags, no_tags, match, listname, attachments, h
         has_attachments=attachments,
         has_due_date=has_due,
     )
-    display.show_cards(cards, use_json=json, tsv=tsv, sort=by, table_fields=fields)
+    ctx.display.show_cards(cards, use_json=json, tsv=tsv, sort=by, table_fields=fields)
 
 
 @show.command('soon')
 @json_option
 @tsv_option
-@pass_config
-def show_soon(config, json, tsv):
-    _, board = BoardTool.start(config)
-    display = Display(config.color)
-    if config.banner and not json:
-        display.banner()
+@pass_context
+def show_soon(ctx, json, tsv):
+    board = ctx.connection.main_board()
+    if not json:
+        ctx.display.banner()
     cards = BoardTool.filter_cards(board, has_due_date=True)
-    display.show_cards(cards, use_json=json, tsv=tsv, sort='due')
+    ctx.display.show_cards(cards, use_json=json, tsv=tsv, sort='due')
 
 
 # show }}}
@@ -381,10 +396,10 @@ def delete():
 @delete.command('list')
 @click.argument('name')
 @click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
-@pass_config
-def delete_list(config, name, noninteractive):
+@pass_context
+def delete_list(ctx, name, noninteractive):
     '''Delete a list by name'''
-    _, board = BoardTool.start(config)
+    board = ctx.connection.main_board()
     lists = [l for l in board.get_lists('open') if l.name == name]
     if not lists:
         click.secho('No such list {}'.format(name), fg='red')
@@ -397,10 +412,10 @@ def delete_list(config, name, noninteractive):
 @delete.command('tag')
 @click.argument('name')
 @click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
-@pass_config
-def delete_tag(config, name, noninteractive):
+@pass_context
+def delete_tag(ctx, name, noninteractive):
     '''Delete a tag by name'''
-    _, board = BoardTool.start(config)
+    board = ctx.connection.main_board()
     tags = [l for l in board.get_labels() if l.name == name]
     if not tags:
         click.secho('No such tag {}'.format(name), fg='red')
@@ -414,14 +429,12 @@ def delete_tag(config, name, noninteractive):
 @click.option('-f', '--force', is_flag=True, default=False, help='Delete the card rather than archiving it')
 @click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
 @filtering_command
-@pass_config
-def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
+@pass_context
+def delete_cards(ctx, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
     '''Delete a set of cards specified
     '''
-    _, board = BoardTool.start(config)
-    display = Display(config.color)
-    if config.banner:
-        display.banner()
+    board = ctx.connection.main_board()
+    ctx.display.banner()
     cards = BoardTool.filter_cards(
         board,
         tags=tags,
@@ -439,7 +452,7 @@ def delete_cards(config, force, noninteractive, tags, no_tags, match, listname, 
             [c.set_closed(True) for c in cards]
     else:
         for card in cards:
-            display.show_card(card)
+            ctx.display.show_card(card)
             if prompt_for_confirmation('Delete this card?'):
                 if force:
                     card.delete()
@@ -463,10 +476,11 @@ def add():
 @click.option('-m', '--message', help='Description for the new card')
 @click.option('-e', '--edit', is_flag=True, help="Edit the card as soon as it's created")
 @click.option('-l', '--listname', default=None, help='List to place this card in. Defaults to inbox_list')
-@pass_config
-def add_card(config, title, message, edit, listname):
+@pass_context
+def add_card(ctx, title, message, edit, listname):
     '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
-    connection, board = BoardTool.start(config)
+    connection = ctx.connection
+    board = connection.main_board()
     if listname is None:
         inbox = connection.inbox_list()
     else:
@@ -486,10 +500,9 @@ def add_card(config, title, message, edit, listname):
             title = title.strip()
     returned = inbox.add_card(name=title, desc=message)
     if edit:
-        display = Display(config.color)
         list_lookup = BoardTool.list_lookup(board)
         label_lookup = BoardTool.label_lookup(board)
-        CardTool.smart_menu(returned, display.show_card, list_lookup, label_lookup, color=config.color)
+        CardTool.smart_menu(returned, ctx.display.show_card, list_lookup, label_lookup, color=config.color)
     else:
         click.secho('Successfully added card {0}!'.format(returned), fg='green')
 
@@ -497,30 +510,30 @@ def add_card(config, title, message, edit, listname):
 @add.command('tag')
 @click.argument('tagname')
 @click.option('-c', '--color', help='color to create this tag with', default='black')
-@pass_config
-def add_tag(config, tagname, color):
+@pass_context
+def add_tag(ctx, tagname, color):
     '''Add a new tag'''
-    connection, board = BoardTool.start(config)
+    board = ctx.connection.main_board()
     label = board.add_label(tagname, color)
     click.secho('Successfully added tag "{0}"!'.format(label.name), color='green')
 
 
 @add.command('list')
 @click.argument('listname')
-@pass_config
-def add_list(config, listname):
+@pass_context
+def add_list(ctx, listname):
     '''Add a new list'''
-    connection, board = BoardTool.start(config)
-    l = board.add_list(listname)
-    click.secho('Successfully added list "{0}"!'.format(l.name), color='green')
+    board = ctx.connection.main_board()
+    new_list = board.add_list(listname)
+    click.secho(f'Successfully added list "{new_list}"!', color='green')
 
 
 @add.command('board')
 @click.argument('boardname')
-@pass_config
-def add_board(config, boardname):
+@pass_context
+def add_board(ctx, boardname):
     '''Add a new board'''
-    connection, _ = BoardTool.start(config)
+    connection = ctx.connection
     if connection.trello.add_board(boardname):
         click.secho('Added board {}'.format(boardname), fg='green')
 
@@ -532,8 +545,8 @@ def add_board(config, boardname):
 @click.option('-e', '--regexp', help='Specify multiple patterns to match against the titles of cards', multiple=True)
 @sorting_fields_command
 @json_option
-@pass_config
-def grep(config, pattern, insensitive, count, regexp, by, fields, json):
+@pass_context
+def grep(ctx, pattern, insensitive, count, regexp, by, fields, json):
     '''egrep through titles of cards on this board. This command attemps to replicate a couple of grep flags
     faithfully, so if you're a power-user of grep this command will feel familiar.
     One deviation from grep is the --json flag, which outputs all matching cards in full JSON format.
@@ -548,15 +561,14 @@ def grep(config, pattern, insensitive, count, regexp, by, fields, json):
     elif pattern:
         final_pattern = pattern
     flags = re.I if insensitive else 0
-    connection, board = BoardTool.start(config)
+    board = ctx.connection.main_board()
     cards = BoardTool.filter_cards(board, title_regex=final_pattern, regex_flags=flags)
     if count:
         print(sum(1 for _ in cards))
         return
-    display = Display(config.color)
-    if config.banner and not json:
-        display.banner()
-    display.show_cards(cards, use_json=json, sort=by, table_fields=fields)
+    if not json:
+        ctx.display.banner()
+    ctx.display.show_cards(cards, use_json=json, sort=by, table_fields=fields)
 
 
 # add }}}
@@ -573,12 +585,11 @@ def batch():
 
 @batch.command('move')
 @filtering_command
-@pass_config
-def batch_move(config, tags, no_tags, match, listname, attachments, has_due):
+@pass_context
+def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Change the list of each card selected'''
-    connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
-        board,
+        ctx.board,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -586,23 +597,20 @@ def batch_move(config, tags, no_tags, match, listname, attachments, has_due):
         has_attachments=attachments,
         has_due_date=has_due,
     )
-    display = Display(config.color)
-    if config.banner:
-        display.banner()
+    ctx.display.banner()
     for card in cards:
-        display.show_card(card)
+        ctx.display.show_card(card)
         if prompt_for_confirmation('Want to move this one?', True):
             CardTool.move_to_list(card)
 
 
 @batch.command('tag')
 @filtering_command
-@pass_config
-def batch_tag(config, tags, no_tags, match, listname, attachments, has_due):
+@pass_context
+def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Change tags on each card selected'''
-    connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
-        board,
+        ctx.board,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -610,22 +618,19 @@ def batch_tag(config, tags, no_tags, match, listname, attachments, has_due):
         has_attachments=attachments,
         has_due_date=has_due,
     )
-    display = Display(config.color)
-    if config.banner:
-        display.banner()
+    ctx.display.banner()
     for card in cards:
-        display.show_card(card)
+        ctx.display.show_card(card)
         CardTool.add_labels(card)
 
 
 @batch.command('due')
 @filtering_command
-@pass_config
-def batch_due(config, tags, no_tags, match, listname, attachments, has_due):
+@pass_context
+def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Set due date for all cards selected'''
-    connection, board = BoardTool.start(config)
     cards = BoardTool.filter_cards(
-        board,
+        ctx.board,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -633,26 +638,21 @@ def batch_due(config, tags, no_tags, match, listname, attachments, has_due):
         has_attachments=attachments,
         has_due_date=has_due,
     )
-    display = Display(config.color)
-    if config.banner:
-        display.banner()
+    ctx.display.banner()
     for card in cards:
-        display.show_card(card)
+        ctx.display.show_card(card)
         if prompt_for_confirmation('Set due date?'):
             CardTool.set_due_date(card)
 
 
 @batch.command('attach')
-@pass_config
-def batch_attach(config):
+@pass_context
+def batch_attach(ctx):
     '''Extract HTTP links from card titles'''
-    connection, board = BoardTool.start(config)
-    cards = BoardTool.filter_cards(board, title_regex=VALID_URL_REGEX)
-    display = Display(config.color)
-    if config.banner:
-        display.banner()
+    cards = BoardTool.filter_cards(ctx.board, title_regex=VALID_URL_REGEX)
+    ctx.display.banner()
     for card in cards:
-        display.show_card(card)
+        ctx.display.show_card(card)
         if prompt_for_confirmation('Attach title?', True):
             CardTool.title_to_link(card)
 
@@ -663,19 +663,18 @@ def batch_attach(config):
 @cli.command(short_help='Use a smart repl-like menu')
 @filtering_command
 @click.option('--by-due', help='review cards that are due soon', is_flag=True)
-@pass_config
-def review(config, tags, no_tags, match, listname, attachments, has_due, by_due):
+@pass_context
+def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
     '''show a smart, command-line based menu for each card selected.
     This menu will prompt you to add tags to untagged cards, to attach the title
     of cards which have a link in the title, and gives you all the other functionality combined.
     '''
-    connection, board = BoardTool.start(config)
     if by_due:
-        cards = BoardTool.filter_cards(board, has_due_date=True)
+        cards = BoardTool.filter_cards(ctx.board, has_due_date=True)
         cards = sorted(cards, key=lambda c: c.due)
     else:
         cards = BoardTool.filter_cards(
-            board,
+            ctx.board,
             tags=tags,
             no_tags=no_tags,
             title_regex=match,
@@ -683,13 +682,11 @@ def review(config, tags, no_tags, match, listname, attachments, has_due, by_due)
             has_attachments=attachments,
             has_due_date=has_due,
         )
-    list_lookup = BoardTool.list_lookup(board)
-    label_lookup = BoardTool.label_lookup(board)
-    display = Display(config.color)
-    if config.banner:
-        display.banner()
+    list_lookup = BoardTool.list_lookup(ctx.board)
+    label_lookup = BoardTool.label_lookup(ctx.board)
+    ctx.display.banner()
     for card in cards:
-        CardTool.smart_menu(card, display.show_card, list_lookup, label_lookup, color=config.color)
+        CardTool.smart_menu(card, ctx.display.show_card, list_lookup, label_lookup, color=config.color)
     click.echo('All done, have a great day!')
 
 

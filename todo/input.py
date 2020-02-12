@@ -387,12 +387,6 @@ class BoardTool:
     '''
 
     @staticmethod
-    def start(config):
-        connection = TrelloConnection(config)
-        board = connection.main_board()
-        return connection, board
-
-    @staticmethod
     def take_cards_from_lists(board, list_regex):
         pattern = re.compile(list_regex, flags=re.I)
         target_lists = filter(lambda x: pattern.search(x.name), board.get_lists('open'))

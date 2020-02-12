@@ -9,6 +9,7 @@ class TrelloConnection:
     creating a connection requires configuration to be parsed because we need the api keys- so this will need to be invoked
     after the config parser is done doing its thing, with a parameter perhaps being the config
     '''
+
     def __init__(self, config):
         self.config = config
         self.trello = self.__connect(config)

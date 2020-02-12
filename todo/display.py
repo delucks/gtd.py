@@ -23,8 +23,9 @@ class Display:
     - banner should have more ascii art options :D
     '''
 
-    def __init__(self, color=True, primary_color=Colors.blue):
-        self.color = color
+    def __init__(self, config, primary_color=Colors.blue):
+        # TODO move primary_color into a configuration setting
+        self.config = config
         self.primary = primary_color
         self.fields = Display.build_fields()
 
@@ -49,7 +50,8 @@ class Display:
 
     def banner(self):
         '''Display an ASCII art banner for the beginning of program run'''
-        print(get_banner(use_color=self.color))
+        if self.config.banner:
+            print(get_banner(use_color=self.config.color))
 
     def show_raw(self, data, use_json=False):
         '''this shows random datastructures
@@ -173,8 +175,8 @@ class Display:
             # TODO allow this to be overridden
             'black': 'white',
         }
-        on = self.primary if self.color else ''
-        off = Colors.reset if self.color else ''
+        on = self.primary if self.config.color else ''
+        off = Colors.reset if self.config.color else ''
         print('{on}Card{off}'.format(on=on, off=off), card.id)
         indent_print('Name:', card.name)
         indent_print('List:', '{0}'.format(card.get_list().name))
