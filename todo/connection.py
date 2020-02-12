@@ -68,4 +68,4 @@ class TrelloConnection:
         if getattr(self.config, 'inbox_list', False):
             return [l for l in self.main_board().open_lists() if l.name == self.config.inbox_list][0]
         else:
-            return self.main_board().board.open_lists()[0]
+            return self.main_board().open_lists()[0]
