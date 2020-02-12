@@ -164,7 +164,7 @@ def sorting_fields_command(f):
     return f
 
 
-def filtering_command(f):
+def card_filtering_command(f):
     '''Add common options to a click function that will filter Trello cards'''
     f = click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')(f)
     f = click.option('--no-tags', is_flag=True, default=False, help='Only show cards which have no tags')(f)
@@ -445,7 +445,7 @@ def show_tags(ctx, json, listname):
 
 
 @show.command('cards')
-@filtering_command
+@card_filtering_command
 @json_option
 @tsv_option
 @sorting_fields_command
@@ -529,7 +529,7 @@ def delete_tag(ctx, name, noninteractive):
 @delete.command('cards')
 @click.option('-f', '--force', is_flag=True, default=False, help='Delete the card rather than archiving it')
 @click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
-@filtering_command
+@card_filtering_command
 @pass_context
 def delete_cards(ctx, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
     '''Delete a set of cards specified
@@ -683,7 +683,7 @@ def batch():
 
 
 @batch.command('move')
-@filtering_command
+@card_filtering_command
 @pass_context
 def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Change the list of each card selected'''
@@ -704,7 +704,7 @@ def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
 
 
 @batch.command('tag')
-@filtering_command
+@card_filtering_command
 @pass_context
 def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Change tags on each card selected'''
@@ -724,7 +724,7 @@ def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
 
 
 @batch.command('due')
-@filtering_command
+@card_filtering_command
 @pass_context
 def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Set due date for all cards selected'''
@@ -760,7 +760,7 @@ def batch_attach(ctx):
 
 
 @cli.command(short_help='Use a smart repl-like menu')
-@filtering_command
+@card_filtering_command
 @click.option('--by-due', help='review cards that are due soon', is_flag=True)
 @pass_context
 def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
