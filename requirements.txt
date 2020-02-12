@@ -1,6 +1,6 @@
 PyYAML==3.13
 py-trello==0.15.0
-click==6.7
+click==7.0
 prompt_toolkit==3.0.3
 prettytable==0.7.2
 arrow==0.12.1
