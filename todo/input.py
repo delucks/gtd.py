@@ -174,7 +174,7 @@ class CardTool:
         off = Colors.reset if color else ''
         card.fetch()
         f_display(card)
-        if card.get_attachments() and prompt_for_open_attachments:
+        if prompt_for_open_attachments and card.get_attachments():
             if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
                 with DevNullRedirect():
                     for url in [a.url for a in card.get_attachments() if a.url is not None]:
@@ -184,7 +184,7 @@ class CardTool:
                 '{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True
             ):
                 CardTool.title_to_link(card)
-        if not card.labels and prompt_for_untagged_cards:
+        if prompt_for_untagged_cards and not card.labels:
             print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
             CardTool.add_labels(card, label_choices)
         commands = {
