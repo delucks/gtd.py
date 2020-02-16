@@ -16,7 +16,7 @@ from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
-from todo.misc import get_title_of_webpage, Colors, DevNullRedirect, VALID_URL_REGEX
+from todo.misc import get_title_of_webpage, Colors, DevNullRedirect, VALID_URL_REGEX, return_on_eof
 from todo.exceptions import GTDException
 
 
@@ -76,7 +76,7 @@ def single_select(options):
         assigned = all_keys[idx]
         lookup[assigned] = idx
         print('[{0}] {1}'.format(assigned, chunk))
-    print('Press the character corresponding to your choice, selection will happen immediately. Enter to cancel')
+    print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+D to cancel')
     result = lookup.get(getch(), None)
     if result is not None:
         return list(options)[int(result)]
@@ -110,8 +110,8 @@ class CardTool:
     different UI components.
     '''
 
-    # TODO add type hints
     @staticmethod
+    @return_on_eof
     def add_labels(card, label_choices=None):
         '''Give the user a way to toggle labels on this card by their
         name rather than by a numeric selection interface. Using
@@ -121,14 +121,12 @@ class CardTool:
         :param trello.Card card: the card to modify
         :param dict label_choices: str->trello.Label, the names and objects of labels on this board
         '''
-        print('Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit')
+        print('Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Ctrl+D to exit')
         label_choices = label_choices or BoardTool.label_lookup(card.board)
         label_completer = FuzzyWordCompleter(label_choices.keys())
         while True:
-            userinput = prompt('tag > ', completer=label_completer).strip()
-            if userinput == '':
-                break
-            elif userinput == 'ls':
+            userinput = prompt('gtd.py > tag > ', completer=label_completer).strip()
+            if userinput == 'ls':
                 triple_column_print(label_choices.keys())
             elif userinput not in label_choices.keys():
                 if prompt_for_confirmation(
@@ -173,6 +171,7 @@ class CardTool:
         reconstructed = ' '.join([n for n in sp if not VALID_URL_REGEX.search(n)])
         CardTool.rename(card, variables=user_parameters, default=reconstructed)
 
+    @return_on_eof
     @staticmethod
     def manipulate_attachments(card):
         '''Give the user a CRUD interface for attachments on this card'''
@@ -180,7 +179,7 @@ class CardTool:
         user_input = 'Nothing really'
         attachment_completer = WordCompleter(['delete', 'print', 'open', 'http://', 'https://'], ignore_case=True)
         while user_input != '':
-            user_input = prompt('attach > ', completer=attachment_completer).strip()
+            user_input = prompt('gtd.py > attach > ', completer=attachment_completer).strip()
             if re.search(VALID_URL_REGEX, user_input):
                 # attach this link
                 card.attach(url=user_input)
@@ -188,7 +187,7 @@ class CardTool:
             elif user_input in ['delete', 'open']:
                 attachment_opts = {a.name: a for a in card.get_attachments()}
                 if not attachment_opts:
-                    print('No attachments')
+                    print('This card is free of attachments')
                     continue
                 dest = single_select(attachment_opts.keys())
                 if dest is not None:
@@ -206,6 +205,7 @@ class CardTool:
                         print('  ' + a.name)
 
     @staticmethod
+    @return_on_eof
     def rename(card, default=None, variables={}):
         if variables:
             print('You can use the following variables in your new card title:')
@@ -224,6 +224,7 @@ class CardTool:
             card.set_name(default or suggestion)
 
     @staticmethod
+    @return_on_eof
     def set_due_date(card):
         '''prompt for the date to set this card due as'''
 
@@ -232,14 +233,11 @@ class CardTool:
 
         validator = Validator.from_callable(
             validate_date,
-            error_message='Enter a date in format "Jun 15 2018", "06/15/2018" or "15/06/2018". Ctrl+C to go back',
+            error_message='Enter a date in format "Jun 15 2018", "06/15/2018" or "15/06/2018". Ctrl+D to go back',
             move_cursor_to_end=True,
         )
         while True:
-            try:
-                user_input = prompt('date > ', validator=validator, validate_while_typing=True)
-            except KeyboardInterrupt:
-                return
+            user_input = prompt('gtd.py > duedate > ', validator=validator, validate_while_typing=True)
             result = parse_user_date_input(user_input)
             if result is None:
                 print('Invalid date format!')

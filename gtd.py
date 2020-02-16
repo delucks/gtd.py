@@ -20,7 +20,7 @@ from prompt_toolkit.completion import FuzzyWordCompleter
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import Display
 from todo.exceptions import GTDException
-from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner, VALID_URL_REGEX
+from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner, VALID_URL_REGEX, return_on_eof
 from todo.configuration import Configuration
 from todo import __version__
 from todo.connection import TrelloConnection
@@ -126,21 +126,7 @@ class CLIContext:
                 if CardTool.move_to_list(card, self._list_choices):
                     break
             elif user_input in ['m', 'move']:
-                boards_by_name = self.connection.boards_by_name()
-                board_name = prompt(
-                    'gtd.py > move-board > board name? ', completer=FuzzyWordCompleter(boards_by_name.keys())
-                )
-                board_id = boards_by_name[board_name]['id']
-                lists_json = self.connection.trello.fetch_json(
-                    f'/boards/{board_id}/lists?cards=none&filter=open&fields=name'
-                )
-                name_to_listid = {l['name']: l['id'] for l in lists_json}
-                list_name = prompt(
-                    f'gtd.py > move-board > {board_name} > list name? ',
-                    completer=FuzzyWordCompleter(name_to_listid.keys()),
-                )
-                card.change_list(name_to_listid[list_name])
-                click.secho(f'Changed list to {list_name} on {board_name}', fg='green')
+                self.move_between_boards(card)
             elif user_input == 'comment':
                 # TODO Optional form 'comment Contents of a comment'
                 new_comment = click.edit(text='<Comment here>', require_save=True)
@@ -154,6 +140,24 @@ class CLIContext:
                         on, user_input, off
                     )
                 )
+
+    @return_on_eof
+    def move_between_boards(self, card: trello.Card) -> None:
+        boards_by_name = self.connection.boards_by_name()
+        board_name = prompt(
+            'gtd.py > move > board name? ', completer=FuzzyWordCompleter(boards_by_name.keys())
+        )
+        board_id = boards_by_name[board_name]['id']
+        lists_json = self.connection.trello.fetch_json(
+            f'/boards/{board_id}/lists?cards=none&filter=open&fields=name'
+        )
+        name_to_listid = {l['name']: l['id'] for l in lists_json}
+        list_name = prompt(
+            f'gtd.py > move > {board_name} > list name? ',
+            completer=FuzzyWordCompleter(name_to_listid.keys()),
+        )
+        card.change_list(name_to_listid[list_name])
+        click.secho(f'Changed list to {list_name} on {board_name}', fg='green')
 
 
 pass_context = click.make_pass_decorator(CLIContext)

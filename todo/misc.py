@@ -10,7 +10,16 @@ except OSError:
     choice = lambda n: n.pop()
 
 
-VALID_URL_REGEX = re.compile('https?://.*\.')
+VALID_URL_REGEX = re.compile(r'https?://.*\.')
+
+
+def return_on_eof(func):
+    def wrapper(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except EOFError:
+            return
+    return wrapper
 
 
 class Colors:
@@ -37,7 +46,7 @@ def get_title_of_webpage(url):
         if 'text/html' not in resp.headers.get('Content-Type', ''):
             return None
         as_text = resp.text
-        return as_text[as_text.find('<title>') + 7 : as_text.find('</title>')]
+        return as_text[as_text.find('<title>') + 7: as_text.find('</title>')]
     except requests.exceptions.ConnectionError:
         return None
 
