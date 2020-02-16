@@ -45,7 +45,7 @@ class CLIContext:
         self._label_choices = BoardTool.label_lookup(self.connection.main_board())
 
     def card_repl(self, card: trello.Card):
-        '''smart_menu is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
+        '''card_repl is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
         - Are there attachments? Maybe you want to open them.
         - Does there appear to be a URL in the title? You might want to attach it.
         - Are there no tags? Maybe you want to add some.
@@ -783,7 +783,7 @@ def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
         )
     ctx.display.banner()
     for card in cards:
-        CardTool.card_repl(card)
+        ctx.card_repl(card)
     click.echo('All done, have a great day!')
 
 
