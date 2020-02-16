@@ -62,6 +62,13 @@ class TrelloConnection:
         self._main_board = board_object
         return board_object
 
+    def boards_by_name(self):
+        '''Return a mapping of board names present in this account to their JSON contents.
+        Useful to potentially avoid a network call when generating mappings for interactive
+        completion, and allowing the boards to be turned into objects quickly with Board.from_json
+        '''
+        return {b['name']: b for b in self.boards}
+
     def inbox_list(self):
         '''use the configuration to get the main board & list from
         Trello, return the list where new cards should go.

@@ -76,7 +76,8 @@ class CLIContext:
             'duedate': 'add a due date or change the due date',
             'description': 'change the description of this card (desc)',
             'help': 'display this help output (h)',
-            'move': 'move to a different list (m)',
+            'change-list': 'move this to a different list on the same board',
+            'move': 'move to a different board and list (m)',
             'next': 'move on to the next card (n)',
             'open': 'open all links on this card (o)',
             'print': 'display this card (p)',
@@ -121,10 +122,25 @@ class CLIContext:
             elif user_input in ['h', 'help']:
                 for cname, cdesc in commands.items():
                     print('{0:<16}| {1}{2}{3}'.format(cname, on, cdesc, off))
-            elif user_input in ['m', 'move']:
-                # TODO Include between-board movement
+            elif user_input == 'change-list':
                 if CardTool.move_to_list(card, self._list_choices):
                     break
+            elif user_input in ['m', 'move']:
+                boards_by_name = self.connection.boards_by_name()
+                board_name = prompt(
+                    'gtd.py > move-board > board name? ', completer=FuzzyWordCompleter(boards_by_name.keys())
+                )
+                board_id = boards_by_name[board_name]['id']
+                lists_json = self.connection.trello.fetch_json(
+                    f'/boards/{board_id}/lists?cards=none&filter=open&fields=name'
+                )
+                name_to_listid = {l['name']: l['id'] for l in lists_json}
+                list_name = prompt(
+                    f'gtd.py > move-board > {board_name} > list name? ',
+                    completer=FuzzyWordCompleter(name_to_listid.keys()),
+                )
+                card.change_list(name_to_listid[list_name])
+                click.secho(f'Changed list to {list_name} on {board_name}', fg='green')
             elif user_input == 'comment':
                 # TODO Optional form 'comment Contents of a comment'
                 new_comment = click.edit(text='<Comment here>', require_save=True)
@@ -768,12 +784,13 @@ def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
     This menu will prompt you to add tags to untagged cards, to attach the title
     of cards which have a link in the title, and gives you all the other functionality combined.
     '''
+    board = ctx.connection.main_board()
     if by_due:
-        cards = BoardTool.filter_cards(ctx.board, has_due_date=True)
+        cards = BoardTool.filter_cards(board, has_due_date=True)
         cards = sorted(cards, key=lambda c: c.due)
     else:
         cards = BoardTool.filter_cards(
-            ctx.board,
+            board,
             tags=tags,
             no_tags=no_tags,
             title_regex=match,
@@ -794,10 +811,7 @@ def main():
         click.secho('[FATAL] Connection lost to the Trello API!', fg='red')
         sys.exit(1)
     except GTDException as e:
-        if e.errno == 0:
-            sys.exit(0)
-        else:
-            sys.exit(1)
+        sys.exit(e.errno)
 
 
 if __name__ == '__main__':
