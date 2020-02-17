@@ -163,9 +163,6 @@ class Display:
 
         :param trello.Card card: card to display
         '''
-        indent_print = lambda m, d: print(
-            '  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off)
-        )
         label_color_correction = {
             'purple': 'magenta',
             'sky': 'cyan',
@@ -177,6 +174,9 @@ class Display:
         }
         on = self.primary if self.config.color else ''
         off = Colors.reset if self.config.color else ''
+        indent_print = lambda m, d: print(
+            '  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off)
+        )
         print('{on}Card{off}'.format(on=on, off=off), card.id)
         indent_print('Name:', card.name)
         indent_print('List:', '{0}'.format(card.get_list().name))
@@ -210,7 +210,7 @@ class Display:
                     display = Colors.yellow
                 else:
                     display = Colors.green
-                indent_print('Remaining:', '{0}{1}{2}'.format(display, diff, Colors.reset))
+                indent_print('Remaining:', '{0}{1}{2}'.format(display if self.config.color else '', diff, off))
             except TypeError:
                 # fucking datetime throws exceptions about bullshit
                 pass

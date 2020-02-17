@@ -206,10 +206,10 @@ def tsv_option(f):
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.version_option(__version__)
 @click.option('-b', '--board', default=None, help='Name of the board to work with for this session')
-@click.option('--no-color', is_flag=True, default=False, help='Disable ANSI terminal color?')
-@click.option('--banner', is_flag=True, default=False, help='Print a gtd.py ascii art banner')
+@click.option('--color/--no-color', default=None, help='Use ANSI terminal colors')
+@click.option('--banner/--no-banner', default=None, help='Print a gtd.py ascii art banner')
 @click.pass_context
-def cli(top_level_context, board, no_color, banner):
+def cli(top_level_context, board, color, banner):
     '''gtd.py'''
     try:
         config = Configuration.from_file()
@@ -224,12 +224,13 @@ def cli(top_level_context, board, no_color, banner):
             for l in Configuration.all_config_locations():
                 print('  ' + l)
             raise
+    # CLI arguments always take precedence over config
     if board is not None:
         config.board = board
-    if no_color:
-        config.color = False
-    if banner:
-        config.banner = True
+    if color is not None:
+        config.color = color
+    if banner is not None:
+        config.banner = banner
     # Click's internal setting
     top_level_context.color = config.color
     top_level_context.obj = CLIContext(config)
@@ -238,16 +239,19 @@ def cli(top_level_context, board, no_color, banner):
 @cli.command()
 @click.option('-w', '--workflow', is_flag=True, default=False, help='Show a Getting Things Done workflow')
 @click.option('-b', '--banner', is_flag=True, default=False, help='Show a random banner')
-def info(workflow, banner):
+@pass_context
+def info(ctx, workflow, banner):
     '''Learn more about gtd.py'''
     if workflow:
         click.secho(WORKFLOW_TEXT, fg='yellow')
         raise GTDException(0)
     elif banner:
-        print(get_banner())
+        print(get_banner(use_color=ctx.config.color))
     else:
-        print('gtd.py version {c}{0}{r}'.format(__version__, c=Colors.green, r=Colors.reset))
-        print('{c}https://github.com/delucks/gtd.py/{r}\nPRs welcome\n'.format(c=Colors.green, r=Colors.reset))
+        on = Colors.green if ctx.config.color else ''
+        off = Colors.reset if ctx.config.color else ''
+        print(f'gtd.py version {on}{__version__}{off}')
+        print(f'Visit {on}https://github.com/delucks/gtd.py/{off} for more information')
 
 
 @cli.command()

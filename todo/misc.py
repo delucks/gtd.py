@@ -87,7 +87,7 @@ WORKFLOW_TEXT = (
 )
 
 
-def get_banner(version=__version__, author=__author__, use_color=True):
+def get_banner(version=__version__, use_color=True):
     '''Hold a buncha poorly done ASCII banners and display one at random!'''
     if use_color:
         on = choice(Colors.all_colors())
@@ -95,8 +95,8 @@ def get_banner(version=__version__, author=__author__, use_color=True):
     else:
         on = off = ''
     b1 = (
-        ' __|_ _| ._     version {on}{0}{off}\n' '(_||_(_|{on}o{off}|_)\/  by {on}{1}{off}\n' ' _|      |  /\n'
-    ).format(version, author, on=on, off=off)
+        ' __|_ _| ._     version {on}{0}{off}\n' '(_||_(_|{on}o{off}|_)\/  by {on}delucks{off}\n' ' _|      |  /\n'
+    ).format(version, on=on, off=off)
     b2 = (
         '  ___  ____  ____    ____  _  _\n'
         ' / __)(_  _)(  _ \  (  _ \( \/ )\n'
@@ -120,8 +120,8 @@ def get_banner(version=__version__, author=__author__, use_color=True):
         '/_____/           \/{on}\/{off}__|   \/\n'
     ).format(version, on=on, off=off)
     # A joke, is funny
-    b5 = '67 74 64 {on}2e{off} 70 79\n76 65 72 73 69 6f 6e {on}{0}{off}\n'.format(version, on=on, off=off)
-    b6 = '--. - -.. {on}.-.-.-{off} .--. -.--\n...- . .-. ... .. --- -. {on}{0}{off}\n'.format(version, on=on, off=off)
+    b5 = f'67 74 64 {on}2e{off} 70 79\n76 65 72 73 69 6f 6e {on}{version}{off}\n'
+    b6 = f'--. - -.. {on}.-.-.-{off} .--. -.--\n...- . .-. ... .. --- -. {on}{version}{off}\n'
     b7 = (
         '     _     _\n'
         ' ___| |_ _| |  ___ _ _\n'

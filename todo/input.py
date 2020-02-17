@@ -145,11 +145,11 @@ class CardTool:
                 label_obj = label_choices[userinput]
                 try:
                     card.add_label(label_obj)
-                    print('Added tag {0}'.format(Colors.green + userinput + Colors.reset))
+                    click.secho(f'Added tag {userinput}', fg='green')
                 except trello.exceptions.ResourceUnavailable:
                     # This label already exists on the card so remove it
                     card.remove_label(label_obj)
-                    print('Removed tag {0}'.format(Colors.red + userinput + Colors.reset))
+                    click.secho(f'Removed tag {userinput}', fg='red')
 
     @staticmethod
     def title_to_link(card):
@@ -171,8 +171,8 @@ class CardTool:
         reconstructed = ' '.join([n for n in sp if not VALID_URL_REGEX.search(n)])
         CardTool.rename(card, variables=user_parameters, default=reconstructed)
 
-    @return_on_eof
     @staticmethod
+    @return_on_eof
     def manipulate_attachments(card):
         '''Give the user a CRUD interface for attachments on this card'''
         print('Enter a URL, "delete", "open", "print", or Enter to exit')
@@ -333,6 +333,8 @@ class BoardTool:
             filters.append(lambda c: c.due_date)
         return filters
 
+    # This needs to be replaced with a stateful "card view" that allows referencing earlier
+    # cards in the list and reloading the labels/lists when things are added or modified
     @staticmethod
     def filter_cards(board, **kwargs):
         list_regex = kwargs.get('list_regex', None)
