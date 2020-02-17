@@ -17,7 +17,7 @@ def test_grep(config, test_list):
     except json.decoder.JSONDecodeError:
         print(result.output)
         [c.delete() for c in cards]
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     assert len(grep_results) == 1
     # Test -i/--insensitive
     cards.append(test_list.add_card('grep_t'))
@@ -29,7 +29,7 @@ def test_grep(config, test_list):
     except json.decoder.JSONDecodeError:
         print(result.output)
         [c.delete() for c in cards]
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     assert len(grep_results) == 2
     # Test -e/--regexp
     cards.append(test_list.add_card('foo'))
@@ -43,7 +43,7 @@ def test_grep(config, test_list):
     except json.decoder.JSONDecodeError:
         print(result.output)
         [c.delete() for c in cards]
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     assert len(grep_results) == 2
     args = ['--board', config.test_board, 'grep', '--json', '-i', '-e', 'grep', '-e', 'ba[rz]']
     result = runner.invoke(cli, args)
@@ -53,7 +53,7 @@ def test_grep(config, test_list):
     except json.decoder.JSONDecodeError:
         print(result.output)
         [c.delete() for c in cards]
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     # grep_t, GREP_TESTING, bar, and baz
     assert len(grep_results) == 4
     # Test -e and an argument given at the same time
@@ -65,7 +65,7 @@ def test_grep(config, test_list):
     except json.decoder.JSONDecodeError:
         print(result.output)
         [c.delete() for c in cards]
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     # grep_t, GREP_TESTING, foo, bar, and baz
     assert len(grep_results) == 5
     # Test -c/--count

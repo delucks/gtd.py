@@ -1,6 +1,8 @@
 import os
-import yaml
 import platform
+
+import yaml
+
 from todo.exceptions import GTDException
 
 
@@ -8,6 +10,11 @@ class Configuration:
     '''hold global configuration for this application. This class has required
     arguments of the properties we need to connect to the Trello API and some
     other properties that modify global state during each run
+
+    Possible configuration properties:
+        Age of cards to show in yellow/red
+        Color of labels
+        "Primary color" for UI elements, maybe hardcoded secondary colors too
     '''
 
     def __init__(self, api_key, api_secret, oauth_token, oauth_token_secret, **kwargs):
@@ -31,13 +38,13 @@ class Configuration:
                 '  API secret: ' + self.api_secret,
                 '  OAuth token: ' + self.oauth_token,
                 '  OAuth secret: ' + self.oauth_token_secret,
-                '  Primary board: {0}'.format(self.board),
-                '  Inbox list: {0}'.format(self.inbox_list),
-                '  Banner? {0}'.format(self.banner),
-                '  Use ANSI color? {0}'.format(self.color),
+                f'  Primary board: {self.board}',
+                f'  Inbox list: {self.inbox_list}',
+                f'  Banner? {self.banner}',
+                f'  Use ANSI color? {self.color}',
                 '  Prompt for:',
-                '    Untagged cards? {0}'.format(self.prompt_for_untagged_cards),
-                '    Opening attachments? {0}'.format(self.prompt_for_open_attachments),
+                f'    Untagged cards? {self.prompt_for_untagged_cards}',
+                f'    Opening attachments? {self.prompt_for_open_attachments}',
             ]
         )
 
@@ -94,8 +101,8 @@ class Configuration:
                 # great!
                 continue
             else:
-                print('A required property {0} in your configuration was not found!'.format(prop))
-                print('Check the file {0}'.format(filename))
+                print(f'A required property {prop} in your configuration was not found!')
+                print(f'Check the file {filename}')
                 raise GTDException(1)
         return Configuration(
             file_config['api_key'],

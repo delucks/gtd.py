@@ -177,17 +177,18 @@ class Display:
         indent_print = lambda m, d: print(
             '  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off)
         )
-        print('{on}Card{off}'.format(on=on, off=off), card.id)
+        print(f'{on}Card{off} {card.id}')
         indent_print('Name:', card.name)
-        indent_print('List:', '{0}'.format(card.get_list().name))
+        indent_print('List:', card.get_list().name)
         if card.labels:
-            click.echo('  {on}{name: <{fill}}{off}'.format(name='Tags:', fill='14', on=on, off=off), nl=False)
+            name = 'Tags:'
+            click.echo(f'  {on}{name:<14}{off}', nl=False)
             for l in card.labels:
                 click.secho(l.name + ' ', fg=label_color_correction.get(l.color, l.color) or 'green', nl=False)
             print()
         try:
             created = card.card_created_date
-            indent_print('Created:', '{0} ({1})'.format(created, int(created.timestamp())))
+            indent_print('Created:', f'{created} ({int(created.timestamp())})')
             indent_print('Age:', datetime.datetime.now() - created)
         except IndexError:
             # this happens when the card is created by the repeating cards trello power-up
@@ -199,7 +200,7 @@ class Display:
         if card.comments:
             indent_print('Comments:', '')
             for c in card.comments:
-                print('    {}: {}'.format(c['memberCreator']['username'], c['data']['text']))
+                print(f"    {c['memberCreator']['username']}: {c['data']['text']}")
         if card.due:
             indent_print('Due:', card.due_date)
             try:
@@ -210,7 +211,7 @@ class Display:
                     display = Colors.yellow
                 else:
                     display = Colors.green
-                indent_print('Remaining:', '{0}{1}{2}'.format(display if self.config.color else '', diff, off))
+                indent_print('Remaining:', f'{display if self.config.color else ""}{diff}{off}')
             except TypeError:
                 # fucking datetime throws exceptions about bullshit
                 pass

@@ -36,7 +36,7 @@ class TrelloConnection:
 
     def __repr__(self):
         c = 'disconnected' if self.trello is None else 'connected'
-        return 'TrelloConnection {0} at {0}'.format(c, id(self))
+        return f'TrelloConnection {c} at {id(self)}'
 
     def __str__(self):
         return repr(self)

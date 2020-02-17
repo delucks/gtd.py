@@ -18,7 +18,7 @@ def test_show_boards():
         open_results = json.loads(result.output)
     except json.decoder.JSONDecodeError:
         print(result.output)
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     # Now include the all-flag
     args = ['show', 'boards', '--json', '--show-all']
     result = runner.invoke(cli, args)
@@ -27,7 +27,7 @@ def test_show_boards():
         archived_results = json.loads(result.output)
     except json.decoder.JSONDecodeError:
         print(result.output)
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     assert len(archived_results) > len(open_results)
     # Last basic test: run "show boards" with no arguments and assert it gets a 0-error code
     # ¯\_(ツ)_/¯
@@ -46,7 +46,7 @@ def test_show_lists(config, test_board):
         open_results = json.loads(result.output)
     except json.decoder.JSONDecodeError:
         print(result.output)
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     args = ['--board', config.test_board, 'show', 'lists', '--json', '--show-all']
     result = runner.invoke(cli, args)
     assert result.exit_code == 0, result.output
@@ -54,7 +54,7 @@ def test_show_lists(config, test_board):
         all_results = json.loads(result.output)
     except json.decoder.JSONDecodeError:
         print(result.output)
-        pytest.fail('Output of `{0}` is not valid JSON'.format(' '.join(args)))
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
     assert len(all_results) > len(open_results)
     assert len(all_results) == len(test_board.get_lists('all'))
     assert len(open_results) == len(test_board.get_lists('open'))

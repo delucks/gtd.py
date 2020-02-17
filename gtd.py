@@ -56,17 +56,17 @@ class CLIContext:
         card.fetch()
         self.display.show_card(card)
         if self.config.prompt_for_open_attachments and card.get_attachments():
-            if prompt_for_confirmation('{0}Open attachments?{1}'.format(on, off), False):
+            if prompt_for_confirmation(f'{on}Open attachments?{off}', False):
                 with DevNullRedirect():
                     for url in [a.url for a in card.get_attachments() if a.url is not None]:
                         webbrowser.open(url)
         if re.search(VALID_URL_REGEX, card.name):
             if prompt_for_confirmation(
-                '{0}Link in title detected, want to attach it & rename?{1}'.format(on, off), True
+                f'{on}Link in title detected, want to attach it & rename?{off}', True
             ):
                 CardTool.title_to_link(card)
         if self.config.prompt_for_untagged_cards and not card.labels:
-            print('{0}No tags on this card yet, want to add some?{1}'.format(on, off))
+            print(f'{on}No tags on this card yet, want to add some?{off}')
             CardTool.add_labels(card, self._label_choices)
         commands = {
             'archive': 'mark this card as closed',
@@ -136,9 +136,7 @@ class CLIContext:
                     click.secho('Change the text & save to post the comment', fg='red')
             else:
                 print(
-                    '{0}{1}{2} is not a command, type "{0}help{2}" to view available commands'.format(
-                        on, user_input, off
-                    )
+                    f'{on}{user_input}{off} is not a command, type "{on}help{off}" to view available commands'
                 )
 
     @return_on_eof
@@ -168,13 +166,13 @@ def validate_fields(command_context, param, value):
     possible = value.split(',') if value else []
     for field in possible:
         if field not in valid:
-            raise click.BadParameter('Field {} is not a valid field! Use {}'.format(field, ','.join(valid)))
+            raise click.BadParameter(f'Field {field} is not a valid field! Use {",".join(valid)}')
     return possible
 
 
 def validate_sort(command_context, param, value):
     if value and value not in Display.build_fields().keys():
-        raise click.BadParameter('Sort parameter {} is not a valid field!'.format(value))
+        raise click.BadParameter(f'Sort parameter {value} is not a valid field!')
     return value
 
 
@@ -218,12 +216,11 @@ def cli(top_level_context, board, color, banner):
         if click.confirm('Would you like to create it interactively?'):
             top_level_context.invoke(onboard)
             click.secho('Please re-run your command to pick up the credentials', fg='green')
-            raise GTDException(0)
         else:
-            click.secho('Put your config file in one of the following locations:', fg='red')
+            print('Put your config file in one of the following locations:')
             for l in Configuration.all_config_locations():
                 print('  ' + l)
-            raise
+        raise
     # CLI arguments always take precedence over config
     if board is not None:
         config.board = board
@@ -314,19 +311,13 @@ def onboard(no_open, output_path=None):
     try:
         response = session.fetch_request_token(request_token_url)
     except TokenRequestDenied:
-        click.secho('Invalid API key/secret provided: {0} / {1}'.format(api_key, api_secret), fg='red')
+        click.secho('Invalid API key/secret provided: {api_key} / {api_secret}', fg='red')
         sys.exit(1)
     resource_owner_key, resource_owner_secret = response.get('oauth_token'), response.get('oauth_token_secret')
     '''Step 2: Redirect to the provider. Since this is a CLI script we do not
     redirect. In a web application you would redirect the user to the URL
     below.'''
-    user_confirmation_url = '{authorize_url}?oauth_token={oauth_token}&scope={scope}&expiration={expiration}&name={name}'.format(
-        authorize_url=authorize_url,
-        oauth_token=resource_owner_key,
-        expiration='never',
-        scope='read,write',
-        name='gtd.py',
-    )
+    user_confirmation_url = f'{authorize_url}?oauth_token={resource_owner_key}&scope=read,write&expiration=never&name=gtd.py'
     click.echo('Visit the following URL in your web browser to authorize gtd.py to access your account:')
     click.echo('  ' + user_confirmation_url)
     if not no_open:
@@ -363,16 +354,16 @@ def onboard(no_open, output_path=None):
     output_folder = os.path.dirname(output_file)
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
-        click.echo('Created folder {0} to hold your configuration'.format(output_folder))
+        click.echo(f'Created folder {output_folder} to hold your configuration')
     # Try to be safe about not destroying existing credentials
     if os.path.exists(output_file):
-        if click.confirm('{0} exists already, would you like to back it up?'.format(output_file), default=True):
+        if click.confirm(f'{output_file} exists already, would you like to back it up?', default=True):
             shutil.move(output_file, output_file + '.backup')
         if not click.confirm('Overwrite the existing file?', default=False):
             return
     with open(output_file, 'w') as f:
         f.write(yaml.safe_dump(final_output_data, default_flow_style=False))
-    click.echo('Credentials saved in "{0}"- you can now use gtd.py!'.format(output_file))
+    click.echo(f'Credentials saved in "{output_file}"- you can now use gtd.py!')
     click.echo('Use the "config" command to view or edit your configuration file')
 
 
@@ -406,7 +397,7 @@ def show_boards(ctx, json, tsv, by, show_all):
     # Set up a table to hold our boards
     board_columns = ['name', 'activity', 'members', 'permission', 'url']
     if by not in board_columns:
-        click.secho('Field {} is not a valid field: {}'.format(by, ','.join(board_columns)), fg='red')
+        click.secho(f'Field {by} is not a valid field: {",".join(board_columns)}', fg='red')
         raise GTDException(1)
     table = prettytable.PrettyTable()
     table.field_names = board_columns
@@ -527,11 +518,11 @@ def delete_list(ctx, name, noninteractive):
     board = ctx.connection.main_board()
     lists = [l for l in board.get_lists('open') if l.name == name]
     if not lists:
-        click.secho('No such list {}'.format(name), fg='red')
+        click.secho(f'No such list {name}', fg='red')
     for l in lists:
-        if noninteractive or prompt_for_confirmation('Close list "{}"?'.format(l.name)):
+        if noninteractive or prompt_for_confirmation(f'Close list "{l.name}"?'):
             l.close()
-            click.secho('Closed {}!'.format(l.name), fg='green')
+            click.secho(f'Closed {l.name}!', fg='green')
 
 
 @delete.command('tag')
@@ -543,11 +534,11 @@ def delete_tag(ctx, name, noninteractive):
     board = ctx.connection.main_board()
     tags = [l for l in board.get_labels() if l.name == name]
     if not tags:
-        click.secho('No such tag {}'.format(name), fg='red')
+        click.secho(f'No such tag {name}', fg='red')
     for t in tags:
-        if noninteractive or prompt_for_confirmation('Delete tag "{}"?'.format(t.name)):
+        if noninteractive or prompt_for_confirmation(f'Delete tag "{t.name}"?'):
             board.delete_label(t.id)
-            click.secho('Deleted {}!'.format(t.name), fg='green')
+            click.secho(f'Deleted {t.name}!', fg='green')
 
 
 @delete.command('cards')
@@ -583,7 +574,7 @@ def delete_cards(ctx, force, noninteractive, tags, no_tags, match, listname, att
                     card.delete()
                 else:
                     card.set_closed(True)
-                click.secho('Card {}d!'.format(method), fg='red')
+                click.secho(f'Card {method}d!', fg='red')
 
 
 # delete }}}
@@ -614,7 +605,7 @@ def add_card(ctx, title, message, edit, listname):
         try:
             inbox = next(target_lists)
         except StopIteration:
-            click.secho('No list names matched by {}'.format(listname), fg='red')
+            click.secho(f'No list names matched by {listname}', fg='red')
             raise GTDException(1)
     if not title:
         title = click.edit(require_save=True, text='<Title here>')
@@ -627,7 +618,7 @@ def add_card(ctx, title, message, edit, listname):
     if edit:
         ctx.card_repl(returned)
     else:
-        click.secho('Successfully added card {0}!'.format(returned), fg='green')
+        click.secho(f'Successfully added card "{returned.name}"!', fg='green')
 
 
 @add.command('tag')
@@ -638,7 +629,7 @@ def add_tag(ctx, tagname, color):
     '''Add a new tag'''
     board = ctx.connection.main_board()
     label = board.add_label(tagname, color)
-    click.secho('Successfully added tag "{0}"!'.format(label.name), color='green')
+    click.secho(f'Created tag "{label.name}"', color='green')
 
 
 @add.command('list')
@@ -648,7 +639,7 @@ def add_list(ctx, listname):
     '''Add a new list'''
     board = ctx.connection.main_board()
     new_list = board.add_list(listname)
-    click.secho(f'Successfully added list "{new_list}"!', color='green')
+    click.secho(f'Created list "{new_list}"', color='green')
 
 
 @add.command('board')
@@ -658,7 +649,7 @@ def add_board(ctx, boardname):
     '''Add a new board'''
     connection = ctx.connection
     if connection.trello.add_board(boardname):
-        click.secho('Added board {}'.format(boardname), fg='green')
+        click.secho(f'Board {boardname} created', fg='green')
 
 
 @cli.command(short_help='egrep through titles of cards')

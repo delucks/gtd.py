@@ -31,7 +31,7 @@ setup(
     author_email='me@jamesluck.com',
     license='BSD 3-clause',
     url='https://github.com/delucks/gtd.py',
-    download_url='https://github.com/delucks/gtd.py/tarball/{}'.format(__version__),
+    download_url=f'https://github.com/delucks/gtd.py/tarball/{__version__}',
     keywords=['productivity', 'cli', 'trello', 'gtd', 'getting things done'],
     classifiers=[
         'Development Status :: 4 - Beta',

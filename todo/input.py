@@ -75,7 +75,7 @@ def single_select(options):
     for idx, chunk in enumerate(options):
         assigned = all_keys[idx]
         lookup[assigned] = idx
-        print('[{0}] {1}'.format(assigned, chunk))
+        print(f'[{assigned}] {chunk}')
     print('Press the character corresponding to your choice, selection will happen immediately. Ctrl+D to cancel')
     result = lookup.get(getch(), None)
     if result is not None:
@@ -130,14 +130,12 @@ class CardTool:
                 triple_column_print(label_choices.keys())
             elif userinput not in label_choices.keys():
                 if prompt_for_confirmation(
-                    'Unrecognized tag name {0}, would you like to create it?'.format(userinput), False
+                    f'Unrecognized tag name {userinput}, would you like to create it?', False
                 ):
                     label = card.board.add_label(userinput, 'black')
                     card.add_label(label)
                     click.echo(
-                        'Successfully added tag {0} to board {1} and card {2}!'.format(
-                            label.name, card.board.name, card.name
-                        )
+                        f'Successfully added tag {label.name} to board {card.board.name} and card {card.name}!'
                     )
                     label_choices = BoardTool.label_lookup(card.board)
                     label_completer = FuzzyWordCompleter(label_choices.keys())
@@ -163,10 +161,10 @@ class CardTool:
             if link_name not in existing_attachments:
                 card.attach(url=link_name)
             # Get the URL & title of the link for the user to access in the renaming interface
-            user_parameters['link{}'.format(idx)] = link_name
+            user_parameters[f'link{idx}'] = link_name
             possible_title = get_title_of_webpage(link_name)
             if possible_title:
-                user_parameters['title{}'.format(idx)] = possible_title
+                user_parameters[f'title{idx}'] = possible_title
         # Give the user a default title without the link, but allow them to use the title of the page from a link as a var instead
         reconstructed = ' '.join([n for n in sp if not VALID_URL_REGEX.search(n)])
         CardTool.rename(card, variables=user_parameters, default=reconstructed)
@@ -183,7 +181,7 @@ class CardTool:
             if re.search(VALID_URL_REGEX, user_input):
                 # attach this link
                 card.attach(url=user_input)
-                print('Attached {0}'.format(user_input))
+                print(f'Attached {user_input}')
             elif user_input in ['delete', 'open']:
                 attachment_opts = {a.name: a for a in card.get_attachments()}
                 if not attachment_opts:
@@ -210,12 +208,12 @@ class CardTool:
         if variables:
             print('You can use the following variables in your new card title:')
             for k, v in variables.items():
-                print('  ${}: {}'.format(k, v))
+                print(f'  ${k}: {v}')
         suggestion = variables.get('title0', None) or card.name
-        newname = input('Input new name for this card (blank for "{0}"): '.format(default or suggestion)).strip()
+        newname = prompt(f'Input new name for this card (blank for "{default or suggestion}"): ').strip()
         if newname:
             for k, v in variables.items():
-                expansion = '${}'.format(k)
+                expansion = f'${k}'
                 if expansion in newname:
                     newname = newname.replace(expansion, v)
             card.set_name(newname)
@@ -259,7 +257,7 @@ class CardTool:
         if dest is not None:
             destination_list = list_choices[dest]
             card.change_list(destination_list.id)
-            print('Moved to {0}'.format(destination_list.name))
+            print(f'Moved to {destination_list.name}')
             return destination_list
         else:
             print('Skipping!')
@@ -303,7 +301,7 @@ class BoardTool:
             try:
                 return re.search(title_regex, card.name, regex_flags)
             except re.error as e:
-                click.secho('Invalid regular expression "{1}" passed: {0}'.format(str(e), title_regex), fg='red')
+                click.secho(f'Invalid regular expression "{title_regex}" passed: {str(e)}', fg='red')
                 raise GTDException(1)
 
         # boolean queries about whether the card has things
