@@ -145,7 +145,7 @@ class CLIContext:
         list_name = prompt(
             f'gtd.py > move > {board_name} > list name? ', completer=FuzzyWordCompleter(name_to_listid.keys()),
         )
-        card.change_list(name_to_listid[list_name])
+        card.change_board(board_id, list_id=name_to_listid[list_name])
         click.secho(f'Changed list to {list_name} on {board_name}', fg='green')
 
 
