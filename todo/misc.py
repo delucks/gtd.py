@@ -19,6 +19,7 @@ def return_on_eof(func):
             func(*args, **kwargs)
         except EOFError:
             return
+
     return wrapper
 
 
@@ -46,7 +47,7 @@ def get_title_of_webpage(url):
         if 'text/html' not in resp.headers.get('Content-Type', ''):
             return None
         as_text = resp.text
-        return as_text[as_text.find('<title>') + 7: as_text.find('</title>')]
+        return as_text[as_text.find('<title>') + 7 : as_text.find('</title>')]
     except requests.exceptions.ConnectionError:
         return None
 

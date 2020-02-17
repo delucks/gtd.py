@@ -61,9 +61,7 @@ class CLIContext:
                     for url in [a.url for a in card.get_attachments() if a.url is not None]:
                         webbrowser.open(url)
         if re.search(VALID_URL_REGEX, card.name):
-            if prompt_for_confirmation(
-                f'{on}Link in title detected, want to attach it & rename?{off}', True
-            ):
+            if prompt_for_confirmation(f'{on}Link in title detected, want to attach it & rename?{off}', True):
                 CardTool.title_to_link(card)
         if self.config.prompt_for_untagged_cards and not card.labels:
             print(f'{on}No tags on this card yet, want to add some?{off}')
@@ -135,24 +133,17 @@ class CLIContext:
                 else:
                     click.secho('Change the text & save to post the comment', fg='red')
             else:
-                print(
-                    f'{on}{user_input}{off} is not a command, type "{on}help{off}" to view available commands'
-                )
+                print(f'{on}{user_input}{off} is not a command, type "{on}help{off}" to view available commands')
 
     @return_on_eof
     def move_between_boards(self, card: trello.Card) -> None:
         boards_by_name = self.connection.boards_by_name()
-        board_name = prompt(
-            'gtd.py > move > board name? ', completer=FuzzyWordCompleter(boards_by_name.keys())
-        )
+        board_name = prompt('gtd.py > move > board name? ', completer=FuzzyWordCompleter(boards_by_name.keys()))
         board_id = boards_by_name[board_name]['id']
-        lists_json = self.connection.trello.fetch_json(
-            f'/boards/{board_id}/lists?cards=none&filter=open&fields=name'
-        )
+        lists_json = self.connection.trello.fetch_json(f'/boards/{board_id}/lists?cards=none&filter=open&fields=name')
         name_to_listid = {l['name']: l['id'] for l in lists_json}
         list_name = prompt(
-            f'gtd.py > move > {board_name} > list name? ',
-            completer=FuzzyWordCompleter(name_to_listid.keys()),
+            f'gtd.py > move > {board_name} > list name? ', completer=FuzzyWordCompleter(name_to_listid.keys()),
         )
         card.change_list(name_to_listid[list_name])
         click.secho(f'Changed list to {list_name} on {board_name}', fg='green')
@@ -317,7 +308,9 @@ def onboard(no_open, output_path=None):
     '''Step 2: Redirect to the provider. Since this is a CLI script we do not
     redirect. In a web application you would redirect the user to the URL
     below.'''
-    user_confirmation_url = f'{authorize_url}?oauth_token={resource_owner_key}&scope=read,write&expiration=never&name=gtd.py'
+    user_confirmation_url = (
+        f'{authorize_url}?oauth_token={resource_owner_key}&scope=read,write&expiration=never&name=gtd.py'
+    )
     click.echo('Visit the following URL in your web browser to authorize gtd.py to access your account:')
     click.echo('  ' + user_confirmation_url)
     if not no_open:

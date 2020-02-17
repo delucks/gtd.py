@@ -129,14 +129,10 @@ class CardTool:
             if userinput == 'ls':
                 triple_column_print(label_choices.keys())
             elif userinput not in label_choices.keys():
-                if prompt_for_confirmation(
-                    f'Unrecognized tag name {userinput}, would you like to create it?', False
-                ):
+                if prompt_for_confirmation(f'Unrecognized tag name {userinput}, would you like to create it?', False):
                     label = card.board.add_label(userinput, 'black')
                     card.add_label(label)
-                    click.echo(
-                        f'Successfully added tag {label.name} to board {card.board.name} and card {card.name}!'
-                    )
+                    click.echo(f'Successfully added tag {label.name} to board {card.board.name} and card {card.name}!')
                     label_choices = BoardTool.label_lookup(card.board)
                     label_completer = FuzzyWordCompleter(label_choices.keys())
             else:
