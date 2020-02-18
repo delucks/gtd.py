@@ -80,8 +80,6 @@ def single_select(options):
     result = lookup.get(getch(), None)
     if result is not None:
         return list(options)[int(result)]
-    else:
-        return None
 
 
 def apply_tags_to_card(card, tags):
@@ -255,9 +253,6 @@ class CardTool:
             card.change_list(destination_list.id)
             print(f'Moved to {destination_list.name}')
             return destination_list
-        else:
-            print('Skipping!')
-            return None
 
     @staticmethod
     def change_description(card):
