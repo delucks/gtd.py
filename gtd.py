@@ -3,6 +3,7 @@
 import re
 import os
 import sys
+import json
 import shutil
 import readline  # noqa
 import webbrowser
@@ -17,10 +18,18 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter
 
-from todo.input import prompt_for_confirmation, BoardTool, CardTool
+from todo.input import prompt_for_confirmation, CardView, CardTool
 from todo.display import Display
 from todo.exceptions import GTDException
-from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner, VALID_URL_REGEX, return_on_eof, build_name_lookup
+from todo.misc import (
+    Colors,
+    DevNullRedirect,
+    WORKFLOW_TEXT,
+    get_banner,
+    VALID_URL_REGEX,
+    return_on_eof,
+    build_name_lookup,
+)
 from todo.configuration import Configuration
 from todo import __version__
 from todo.connection import TrelloConnection
@@ -177,7 +186,7 @@ def sorting_fields_command(f):
 def card_filtering_command(f):
     '''Add common options to a click function that will filter Trello cards'''
     f = click.option('-t', '--tags', default=None, help='Filter cards by this comma-separated list of tag names')(f)
-    f = click.option('--no-tags', is_flag=True, default=False, help='Only show cards which have no tags')(f)
+    f = click.option('--no-tags', is_flag=True, default=None, help='Only show cards which have no tags')(f)
     f = click.option('-m', '--match', help='Filter cards to this regex on their title', default=None)(f)
     f = click.option('-l', '--listname', help='Only show cards from this list', default=None)(f)
     f = click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)(f)
@@ -186,7 +195,7 @@ def card_filtering_command(f):
 
 
 def json_option(f):
-    return click.option('-j', '--json', is_flag=True, default=False, help='Output as JSON')(f)
+    return click.option('-j', '--json', 'use_json', is_flag=True, default=False, help='Output as JSON')(f)
 
 
 def tsv_option(f):
@@ -377,17 +386,17 @@ def show():
 @click.option('--by', default='activity', help='Choose field to sort (when not using json output)')
 @click.option('-a', '--show-all', is_flag=True, default=False, help='Show closed boards')
 @pass_context
-def show_boards(ctx, json, tsv, by, show_all):
+def show_boards(ctx, use_json, tsv, by, show_all):
     '''Show all boards your account can access'''
-    if not json:
-        ctx.display.banner()
     if show_all:
         boards = ctx.connection.trello.fetch_json('/members/me/boards/?filter=all')
     else:
         boards = ctx.connection.boards
-    if json:
-        ctx.display.show_raw(boards, use_json=json)
+    if use_json:
+        print(json.dumps(boards, sort_keys=True, indent=2))
         return
+    else:
+        ctx.display.banner()
     # Set up a table to hold our boards
     board_columns = ['name', 'activity', 'members', 'permission', 'url']
     if by not in board_columns:
@@ -421,34 +430,39 @@ def show_boards(ctx, json, tsv, by, show_all):
 @json_option
 @click.option('-a', '--show-all', is_flag=True, default=False, help='Show open & archived lists')
 @pass_context
-def show_lists(ctx, json, show_all):
+def show_lists(ctx, use_json, show_all):
     '''Display all lists on this board'''
-    if not json:
+    if not use_json:
         ctx.display.banner()
     list_filter = 'all' if show_all else 'open'
     list_names = [l.name for l in ctx.board.get_lists(list_filter)]
-    ctx.display.show_raw(list_names, use_json=json)
+    ctx.display.show_raw(list_names, use_json=use_json)
 
 
 @show.command('tags')
 @json_option
 @click.option('-l', '--listname', default=None, help='Only show the tags present on this list')
 @pass_context
-def show_tags(ctx, json, listname):
+def show_tags(ctx, use_json, listname):
     '''Display all tags on this board'''
-    if not json:
+    if not use_json:
         ctx.display.banner()
     if listname:
         # Assemble a set of all tags on each card
         tags = set()
-        cardsource = BoardTool.take_cards_from_lists(ctx.board, listname)
-        for card in cardsource:
-            if card.labels:
-                tags.update([l.name for l in card.labels])
+        lists_json = ctx.connection.trello.fetch_json(
+            f'/boards/{ctx.board.id}/lists',
+            query_params={'filter': 'open', 'fields': 'id,name', 'cards': 'open', 'card_fields': 'labels'},
+        )
+        for list_obj in lists_json:
+            if re.search(listname, list_obj['name']):
+                for card in list_obj['cards']:
+                    for label in card['labels']:
+                        tags.add(label['name'])
         tag_names = list(tags)
     else:
         tag_names = [t.name for t in ctx.board.get_labels()]
-    ctx.display.show_raw(tag_names, use_json=json)
+    ctx.display.show_raw(tag_names, use_json=use_json)
 
 
 @show.command('cards')
@@ -457,17 +471,17 @@ def show_tags(ctx, json, listname):
 @tsv_option
 @sorting_fields_command
 @pass_context
-def show_cards(ctx, json, tsv, tags, no_tags, match, listname, attachments, has_due, by, fields):
+def show_cards(ctx, use_json, tsv, tags, no_tags, match, listname, attachments, has_due, by, fields):
     '''Display cards
     The show command prints a table of all the cards with fields that will fit on the terminal you're using.
     You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
     This command along with the batch & review commands share a flexible argument scheme for getting card information.
     Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
     '''
-    if not json:
+    if not use_json:
         ctx.display.banner()
-    cards = BoardTool.filter_cards(
-        ctx.board,
+    cards = CardView.create(
+        ctx,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -475,18 +489,18 @@ def show_cards(ctx, json, tsv, tags, no_tags, match, listname, attachments, has_
         has_attachments=attachments,
         has_due_date=has_due,
     )
-    ctx.display.show_cards(cards, use_json=json, tsv=tsv, sort=by, table_fields=fields)
+    ctx.display.show_cards(cards, use_json=use_json, tsv=tsv, sort=by, table_fields=fields)
 
 
 @show.command('soon')
 @json_option
 @tsv_option
 @pass_context
-def show_soon(ctx, json, tsv):
-    if not json:
+def show_soon(ctx, use_json, tsv):
+    if not use_json:
         ctx.display.banner()
-    cards = BoardTool.filter_cards(ctx.board, has_due_date=True)
-    ctx.display.show_cards(cards, use_json=json, tsv=tsv, sort='due')
+    cards = CardView.create(ctx, has_due_date=True)
+    ctx.display.show_cards(cards, use_json=use_json, tsv=tsv, sort='due')
 
 
 # show }}}
@@ -538,8 +552,8 @@ def delete_cards(ctx, force, noninteractive, tags, no_tags, match, listname, att
     '''Delete a set of cards specified
     '''
     ctx.display.banner()
-    cards = BoardTool.filter_cards(
-        ctx.board,
+    cards = CardView.create(
+        ctx,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -644,7 +658,7 @@ def add_board(ctx, boardname):
 @sorting_fields_command
 @json_option
 @pass_context
-def grep(ctx, pattern, insensitive, count, regexp, by, fields, json):
+def grep(ctx, pattern, insensitive, count, regexp, by, fields, use_json):
     '''egrep through titles of cards on this board. This command attemps to replicate a couple of grep flags
     faithfully, so if you're a power-user of grep this command will feel familiar.
     One deviation from grep is the --json flag, which outputs all matching cards in full JSON format.
@@ -659,13 +673,13 @@ def grep(ctx, pattern, insensitive, count, regexp, by, fields, json):
     elif pattern:
         final_pattern = pattern
     flags = re.I if insensitive else 0
-    cards = BoardTool.filter_cards(ctx.board, title_regex=final_pattern, regex_flags=flags)
+    cards = CardView.create(ctx, title_regex=final_pattern, regex_flags=flags)
     if count:
         print(sum(1 for _ in cards))
         return
-    if not json:
+    if not use_json:
         ctx.display.banner()
-    ctx.display.show_cards(cards, use_json=json, sort=by, table_fields=fields)
+    ctx.display.show_cards(cards, use_json=use_json, sort=by, table_fields=fields)
 
 
 # add }}}
@@ -685,8 +699,8 @@ def batch():
 @pass_context
 def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Change the list of each card selected'''
-    cards = BoardTool.filter_cards(
-        ctx.board,
+    cards = CardView.create(
+        ctx,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -706,8 +720,8 @@ def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
 @pass_context
 def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Change tags on each card selected'''
-    cards = BoardTool.filter_cards(
-        ctx.board,
+    cards = CardView.create(
+        ctx,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -726,8 +740,8 @@ def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
 @pass_context
 def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''Set due date for all cards selected'''
-    cards = BoardTool.filter_cards(
-        ctx.board,
+    cards = CardView.create(
+        ctx,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -746,7 +760,7 @@ def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due):
 @pass_context
 def batch_attach(ctx):
     '''Extract HTTP links from card titles'''
-    cards = BoardTool.filter_cards(ctx.board, title_regex=VALID_URL_REGEX)
+    cards = CardView.create(ctx, title_regex=VALID_URL_REGEX)
     ctx.display.banner()
     for card in cards:
         ctx.display.show_card(card)
@@ -767,11 +781,11 @@ def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
     of cards which have a link in the title, and gives you all the other functionality combined.
     '''
     if by_due:
-        cards = BoardTool.filter_cards(ctx.board, has_due_date=True)
+        cards = CardView.create(ctx, has_due_date=True)
         cards = sorted(cards, key=lambda c: c.due)
     else:
-        cards = BoardTool.filter_cards(
-            ctx.board,
+        cards = CardView.create(
+            ctx,
             tags=tags,
             no_tags=no_tags,
             title_regex=match,

@@ -82,17 +82,6 @@ def single_select(options):
         return list(options)[int(result)]
 
 
-def apply_tags_to_card(card, tags):
-    '''Take in a comma-sep list of tag names, and ensure that
-    each is on this card'''
-    if card.labels:
-        user_tags = set(tags.split(','))
-        card_tags = set([l.name for l in card.labels])
-        return user_tags.issubset(card_tags)
-    else:
-        return False
-
-
 def triple_column_print(iterable):
     chunk_count = 3
     max_width = shutil.get_terminal_size().columns
@@ -261,7 +250,26 @@ class CardTool:
         return new_desc
 
 
-class BoardTool:
+def search_for_regex(card, title_regex, regex_flags):
+    try:
+        return re.search(title_regex, card['name'], regex_flags)
+    except re.error as e:
+        click.secho(f'Invalid regular expression "{title_regex}" passed: {str(e)}', fg='red')
+        raise GTDException(1)
+
+
+def check_for_label_presence(card, tags):
+    '''Take in a comma-sep list of tag names, and ensure that
+    each is on this card'''
+    if card['idLabels']:
+        user_tags = set(tags.split(','))
+        card_tags = set(card['_labels'])
+        return user_tags.issubset(card_tags)
+    else:
+        return False
+
+
+class CardView:
     '''CardView presents an interface to a stateful set of cards selected by the user, allowing the user
     to navigate back and forth between them, delete them from the list, etc.
     CardView also translates filtering options from the CLI into parameters to request from Trello, or
@@ -271,75 +279,85 @@ class BoardTool:
         Be light on resources. Store a list of IDs and only create Card objects when they are viewed for the first time.
         Minimize network calls.
         Simplify the API for a command to iterate over a set of selected cards
-
-    Usage:
-      1 BoardTool.create_card_filters
-      2 BoardTool.take_cards_from_lists
-     10 BoardTool.filter_cards
     '''
 
-    @staticmethod
-    def take_cards_from_lists(board, list_regex):
-        pattern = re.compile(list_regex, flags=re.I)
-        target_lists = filter(lambda x: pattern.search(x.name), board.get_lists('open'))
-        for cardlist in target_lists:
-            for card in cardlist.list_cards():
-                yield card
+    def __init__(self, context, cards_json):
+        self.context = context
+        self.cards_json = cards_json
+        self.position = 0
 
-    @staticmethod
-    def create_card_filters(**kwargs):
-        '''takes in arguments that relate to how cards should be filtered, and outputs
-        a number of callables that are used in filtering an iterable of cards
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        '''This bridges the class into an iterator that acts equivalently to the current "for card in cardsource" type of usage
+        It should be replaced with a more elegant way of moving through the cards
         '''
-        # Regular expression on trello.Card.name
-        title_regex = kwargs.get('title_regex', None)
-        regex_flags = kwargs.get('regex_flags', 0)
-
-        def search_for_regex(card):
-            try:
-                return re.search(title_regex, card.name, regex_flags)
-            except re.error as e:
-                click.secho(f'Invalid regular expression "{title_regex}" passed: {str(e)}', fg='red')
-                raise GTDException(1)
-
-        # boolean queries about whether the card has things
-        has_attachments = kwargs.get('has_attachments', None)
-        no_tags = kwargs.get('no_tags', False)
-        has_due_date = kwargs.get('has_due_date', None)
-        # comma-separated string of tags to filter on
-        tags = kwargs.get('tags', None)
-        # custom user-supplied callable functions to filter a card on
-        filter_funcs = kwargs.get('filter_funcs', None)
-        # Parse arguments into callables
-        filters = []
-        if tags:
-            filters.append(partial(apply_tags_to_card, tags=tags))
-        if no_tags:
-            filters.append(lambda c: not c.labels)
-        if title_regex:
-            filters.append(search_for_regex)
-        if filter_funcs:
-            if callable(filter_funcs):
-                filters.append(filter_funcs)
-            elif type(filter_funcs) is list and all(callable(x) for x in filter_funcs):
-                filters.extend(filter_funcs)
-        if has_attachments is not None:
-            filters.append(lambda c: c.get_attachments())
-        if has_due_date:
-            filters.append(lambda c: c.due_date)
-        return filters
-
-    # This needs to be replaced with a stateful "card view" that allows referencing earlier
-    # cards in the list and reloading the labels/lists when things are added or modified
-    @staticmethod
-    def filter_cards(board, **kwargs):
-        list_regex = kwargs.get('list_regex', None)
-        filters = BoardTool.create_card_filters(**kwargs)
-        # create a generator of cards to filter
-        if list_regex is not None:
-            cardsource = BoardTool.take_cards_from_lists(board, list_regex)
+        if self.position < len(self.cards_json):
+            card = trello.Card.from_json(self.context.board, self.cards_json[self.position])
+            self.position += 1
+            return card
         else:
-            cardsource = board.get_cards('open')
-        for card in cardsource:
-            if all(x(card) for x in filters):
-                yield card
+            raise StopIteration
+
+    @staticmethod
+    def create(context, **kwargs):
+        '''Create a new CardView with the given filters on the cards to find.
+        '''
+        # Establish all base filters for cards nested resource query parameters.
+        query_params = {}
+        regex_flags = kwargs.get('regex_flags', 0)
+        # Card status: open/closed/archived/all
+        if (status := kwargs.get('status', None)) is not None:  # noqa
+            valid_filters = ['all', 'closed', 'open', 'visible']
+            if status not in valid_filters:
+                click.secho(f'Card filter {status} is not valid! Use one of {",".join(valid_filters)}')
+                raise GTDException(1)
+            query_params['cards'] = status
+        # TODO common field selection? Might be able to avoid ones that we don't use at all
+        target_cards = []
+        if (list_regex := kwargs.get('list_regex', None)) is not None:  # noqa
+            # Are lists passed? If so, query to find out the list IDs corresponding to the names we have
+            target_list_ids = []
+            lists_json = context.connection.trello.fetch_json(
+                f'/boards/{context.board.id}/lists',
+                query_params={'cards': 'none', 'filter': 'open', 'fields': 'id,name'},
+            )
+            pattern = re.compile(list_regex, flags=regex_flags)
+            for list_object in lists_json:
+                if pattern.search(list_object['name']):
+                    target_list_ids.append(list_object['id'])
+            # Iteratively pull IDs from each list, passing the common parameters to them
+            for list_id in target_list_ids:
+                cards_json = context.connection.trello.fetch_json(f'/lists/{list_id}/cards', query_params=query_params)
+                target_cards.extend(cards_json)
+        else:
+            # If no lists are passed, call the board's card resource
+            cards_json = context.connection.trello.fetch_json(
+                f'/boards/{context.board.id}/cards', query_params=query_params
+            )
+            target_cards.extend(cards_json)
+
+        # Post-process the returned JSON, filtering down to the other passed parameters
+        filters = []
+        post_processed_cards = []
+        # Regular expression on trello.Card.name
+        if (title_regex := kwargs.get('title_regex', None)) is not None:  # noqa
+            filters.append(partial(search_for_regex, title_regex=title_regex, regex_flags=regex_flags))
+        # boolean queries about whether the card has things
+        if (has_attachments := kwargs.get('has_attachments', None)) is not None:  # noqa
+            filters.append(lambda c: c['badges']['attachments'] > 0)
+        if (no_tags := kwargs.get('no_tags', None)) is not None:  # noqa
+            filters.append(lambda c: not c['idLabels'])
+        if (has_due_date := kwargs.get('has_due_date', None)) is not None:  # noqa
+            filters.append(lambda c: c['due'])
+        # comma-separated string of tags to filter on
+        if (tags := kwargs.get('tags', None)) is not None:  # noqa
+            filters.append(partial(check_for_label_presence, tags=tags))
+
+        for card in target_cards:
+            if all(filter_func(card) for filter_func in filters):
+                post_processed_cards.append(card)
+
+        # Create a CardView with those objects as the base
+        return CardView(context=context, cards_json=post_processed_cards)
