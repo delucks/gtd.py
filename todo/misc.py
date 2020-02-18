@@ -23,6 +23,13 @@ def return_on_eof(func):
     return wrapper
 
 
+def build_name_lookup(sequence):
+    '''Creates a mapping between each object's name in "sequence" and
+    the object itself. Useful for selecting label or list objects.
+    '''
+    return {o.name: o for o in sequence}
+
+
 class Colors:
     esc = '\033'
     black = esc + '[0;30m'

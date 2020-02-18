@@ -16,7 +16,7 @@ from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
-from todo.misc import get_title_of_webpage, Colors, DevNullRedirect, VALID_URL_REGEX, return_on_eof
+from todo.misc import get_title_of_webpage, DevNullRedirect, VALID_URL_REGEX, return_on_eof, build_name_lookup
 from todo.exceptions import GTDException
 
 
@@ -110,7 +110,7 @@ class CardTool:
 
     @staticmethod
     @return_on_eof
-    def add_labels(card, label_choices=None):
+    def add_labels(card, label_choices):
         '''Give the user a way to toggle labels on this card by their
         name rather than by a numeric selection interface. Using
         prompt_toolkit, we have automatic completion which makes
@@ -120,7 +120,6 @@ class CardTool:
         :param dict label_choices: str->trello.Label, the names and objects of labels on this board
         '''
         print('Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Ctrl+D to exit')
-        label_choices = label_choices or BoardTool.label_lookup(card.board)
         label_completer = FuzzyWordCompleter(label_choices.keys())
         while True:
             userinput = prompt('gtd.py > tag > ', completer=label_completer).strip()
@@ -131,7 +130,7 @@ class CardTool:
                     label = card.board.add_label(userinput, 'black')
                     card.add_label(label)
                     click.echo(f'Successfully added tag {label.name} to board {card.board.name} and card {card.name}!')
-                    label_choices = BoardTool.label_lookup(card.board)
+                    label_choices = build_name_lookup(card.board.get_labels(limit=200))
                     label_completer = FuzzyWordCompleter(label_choices.keys())
             else:
                 label_obj = label_choices[userinput]
@@ -241,12 +240,11 @@ class CardTool:
         return result
 
     @staticmethod
-    def move_to_list(card, list_choices=None):
+    def move_to_list(card, list_choices):
         '''Select labels to add to this card
         :param trello.Card card: the card to modify
         :param dict list_choices: str->trello.List, the names and objects of lists on this board
         '''
-        list_choices = list_choices or BoardTool.list_lookup(card.board)
         dest = single_select(sorted(list_choices.keys()))
         if dest is not None:
             destination_list = list_choices[dest]
@@ -264,11 +262,20 @@ class CardTool:
 
 
 class BoardTool:
-    '''modeled after the last successful static class rewrite, this one will
-    take in a top-level API connection (trello.Trello) with just about every method
-    and return something useful to the program, like an iterable of cards or something else
-    this should replace the existing BoardTool class and the init_and_filter method, which is really just
-    doing some boilerplate that can be handled in this class
+    '''CardView presents an interface to a stateful set of cards selected by the user, allowing the user
+    to navigate back and forth between them, delete them from the list, etc.
+    CardView also translates filtering options from the CLI into parameters to request from Trello, or
+    filters to post-process the list of cards coming in.
+
+    Goals:
+        Be light on resources. Store a list of IDs and only create Card objects when they are viewed for the first time.
+        Minimize network calls.
+        Simplify the API for a command to iterate over a set of selected cards
+
+    Usage:
+      1 BoardTool.create_card_filters
+      2 BoardTool.take_cards_from_lists
+     10 BoardTool.filter_cards
     '''
 
     @staticmethod
@@ -336,11 +343,3 @@ class BoardTool:
         for card in cardsource:
             if all(x(card) for x in filters):
                 yield card
-
-    @staticmethod
-    def list_lookup(board):
-        return {o.name: o for o in board.get_lists('open')}
-
-    @staticmethod
-    def label_lookup(board):
-        return {o.name: o for o in board.get_labels(limit=1000)}

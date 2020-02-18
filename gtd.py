@@ -20,7 +20,7 @@ from prompt_toolkit.completion import FuzzyWordCompleter
 from todo.input import prompt_for_confirmation, BoardTool, CardTool
 from todo.display import Display
 from todo.exceptions import GTDException
-from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner, VALID_URL_REGEX, return_on_eof
+from todo.misc import Colors, DevNullRedirect, WORKFLOW_TEXT, get_banner, VALID_URL_REGEX, return_on_eof, build_name_lookup
 from todo.configuration import Configuration
 from todo import __version__
 from todo.connection import TrelloConnection
@@ -40,9 +40,10 @@ class CLIContext:
         self.config = config
         self.connection = TrelloConnection(config)
         self.display = Display(config)
+        self.board = self.connection.main_board()
         # Cached state for card_repl
-        self._list_choices = BoardTool.list_lookup(self.connection.main_board())
-        self._label_choices = BoardTool.label_lookup(self.connection.main_board())
+        self._list_choices = build_name_lookup(self.connection.main_board().get_lists('open'))
+        self._label_choices = build_name_lookup(self.connection.main_board().get_labels(limit=200))
 
     def card_repl(self, card: trello.Card):
         '''card_repl is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
@@ -422,11 +423,10 @@ def show_boards(ctx, json, tsv, by, show_all):
 @pass_context
 def show_lists(ctx, json, show_all):
     '''Display all lists on this board'''
-    board = ctx.connection.main_board()
     if not json:
         ctx.display.banner()
     list_filter = 'all' if show_all else 'open'
-    list_names = [l.name for l in board.get_lists(list_filter)]
+    list_names = [l.name for l in ctx.board.get_lists(list_filter)]
     ctx.display.show_raw(list_names, use_json=json)
 
 
@@ -436,19 +436,18 @@ def show_lists(ctx, json, show_all):
 @pass_context
 def show_tags(ctx, json, listname):
     '''Display all tags on this board'''
-    board = ctx.connection.main_board()
     if not json:
         ctx.display.banner()
     if listname:
         # Assemble a set of all tags on each card
         tags = set()
-        cardsource = BoardTool.take_cards_from_lists(board, listname)
+        cardsource = BoardTool.take_cards_from_lists(ctx.board, listname)
         for card in cardsource:
             if card.labels:
                 tags.update([l.name for l in card.labels])
         tag_names = list(tags)
     else:
-        tag_names = [t.name for t in board.get_labels()]
+        tag_names = [t.name for t in ctx.board.get_labels()]
     ctx.display.show_raw(tag_names, use_json=json)
 
 
@@ -465,11 +464,10 @@ def show_cards(ctx, json, tsv, tags, no_tags, match, listname, attachments, has_
     This command along with the batch & review commands share a flexible argument scheme for getting card information.
     Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
     '''
-    board = ctx.connection.main_board()
     if not json:
         ctx.display.banner()
     cards = BoardTool.filter_cards(
-        board,
+        ctx.board,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -485,10 +483,9 @@ def show_cards(ctx, json, tsv, tags, no_tags, match, listname, attachments, has_
 @tsv_option
 @pass_context
 def show_soon(ctx, json, tsv):
-    board = ctx.connection.main_board()
     if not json:
         ctx.display.banner()
-    cards = BoardTool.filter_cards(board, has_due_date=True)
+    cards = BoardTool.filter_cards(ctx.board, has_due_date=True)
     ctx.display.show_cards(cards, use_json=json, tsv=tsv, sort='due')
 
 
@@ -508,8 +505,7 @@ def delete():
 @pass_context
 def delete_list(ctx, name, noninteractive):
     '''Delete a list by name'''
-    board = ctx.connection.main_board()
-    lists = [l for l in board.get_lists('open') if l.name == name]
+    lists = [l for l in ctx.board.get_lists('open') if l.name == name]
     if not lists:
         click.secho(f'No such list {name}', fg='red')
     for l in lists:
@@ -524,13 +520,12 @@ def delete_list(ctx, name, noninteractive):
 @pass_context
 def delete_tag(ctx, name, noninteractive):
     '''Delete a tag by name'''
-    board = ctx.connection.main_board()
-    tags = [l for l in board.get_labels() if l.name == name]
+    tags = [l for l in ctx.board.get_labels() if l.name == name]
     if not tags:
         click.secho(f'No such tag {name}', fg='red')
     for t in tags:
         if noninteractive or prompt_for_confirmation(f'Delete tag "{t.name}"?'):
-            board.delete_label(t.id)
+            ctx.board.delete_label(t.id)
             click.secho(f'Deleted {t.name}!', fg='green')
 
 
@@ -542,10 +537,9 @@ def delete_tag(ctx, name, noninteractive):
 def delete_cards(ctx, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
     '''Delete a set of cards specified
     '''
-    board = ctx.connection.main_board()
     ctx.display.banner()
     cards = BoardTool.filter_cards(
-        board,
+        ctx.board,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -589,12 +583,11 @@ def add():
 def add_card(ctx, title, message, edit, listname):
     '''Add a new card. If no title is provided, $EDITOR will be opened so you can write one.'''
     connection = ctx.connection
-    board = connection.main_board()
     if listname is None:
         inbox = connection.inbox_list()
     else:
         pattern = re.compile(listname, flags=re.I)
-        target_lists = filter(lambda x: pattern.search(x.name), board.get_lists('open'))
+        target_lists = filter(lambda x: pattern.search(x.name), ctx.board.get_lists('open'))
         try:
             inbox = next(target_lists)
         except StopIteration:
@@ -620,8 +613,7 @@ def add_card(ctx, title, message, edit, listname):
 @pass_context
 def add_tag(ctx, tagname, color):
     '''Add a new tag'''
-    board = ctx.connection.main_board()
-    label = board.add_label(tagname, color)
+    label = ctx.board.add_label(tagname, color)
     click.secho(f'Created tag "{label.name}"', color='green')
 
 
@@ -630,8 +622,7 @@ def add_tag(ctx, tagname, color):
 @pass_context
 def add_list(ctx, listname):
     '''Add a new list'''
-    board = ctx.connection.main_board()
-    new_list = board.add_list(listname)
+    new_list = ctx.board.add_list(listname)
     click.secho(f'Created list "{new_list}"', color='green')
 
 
@@ -668,8 +659,7 @@ def grep(ctx, pattern, insensitive, count, regexp, by, fields, json):
     elif pattern:
         final_pattern = pattern
     flags = re.I if insensitive else 0
-    board = ctx.connection.main_board()
-    cards = BoardTool.filter_cards(board, title_regex=final_pattern, regex_flags=flags)
+    cards = BoardTool.filter_cards(ctx.board, title_regex=final_pattern, regex_flags=flags)
     if count:
         print(sum(1 for _ in cards))
         return
@@ -708,7 +698,7 @@ def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
     for card in cards:
         ctx.display.show_card(card)
         if prompt_for_confirmation('Want to move this one?', True):
-            CardTool.move_to_list(card)
+            CardTool.move_to_list(card, ctx._list_choices)
 
 
 @batch.command('tag')
@@ -728,7 +718,7 @@ def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
     ctx.display.banner()
     for card in cards:
         ctx.display.show_card(card)
-        CardTool.add_labels(card)
+        CardTool.add_labels(card, ctx._label_choices)
 
 
 @batch.command('due')
@@ -776,13 +766,12 @@ def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
     This menu will prompt you to add tags to untagged cards, to attach the title
     of cards which have a link in the title, and gives you all the other functionality combined.
     '''
-    board = ctx.connection.main_board()
     if by_due:
-        cards = BoardTool.filter_cards(board, has_due_date=True)
+        cards = BoardTool.filter_cards(ctx.board, has_due_date=True)
         cards = sorted(cards, key=lambda c: c.due)
     else:
         cards = BoardTool.filter_cards(
-            board,
+            ctx.board,
             tags=tags,
             no_tags=no_tags,
             title_regex=match,
