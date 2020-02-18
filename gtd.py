@@ -478,8 +478,6 @@ def show_cards(ctx, use_json, tsv, tags, no_tags, match, listname, attachments, 
     This command along with the batch & review commands share a flexible argument scheme for getting card information.
     Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
     '''
-    if not use_json:
-        ctx.display.banner()
     cards = CardView.create(
         ctx,
         tags=tags,
@@ -489,7 +487,11 @@ def show_cards(ctx, use_json, tsv, tags, no_tags, match, listname, attachments, 
         has_attachments=attachments,
         has_due_date=has_due,
     )
-    ctx.display.show_cards(cards, use_json=use_json, tsv=tsv, sort=by, table_fields=fields)
+    if use_json:
+        print(cards.json())
+    else:
+        ctx.display.banner()
+        ctx.display.show_cards(cards, tsv=tsv, sort=by, table_fields=fields)
 
 
 @show.command('soon')
@@ -497,10 +499,12 @@ def show_cards(ctx, use_json, tsv, tags, no_tags, match, listname, attachments, 
 @tsv_option
 @pass_context
 def show_soon(ctx, use_json, tsv):
-    if not use_json:
-        ctx.display.banner()
     cards = CardView.create(ctx, has_due_date=True)
-    ctx.display.show_cards(cards, use_json=use_json, tsv=tsv, sort='due')
+    if use_json:
+        print(cards.json())
+    else:
+        ctx.display.banner()
+        ctx.display.show_cards(cards, tsv=tsv, sort='due')
 
 
 # show }}}
@@ -677,9 +681,11 @@ def grep(ctx, pattern, insensitive, count, regexp, by, fields, use_json):
     if count:
         print(sum(1 for _ in cards))
         return
-    if not use_json:
+    if use_json:
+        print(cards.json())
+    else:
         ctx.display.banner()
-    ctx.display.show_cards(cards, use_json=use_json, sort=by, table_fields=fields)
+        ctx.display.show_cards(cards, sort=by, table_fields=fields)
 
 
 # add }}}

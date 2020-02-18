@@ -2,6 +2,7 @@
 import re
 import sys
 import tty
+import json
 import string
 import shutil
 import termios
@@ -281,9 +282,9 @@ class CardView:
         Simplify the API for a command to iterate over a set of selected cards
     '''
 
-    def __init__(self, context, cards_json):
+    def __init__(self, context, cards):
         self.context = context
-        self.cards_json = cards_json
+        self.cards = cards
         self.position = 0
 
     def __iter__(self):
@@ -293,12 +294,15 @@ class CardView:
         '''This bridges the class into an iterator that acts equivalently to the current "for card in cardsource" type of usage
         It should be replaced with a more elegant way of moving through the cards
         '''
-        if self.position < len(self.cards_json):
-            card = trello.Card.from_json(self.context.board, self.cards_json[self.position])
+        if self.position < len(self.cards):
+            card = trello.Card.from_json(self.context.board, self.cards[self.position])
             self.position += 1
             return card
         else:
             raise StopIteration
+
+    def json(self):
+        return json.dumps(self.cards, sort_keys=True, indent=2)
 
     @staticmethod
     def create(context, **kwargs):
@@ -315,6 +319,7 @@ class CardView:
                 raise GTDException(1)
             query_params['cards'] = status
         # TODO common field selection? Might be able to avoid ones that we don't use at all
+        # query_params['fields'] = 'all'
         target_cards = []
         if (list_regex := kwargs.get('list_regex', None)) is not None:  # noqa
             # Are lists passed? If so, query to find out the list IDs corresponding to the names we have
@@ -360,4 +365,4 @@ class CardView:
                 post_processed_cards.append(card)
 
         # Create a CardView with those objects as the base
-        return CardView(context=context, cards_json=post_processed_cards)
+        return CardView(context=context, cards=post_processed_cards)

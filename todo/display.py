@@ -101,7 +101,7 @@ class Display:
         else:
             return for_json
 
-    def show_cards(self, cards, use_json=False, tsv=False, sort='activity', table_fields=[]):
+    def show_cards(self, cards, tsv=False, sort='activity', table_fields=[]):
         '''Display an iterable of cards all at once.
         Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
         Supports the following cli commands:
@@ -109,37 +109,31 @@ class Display:
             grep
 
         :param list(trello.Card)|iterable(trello.Card) cards: cards to show
-        :param bool use_json: display all metadata of these cards in JSON format
         :param bool tsv: display these cards using a tab-separated value format
         :param str sort: the field name to sort by (must be a valid field name in this table)
         :param list table_fields: display only these fields
         '''
-        if use_json:
-            sanitized_cards = list(map(lambda d: d.pop('client') and d, [c.__dict__.copy() for c in cards]))
-            tostr = self._force_json(sanitized_cards)
-            print(json.dumps(tostr, sort_keys=True, indent=2))
+        # TODO construct the table dynamically instead of filtering down an already-constructed table
+        # TODO implement a custom sorting functions so the table can be sorted by multiple columns
+        table = prettytable.PrettyTable()
+        table.field_names = self.fields.keys()
+        table.align = 'l'
+        if tsv:
+            table.set_style(prettytable.PLAIN_COLUMNS)
         else:
-            # TODO construct the table dynamically instead of filtering down an already-constructed table
-            # TODO implement a custom sorting functions so the table can be sorted by multiple columns
-            table = prettytable.PrettyTable()
-            table.field_names = self.fields.keys()
-            table.align = 'l'
-            if tsv:
-                table.set_style(prettytable.PLAIN_COLUMNS)
-            else:
-                table.hrules = prettytable.FRAME
-            with click.progressbar(list(cards), label='Fetching cards', width=0) as pg:
-                for card in pg:
-                    table.add_row([x(card) for x in self.fields.values()])
-            try:
-                table[0]
-            except IndexError:
-                click.secho('No cards match!', fg='red')
-                raise GTDException(1)
-            if table_fields:
-                print(table.get_string(fields=table_fields, sortby=sort))
-            else:
-                print(self.resize_and_get_table(table, self.fields.keys(), sort))
+            table.hrules = prettytable.FRAME
+        with click.progressbar(list(cards), label='Fetching cards', width=0) as pg:
+            for card in pg:
+                table.add_row([x(card) for x in self.fields.values()])
+        try:
+            table[0]
+        except IndexError:
+            click.secho('No cards match!', fg='red')
+            raise GTDException(1)
+        if table_fields:
+            print(table.get_string(fields=table_fields, sortby=sort))
+        else:
+            print(self.resize_and_get_table(table, self.fields.keys(), sort))
 
     def resize_and_get_table(self, table, fields, sort):
         '''Remove columns from the table until it fits in your terminal'''
