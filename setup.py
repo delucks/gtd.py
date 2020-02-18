@@ -26,7 +26,7 @@ setup(
             'gtd = gtd:main'
         ]
     },
-    python_requires='>=3',
+    python_requires='>=3.8',
     author='James Luck',
     author_email='me@jamesluck.com',
     license='BSD 3-clause',
