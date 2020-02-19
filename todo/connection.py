@@ -13,8 +13,10 @@ class TrelloConnection:
     def __init__(self, config):
         self.config = config
         self.trello = self.__connect(config)
-        # Used as a singleton to cache the board object when created
+        # Used to cache the board object
         self._main_board = None
+        # and list JSON contents
+        self._main_lists = None
 
     def __connect(self, config):
         trello_client = trello.TrelloClient(
@@ -68,6 +70,22 @@ class TrelloConnection:
         completion, and allowing the boards to be turned into objects quickly with Board.from_json
         '''
         return {b['name']: b for b in self.boards}
+
+    def main_lists(self, status_filter='open'):
+        '''Load the JSON corresponding to all lists on the main board, to ease setup of CardView'''
+        if self._main_lists is None:
+            lists_json = self.trello.fetch_json(
+                f'/boards/{self.main_board().id}/lists',
+                query_params={'cards': 'none', 'filter': status_filter, 'fields': 'id,name'},
+            )
+            self._main_lists = lists_json
+        return self._main_lists
+
+    def lists_by_name(self):
+        '''Return a mapping of list names to IDs on the main board, so that cards can have their
+        lists shown without making a network call to retrieve the list names.
+        '''
+        return {l['name']: l['id'] for l in self.main_lists()}
 
     def inbox_list(self):
         '''use the configuration to get the main board & list from

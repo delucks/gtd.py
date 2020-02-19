@@ -324,10 +324,7 @@ class CardView:
         if (list_regex := kwargs.get('list_regex', None)) is not None:  # noqa
             # Are lists passed? If so, query to find out the list IDs corresponding to the names we have
             target_list_ids = []
-            lists_json = context.connection.trello.fetch_json(
-                f'/boards/{context.board.id}/lists',
-                query_params={'cards': 'none', 'filter': 'open', 'fields': 'id,name'},
-            )
+            lists_json = context.connection.main_lists()
             pattern = re.compile(list_regex, flags=regex_flags)
             for list_object in lists_json:
                 if pattern.search(list_object['name']):
