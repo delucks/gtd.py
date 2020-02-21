@@ -81,11 +81,11 @@ class TrelloConnection:
             self._main_lists = lists_json
         return self._main_lists
 
-    def lists_by_name(self):
+    def lists_by_id(self):
         '''Return a mapping of list names to IDs on the main board, so that cards can have their
         lists shown without making a network call to retrieve the list names.
         '''
-        return {l['name']: l['id'] for l in self.main_lists()}
+        return {l['id']: l['name'] for l in self.main_lists()}
 
     def inbox_list(self):
         '''use the configuration to get the main board & list from

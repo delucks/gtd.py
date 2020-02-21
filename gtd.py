@@ -48,13 +48,13 @@ class CLIContext:
     def __init__(self, config: Configuration):
         self.config = config
         self.connection = TrelloConnection(config)
-        self.display = Display(config)
+        self.display = Display(config, self.connection)
         self.board = self.connection.main_board()
         # Cached state for card_repl
         self._list_choices = build_name_lookup(self.connection.main_board().get_lists('open'))
         self._label_choices = build_name_lookup(self.connection.main_board().get_labels(limit=200))
 
-    def card_repl(self, card: trello.Card):
+    def card_repl(self, card: dict):
         '''card_repl is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
         - Are there attachments? Maybe you want to open them.
         - Does there appear to be a URL in the title? You might want to attach it.

@@ -7,7 +7,8 @@ import click
 import prettytable
 
 from todo.exceptions import GTDException
-from todo.misc import Colors, get_banner
+from todo.input import CardTool
+from todo.misc import Colors, get_banner, mongo_id_to_date
 
 
 class Display:
@@ -23,9 +24,10 @@ class Display:
     - banner should have more ascii art options :D
     '''
 
-    def __init__(self, config, primary_color=Colors.blue):
+    def __init__(self, config, connection, primary_color=Colors.blue):
         # TODO move primary_color into a configuration setting
         self.config = config
+        self.connection = connection
         self.primary = primary_color
         self.fields = Display.build_fields()
 
@@ -149,13 +151,11 @@ class Display:
             possible = table.get_string(fields=list(fset), sortby=sort)
         return possible
 
-    def show_card(self, card):
+    def show_card(self, card: dict):
         '''Display only one card in a format that doesn't take up too much space or depend on external styling.
-        Supports the following cli commands:
-            review
-            batch
 
-        :param trello.Card card: card to display
+        Arguments:
+            card: Full JSON card structure back from the Trello API
         '''
         label_color_correction = {
             'purple': 'magenta',
@@ -166,50 +166,46 @@ class Display:
             # TODO allow this to be overridden
             'black': 'white',
         }
+        date_display_format = '%Y-%m-%d %H:%M:%S'
         on = self.primary if self.config.color else ''
         off = Colors.reset if self.config.color else ''
         indent_print = lambda m, d: print(
             '  {on}{name: <{fill}}{off}{val}'.format(name=m, val=d, fill='14', on=on, off=off)
         )
-        print(f'{on}Card{off} {card.id}')
-        indent_print('Name:', card.name)
-        indent_print('List:', card.get_list().name)
-        if card.labels:
+        print(f'{on}Card{off} {card["id"]}')
+        indent_print('Name:', card['name'])
+        indent_print('List:', self.connection.lists_by_id()[card['idList']])
+        if card['labels']:
             name = 'Tags:'
             click.echo(f'  {on}{name:<14}{off}', nl=False)
-            for l in card.labels:
-                click.secho(l.name + ' ', fg=label_color_correction.get(l.color, l.color) or 'green', nl=False)
+            for l in card['labels']:
+                click.secho(l['name'] + ' ', fg=label_color_correction.get(l['color'], l['color']) or 'green', nl=False)
             print()
-        try:
-            created = card.card_created_date
-            indent_print('Created:', f'{created} ({int(created.timestamp())})')
-            indent_print('Age:', datetime.datetime.now() - created)
-        except IndexError:
-            # this happens when the card is created by the repeating cards trello power-up
-            indent_print('Created:', 'Repeating Creation Date')
-        if card.get_attachments():
+        created = mongo_id_to_date(card['id'])
+        indent_print('Created:', f'{created.strftime(date_display_format)} ({int(created.timestamp())})')
+        indent_print('Age:', datetime.datetime.now() - created)
+        if card['badges']['attachments']:
             indent_print('Attachments:', '')
-            for a in card.get_attachments():
-                print(' ' * 4 + a.name)
-        if card.comments:
+            for a in CardTool.fetch_attachments(card, self.connection):
+                print(' ' * 4 + a['name'])
+        if card['badges']['comments'] > 0:
             indent_print('Comments:', '')
-            for c in card.comments:
+            for c in CardTool.fetch_comments(card, self.connection):
                 print(f"    {c['memberCreator']['username']}: {c['data']['text']}")
-        if card.due:
-            indent_print('Due:', card.due_date)
-            try:
-                diff = card.due_date - datetime.datetime.now(datetime.timezone.utc)
-                if diff < datetime.timedelta(0):
-                    display = Colors.red
-                elif diff < datetime.timedelta(weeks=2):
-                    display = Colors.yellow
-                else:
-                    display = Colors.green
-                indent_print('Remaining:', f'{display if self.config.color else ""}{diff}{off}')
-            except TypeError:
-                # fucking datetime throws exceptions about bullshit
-                pass
-        if card.description:
+        if card['due']:
+            # Why can't python properly parse ISO8601 timestamps? gah
+            due_date_string = card['due'].replace('Z', '+00:00')
+            due = datetime.datetime.fromisoformat(due_date_string)
+            indent_print('Due:', f'{due.strftime(date_display_format)}')
+            diff = due - datetime.datetime.now(datetime.timezone.utc)
+            if diff < datetime.timedelta(0):
+                display = Colors.red
+            elif diff < datetime.timedelta(weeks=2):
+                display = Colors.yellow
+            else:
+                display = Colors.green
+            indent_print('Remaining:', f'{display if self.config.color else ""}{diff}{off}')
+        if card['desc']:
             indent_print('Description', '')
-            for line in card.description.splitlines():
+            for line in card['desc'].splitlines():
                 print(' ' * 4 + line)

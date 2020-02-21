@@ -1,7 +1,6 @@
 import os
 import re
-import requests
-from todo import __version__, __author__
+from datetime import datetime
 
 try:
     from random import choice
@@ -9,8 +8,21 @@ except OSError:
     # Some platforms (cough cough armv7, mips) fail when importing random due to lack of hardware support
     choice = lambda n: n.pop()
 
+import requests
+
+from todo import __version__, __author__
+
 
 VALID_URL_REGEX = re.compile(r'https?://.*\.')
+
+
+def mongo_id_to_date(item_id: str) -> int:
+    '''Trello uses MongoDB ids for the card IDs, which have an embedded timestamp.
+    This function extracts that embedded timestamp, which is the card creation time.
+    Based on https://steveridout.github.io/mongo-object-time/
+    '''
+    ts = int(item_id[:8], 16)
+    return datetime.fromtimestamp(ts)
 
 
 def return_on_eof(func):
