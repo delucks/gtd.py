@@ -404,5 +404,8 @@ class CardView:
             if all(filter_func(card) for filter_func in filters):
                 post_processed_cards.append(card)
 
+        if not post_processed_cards:
+            click.secho('No cards matched the filters provided', fg='red')
+            raise GTDException(0)
         # Create a CardView with those objects as the base
         return CardView(context=context, cards=post_processed_cards)
