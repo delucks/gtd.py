@@ -33,7 +33,7 @@ def parse_user_date_input(user_input):
 
 
 class Card:
-    '''This class is an alternative to trello.card.Card that can reuse the entire JSON structure rather than calling the API
+    '''This class is an alternative to py-trello's Card that can reuse the entire JSON structure rather than calling the API
     for each remote attribute.
     '''
 
@@ -153,8 +153,9 @@ class Card:
         prompt_toolkit, we have automatic completion which makes
         things substantially faster without having to do a visual
         lookup against numeric IDs
-        :param trello.Card card: the card to modify
-        :param dict label_choices: str->trello.Label, the names and objects of labels on this board
+
+        Options:
+            label_choices: str->trello.Label, the names and objects of labels on this board
         '''
         print('Enter a tag name to toggle it, <TAB> completes. Ctrl+D to exit')
         label_completer = FuzzyWordCompleter(label_choices.keys())
