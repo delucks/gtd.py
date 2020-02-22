@@ -85,7 +85,7 @@ class TrelloConnection:
         '''Return a mapping of list names to IDs on the main board, so that cards can have their
         lists shown without making a network call to retrieve the list names.
         '''
-        return {l['id']: l['name'] for l in self.main_lists()}
+        return {l['id']: l['name'] for l in self.main_lists(status_filter='all', force=True)}
 
     def inbox_list(self):
         '''use the configuration to get the main board & list from

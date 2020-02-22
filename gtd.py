@@ -187,8 +187,8 @@ def validate_sort(command_context, param, value):
 
 
 def sorting_fields_command(f):
-    f = click.option('--fields', callback=validate_fields, help='Choose fields to display by name, comma-separated')(f)
-    f = click.option('--by', default='activity', callback=validate_sort, help='Choose field to sort')(f)
+    f = click.option('--fields', callback=validate_fields, help='[Table] display only these fields')(f)
+    f = click.option('--by', default='activity', callback=validate_sort, help='[Table] sort by this field')(f)
     return f
 
 
@@ -200,15 +200,21 @@ def card_filtering_command(f):
     f = click.option('-l', '--listname', help='Only show cards from this list', default=None)(f)
     f = click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)(f)
     f = click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)(f)
+    f = click.option(
+        '-s', '--status',
+        default='visible',
+        help='Show cards in this state',
+        type=click.Choice(['all', 'closed', 'open', 'visible'])
+    )(f)
     return f
 
 
 def json_option(f):
-    return click.option('-j', '--json', 'use_json', is_flag=True, default=False, help='Output as JSON')(f)
+    return click.option('-j', '--json', 'use_json', is_flag=True, default=False, help='Output JSON')(f)
 
 
 def tsv_option(f):
-    return click.option('--tsv', is_flag=True, default=False, help='Output as tab-separated values')(f)
+    return click.option('--tsv', is_flag=True, default=False, help='Output tab-separated values')(f)
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
@@ -486,15 +492,16 @@ def show_tags(ctx, use_json, listname):
 @tsv_option
 @sorting_fields_command
 @pass_context
-def show_cards(ctx, use_json, tsv, tags, no_tags, match, listname, attachments, has_due, by, fields):
+def show_cards(ctx, use_json, tsv, tags, no_tags, match, listname, attachments, has_due, status, by, fields):
     '''Display cards
     The show command prints a table of all the cards with fields that will fit on the terminal you're using.
-    You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet or JSON.
-    This command along with the batch & review commands share a flexible argument scheme for getting card information.
-    Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
+    You can change this formatting by passing one of --tsv or --json, which will output as a tab-separated value sheet
+    or JSON. This command along with the batch & review commands share a flexible argument scheme for getting card
+    information. Mutually exclusive arguments include -t/--tags & --no-tags along with -j/--json & --tsv
     '''
     cards = CardView.create(
         ctx,
+        status=status,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -514,7 +521,7 @@ def show_cards(ctx, use_json, tsv, tags, no_tags, match, listname, attachments, 
 @tsv_option
 @pass_context
 def show_soon(ctx, use_json, tsv):
-    cards = CardView.create(ctx, has_due_date=True)
+    cards = CardView.create(ctx, status='visible', has_due_date=True)
     if use_json:
         print(cards.json())
     else:
@@ -567,12 +574,13 @@ def delete_tag(ctx, name, noninteractive):
 @click.option('-n', '--noninteractive', is_flag=True, default=False, help='Do not prompt before deleting')
 @card_filtering_command
 @pass_context
-def delete_cards(ctx, force, noninteractive, tags, no_tags, match, listname, attachments, has_due):
+def delete_cards(ctx, force, noninteractive, tags, no_tags, match, listname, attachments, has_due, status):
     '''Delete a set of cards specified
     '''
     ctx.display.banner()
     cards = CardView.create(
         ctx,
+        status=status,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -692,7 +700,7 @@ def grep(ctx, pattern, insensitive, count, regexp, by, fields, use_json):
     elif pattern:
         final_pattern = pattern
     flags = re.I if insensitive else 0
-    cards = CardView.create(ctx, title_regex=final_pattern, regex_flags=flags)
+    cards = CardView.create(ctx, status='visible', title_regex=final_pattern, regex_flags=flags)
     if count:
         print(sum(1 for _ in cards))
         return
@@ -718,10 +726,11 @@ def batch():
 @batch.command('move')
 @card_filtering_command
 @pass_context
-def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
+def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due, status):
     '''Change the list of each card selected'''
     cards = CardView.create(
         ctx,
+        status=status,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -739,10 +748,11 @@ def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
 @batch.command('tag')
 @card_filtering_command
 @pass_context
-def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
+def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due, status):
     '''Change tags on each card selected'''
     cards = CardView.create(
         ctx,
+        status=status,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -759,10 +769,11 @@ def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
 @batch.command('due')
 @card_filtering_command
 @pass_context
-def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due):
+def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due, status):
     '''Set due date for all cards selected'''
     cards = CardView.create(
         ctx,
+        status=status,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,
@@ -781,7 +792,7 @@ def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due):
 @pass_context
 def batch_attach(ctx):
     '''Extract HTTP links from card titles'''
-    cards = CardView.create(ctx, title_regex=VALID_URL_REGEX)
+    cards = CardView.create(ctx, status='visible', title_regex=VALID_URL_REGEX)
     ctx.display.banner()
     for card in cards:
         ctx.display.show_card(card)
@@ -795,13 +806,14 @@ def batch_attach(ctx):
 @cli.command(short_help='Use a smart repl-like menu')
 @card_filtering_command
 @pass_context
-def review(ctx, tags, no_tags, match, listname, attachments, has_due):
+def review(ctx, tags, no_tags, match, listname, attachments, has_due, status):
     '''show a smart, command-line based menu for each card selected.
     This menu will prompt you to add tags to untagged cards, to attach the title
     of cards which have a link in the title, and gives you all the other functionality combined.
     '''
     cards = CardView.create(
         ctx,
+        status=status,
         tags=tags,
         no_tags=no_tags,
         title_regex=match,

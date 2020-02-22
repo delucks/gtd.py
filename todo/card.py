@@ -14,7 +14,7 @@ from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
-from todo.connection import Connection
+from todo.connection import TrelloConnection
 from todo.exceptions import GTDException
 from todo.input import prompt_for_confirmation, single_select
 from todo.misc import get_title_of_webpage, DevNullRedirect, VALID_URL_REGEX, return_on_eof, build_name_lookup
@@ -39,7 +39,7 @@ class Card:
     unless you call Card.fetch() to refresh the base JSON structure.
     '''
 
-    def __init__(self, connection: Connection, card_json: dict):
+    def __init__(self, connection: TrelloConnection, card_json: dict):
         self.card_json = card_json
         self.connection = connection
 
@@ -366,15 +366,15 @@ class CardView:
         # Establish all base filters for cards nested resource query parameters.
         query_params = {}
         regex_flags = kwargs.get('regex_flags', 0)
-        # Card status: open/closed/archived/all
-        if (status := kwargs.get('status', None)) is not None:  # noqa
-            valid_filters = ['all', 'closed', 'open', 'visible']
-            if status not in valid_filters:
-                click.secho(f'Card filter {status} is not valid! Use one of {",".join(valid_filters)}')
-                raise GTDException(1)
-            query_params['cards'] = status
+        # Card status, in nested card resource
+        status = kwargs.get('status', 'visible')
+        valid_filters = ['all', 'closed', 'open', 'visible']
+        if status not in valid_filters:
+            click.secho(f'Card filter {status} is not valid! Use one of {",".join(valid_filters)}')
+            raise GTDException(1)
+        query_params['cards'] = status
         # TODO common field selection? Might be able to avoid ones that we don't use at all
-        # query_params['fields'] = 'all'
+        query_params['card_fields'] = 'all'
         target_cards = []
         if (list_regex := kwargs.get('list_regex', None)) is not None:  # noqa
             # Are lists passed? If so, query to find out the list IDs corresponding to the names we have
@@ -386,14 +386,14 @@ class CardView:
                     target_list_ids.append(list_object['id'])
             # Iteratively pull IDs from each list, passing the common parameters to them
             for list_id in target_list_ids:
-                cards_json = context.connection.trello.fetch_json(f'/lists/{list_id}/cards', query_params=query_params)
-                target_cards.extend(cards_json)
+                cards_json = context.connection.trello.fetch_json(f'/lists/{list_id}', query_params=query_params)
+                target_cards.extend(cards_json['cards'])
         else:
             # If no lists are passed, call the board's card resource
             cards_json = context.connection.trello.fetch_json(
-                f'/boards/{context.board.id}/cards', query_params=query_params
+                f'/boards/{context.board.id}', query_params=query_params
             )
-            target_cards.extend(cards_json)
+            target_cards.extend(cards_json['cards'])
 
         # Post-process the returned JSON, filtering down to the other passed parameters
         filters = []
