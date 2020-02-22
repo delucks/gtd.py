@@ -317,6 +317,19 @@ class CardView:
         self.cards = cards
         self.position = 0
 
+    def current(self):
+        return Card(self.context.connection, self.cards[self.position])
+
+    def next(self):
+        if self.position < len(self.cards) - 1:
+            self.position += 1
+            return self.current()
+
+    def prev(self):
+        if self.position > 0:
+            self.position -= 1
+            return self.current()
+
     def __iter__(self):
         return self
 
@@ -325,8 +338,6 @@ class CardView:
         It should be replaced with a more elegant way of moving through the cards
         '''
         if self.position < len(self.cards):
-            # card = trello.Card.from_json(self.context.board, self.cards[self.position])
-            # card = self.cards[self.position]
             card = Card(self.context.connection, self.cards[self.position])
             self.position += 1
             return card

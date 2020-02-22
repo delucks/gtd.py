@@ -89,9 +89,10 @@ class CLIContext:
             'help': 'display this help output (h)',
             'change-list': 'move this to a different list on the same board',
             'move': 'move to a different board and list (m)',
-            'next': 'move on to the next card (n)',
+            'next': 'move to the next card (n)',
+            'prev': 'go back to the previous card (p)',
             'open': 'open all links on this card (o)',
-            'print': 'display this card (p)',
+            'print': 're-display this card',
             'rename': 'change title of this card',
             'tag': 'add or remove tags on this card (t)',
             'quit': 'exit program',
@@ -102,8 +103,10 @@ class CLIContext:
             if user_input in ['q', 'quit']:
                 raise GTDException(0)
             elif user_input in ['n', 'next']:
-                break
-            elif user_input in ['p', 'print']:
+                return True
+            elif user_input in ['p', 'prev']:
+                return False
+            elif user_input == 'print':
                 card.fetch()
                 self.display.show_card(card)
             elif user_input in ['o', 'open']:
@@ -115,13 +118,13 @@ class CLIContext:
             elif user_input == 'delete':
                 card.delete()
                 print('Card deleted')
-                break
+                return True
             elif user_input == 'attach':
                 card.manipulate_attachments()
             elif user_input == 'archive':
                 card.set_closed(True)
                 print('Card archived')
-                break
+                return True
             elif user_input in ['t', 'tag']:
                 card.add_labels(self._label_choices)
             elif user_input == 'rename':
@@ -134,7 +137,7 @@ class CLIContext:
                     print('{0:<16}| {1}{2}{3}'.format(cname, on, cdesc, off))
             elif user_input == 'change-list':
                 if card.move_to_list(self._list_choices):
-                    break
+                    return True
             elif user_input in ['m', 'move']:
                 self.move_between_boards(card)
             elif user_input == 'comment':
@@ -781,29 +784,28 @@ def batch_attach(ctx):
 
 @cli.command(short_help='Use a smart repl-like menu')
 @card_filtering_command
-@click.option('--by-due', help='review cards that are due soon', is_flag=True)
 @pass_context
-def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
+def review(ctx, tags, no_tags, match, listname, attachments, has_due):
     '''show a smart, command-line based menu for each card selected.
     This menu will prompt you to add tags to untagged cards, to attach the title
     of cards which have a link in the title, and gives you all the other functionality combined.
     '''
-    if by_due:
-        cards = CardView.create(ctx, has_due_date=True)
-        cards = sorted(cards, key=lambda c: c.due)
-    else:
-        cards = CardView.create(
-            ctx,
-            tags=tags,
-            no_tags=no_tags,
-            title_regex=match,
-            list_regex=listname,
-            has_attachments=attachments,
-            has_due_date=has_due,
-        )
+    cards = CardView.create(
+        ctx,
+        tags=tags,
+        no_tags=no_tags,
+        title_regex=match,
+        list_regex=listname,
+        has_attachments=attachments,
+        has_due_date=has_due,
+    )
     ctx.display.banner()
-    for card in cards:
-        ctx.card_repl(card)
+    card = cards.current()
+    while card is not None:
+        if ctx.card_repl(card):
+            card = cards.next()
+        else:
+            card = cards.prev()
 
 
 def main():
