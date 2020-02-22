@@ -318,6 +318,9 @@ class CardView:
     CardView also translates filtering options from the CLI into parameters to request from Trello, or
     filters to post-process the list of cards coming in.
 
+    Use this class either as an iterator ('for card in cardview') or by calling the next() and prev() methods to
+    manually step through the list of cards.
+
     Goals:
         Be light on resources. Store a list of IDs and only create Card objects when they are viewed for the first time.
         Minimize network calls.
@@ -328,6 +331,20 @@ class CardView:
         self.context = context
         self.cards = cards
         self.position = 0
+
+    def __str__(self):
+        return f'CardView on {self.context.connection.main_board().name} with {len(self.cards)} items'
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.position < len(self.cards):
+            card = Card(self.context.connection, self.cards[self.position])
+            self.position += 1
+            return card
+        else:
+            raise StopIteration
 
     def current(self):
         return Card(self.context.connection, self.cards[self.position])
@@ -341,20 +358,6 @@ class CardView:
         if self.position > 0:
             self.position -= 1
             return self.current()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        '''This bridges the class into an iterator that acts equivalently to the current "for card in cardsource" type of usage
-        It should be replaced with a more elegant way of moving through the cards
-        '''
-        if self.position < len(self.cards):
-            card = Card(self.context.connection, self.cards[self.position])
-            self.position += 1
-            return card
-        else:
-            raise StopIteration
 
     def json(self):
         return json.dumps(self.cards, sort_keys=True, indent=2)
@@ -373,7 +376,6 @@ class CardView:
             click.secho(f'Card filter {status} is not valid! Use one of {",".join(valid_filters)}')
             raise GTDException(1)
         query_params['cards'] = status
-        # TODO common field selection? Might be able to avoid ones that we don't use at all
         query_params['card_fields'] = 'all'
         target_cards = []
         if (list_regex := kwargs.get('list_regex', None)) is not None:  # noqa
@@ -390,9 +392,7 @@ class CardView:
                 target_cards.extend(cards_json['cards'])
         else:
             # If no lists are passed, call the board's card resource
-            cards_json = context.connection.trello.fetch_json(
-                f'/boards/{context.board.id}', query_params=query_params
-            )
+            cards_json = context.connection.trello.fetch_json(f'/boards/{context.board.id}', query_params=query_params)
             target_cards.extend(cards_json['cards'])
 
         # Post-process the returned JSON, filtering down to the other passed parameters

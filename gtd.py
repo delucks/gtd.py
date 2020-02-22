@@ -201,10 +201,11 @@ def card_filtering_command(f):
     f = click.option('--attachments', is_flag=True, help='Only show cards which have attachments', default=None)(f)
     f = click.option('--has-due', is_flag=True, help='Only show cards which have due dates', default=None)(f)
     f = click.option(
-        '-s', '--status',
+        '-s',
+        '--status',
         default='visible',
         help='Show cards in this state',
-        type=click.Choice(['all', 'closed', 'open', 'visible'])
+        type=click.Choice(['all', 'closed', 'open', 'visible']),
     )(f)
     return f
 
