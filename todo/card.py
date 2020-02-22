@@ -170,8 +170,8 @@ class Card:
             label_choices: str->trello.Label, the names and objects of labels on this board
         '''
         print('Enter a tag name to toggle it, <TAB> completes. Ctrl+D to exit')
-        label_completer = FuzzyWordCompleter(label_choices.keys())
         while True:
+            label_completer = FuzzyWordCompleter(label_choices.keys())
             userinput = prompt('gtd.py > tag > ', completer=label_completer).strip()
             if userinput not in label_choices.keys():
                 if prompt_for_confirmation(f'Unrecognized tag name {userinput}, would you like to create it?', False):
@@ -180,8 +180,7 @@ class Card:
                     click.echo(
                         f'Added tag {label.name} to board {self.connection.main_board().name} and to the card {self}'
                     )
-                    label_choices = build_name_lookup(self.connection.main_board().get_labels(limit=200))
-                    label_completer = FuzzyWordCompleter(label_choices.keys())
+                    label_choices[userinput] = label
             else:
                 label_obj = label_choices[userinput]
                 try:
