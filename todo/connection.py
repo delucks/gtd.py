@@ -71,12 +71,12 @@ class TrelloConnection:
         '''
         return {b['name']: b for b in self.boards}
 
-    def main_lists(self, status_filter='open'):
+    def main_lists(self, status_filter='open', force=False):
         '''Load the JSON corresponding to all lists on the main board, to ease setup of CardView'''
         if self._main_lists is None:
             lists_json = self.trello.fetch_json(
                 f'/boards/{self.main_board().id}/lists',
-                query_params={'cards': 'none', 'filter': status_filter, 'fields': 'id,name'},
+                query_params={'cards': 'none', 'filter': status_filter, 'fields': 'all'},
             )
             self._main_lists = lists_json
         return self._main_lists

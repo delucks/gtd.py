@@ -442,11 +442,14 @@ def show_boards(ctx, use_json, tsv, by, show_all):
 @pass_context
 def show_lists(ctx, use_json, show_all):
     '''Display all lists on this board'''
-    if not use_json:
-        ctx.display.banner()
-    list_filter = 'all' if show_all else 'open'
-    list_names = [l.name for l in ctx.board.get_lists(list_filter)]
-    ctx.display.show_raw(list_names, use_json=use_json)
+    status_filter = 'all' if show_all else 'open'
+    lists_json = ctx.connection.main_lists(status_filter=status_filter, force=True)
+    if use_json:
+        print(json.dumps(lists_json, sort_keys=True, indent=2))
+        return
+    ctx.display.banner()
+    for list_struct in lists_json:
+        print(f'list_struct["name"] (list_struct["id"])')
 
 
 @show.command('tags')
@@ -455,8 +458,6 @@ def show_lists(ctx, use_json, show_all):
 @pass_context
 def show_tags(ctx, use_json, listname):
     '''Display all tags on this board'''
-    if not use_json:
-        ctx.display.banner()
     if listname:
         # Assemble a set of all tags on each card
         tags = set()
@@ -472,7 +473,12 @@ def show_tags(ctx, use_json, listname):
         tag_names = list(tags)
     else:
         tag_names = [t.name for t in ctx.board.get_labels()]
-    ctx.display.show_raw(tag_names, use_json=use_json)
+    if use_json:
+        print(json.dumps(tag_names, sort_keys=True, indent=2))
+        return
+    ctx.display.banner()
+    for tag in tag_names:
+        print(tag)
 
 
 @show.command('cards')

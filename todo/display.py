@@ -1,5 +1,3 @@
-import json
-import trello
 import datetime
 from collections import OrderedDict
 
@@ -14,13 +12,6 @@ class Display:
     '''This class is responsible for displaying cards, lists, and other pieces of data from Trello in a visually appealing way.
     It replaces a polymorphic hierarchy that was a poor fit for this operation.
     Different functions are useful for displaying cards in JSON, a table, and in a set of pretty-printed lines.
-
-    Needs:
-    - json & text displays must be interchangeable for noninteractive commands
-    - table display must have more columns / ability to select only certain columns
-    - the "show lists/show tags" thing should have way more bits of metadata it can display. we should ideally have a method that just dumps the names of
-      something to stdout
-    - banner should have more ascii art options :D
     '''
 
     def __init__(self, config, connection, primary_color=Colors.blue):
@@ -57,55 +48,9 @@ class Display:
         if self.config.banner:
             print(get_banner(use_color=self.config.color))
 
-    def show_raw(self, data, use_json=False):
-        '''this shows random datastructures
-        supports the following features
-            show lists
-            show tags
-            show boards
-        '''
-        if use_json:
-            print(json.dumps(self._force_json(data), sort_keys=True, indent=2))
-        elif isinstance(data, list):
-            for l in data:
-                self.show_raw(l)
-        elif isinstance(data, dict):
-            for k, v in data.items():
-                print(k, end=' ')
-                self.show_raw(v)
-        elif isinstance(data, trello.Board):
-            print(data)
-        elif isinstance(data, trello.List):
-            print(data)
-        elif isinstance(data, trello.Label):
-            print(data)
-        else:
-            print(data)
-
-    def _force_json(self, for_json):
-        '''force objects held in datastructures to be json-serializable by name only
-        :param List|Label|Board|bytes|list|dict|datetime for_json: object to be encoded
-        '''
-        if isinstance(for_json, trello.List):
-            return for_json.name
-        elif isinstance(for_json, trello.Label):
-            return for_json.name
-        elif isinstance(for_json, trello.Board):
-            return for_json.name
-        elif isinstance(for_json, bytes):
-            return for_json.decode('utf8')
-        elif isinstance(for_json, list):
-            return list(map(self._force_json, for_json))
-        elif isinstance(for_json, dict):
-            return {k: self._force_json(v) for k, v in for_json.items()}
-        elif isinstance(for_json, datetime.datetime):
-            return str(for_json)
-        else:
-            return for_json
-
     def show_cards(self, cards, tsv=False, sort='activity', table_fields=[]):
         '''Display an iterable of cards all at once.
-        Uses a pretty-printed table by default, but can also print JSON and tab-separated values (TSV).
+        Uses a pretty-printed table by default, but can also print tab-separated values (TSV).
         Supports the following cli commands:
             show cards
             grep
