@@ -7,7 +7,6 @@ import click
 import prettytable
 
 from todo.exceptions import GTDException
-from todo.card import CardTool
 from todo.misc import Colors, get_banner, mongo_id_to_date
 
 
@@ -76,8 +75,6 @@ class Display:
         elif isinstance(data, trello.List):
             print(data)
         elif isinstance(data, trello.Label):
-            print(data)
-        elif isinstance(data, trello.Card):
             print(data)
         else:
             print(data)
@@ -186,11 +183,11 @@ class Display:
         indent_print('Age:', datetime.datetime.now() - created)
         if card['badges']['attachments']:
             indent_print('Attachments:', '')
-            for a in CardTool.fetch_attachments(card, self.connection):
+            for a in card.fetch_attachments():
                 print(' ' * 4 + a['name'])
         if card['badges']['comments'] > 0:
             indent_print('Comments:', '')
-            for c in CardTool.fetch_comments(card, self.connection):
+            for c in card.fetch_comments():
                 print(f"    {c['memberCreator']['username']}: {c['data']['text']}")
         if card['due']:
             # Why can't python properly parse ISO8601 timestamps? gah

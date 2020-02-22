@@ -5,6 +5,7 @@ import shutil
 import itertools
 import webbrowser
 from functools import partial
+from typing import Optional
 
 import arrow
 import click
@@ -31,40 +32,122 @@ def parse_user_date_input(user_input):
     return None
 
 
-class CardTool:
-    '''This static class holds functionality to do atomic modifications on certain cards.
-    These methods are used inside of the user interaction parts of the codebase as a way of doing the same operation across
-    different UI components.
+class Card:
+    '''This class is an alternative to trello.card.Card that can reuse the entire JSON structure rather than calling the API
+    for each remote attribute.
     '''
 
-    @staticmethod
-    def fetch_comments(card_json, connection):
+    def __init__(self, connection, card_json):
+        self.card_json = card_json
+        self.connection = connection
+
+    def __getitem__(self, attr):
+        '''Make this object subscriptable so you can treat it like the JSON structure directly'''
+        return self.card_json[attr]
+
+    def __str__(self):
+        return self.card_json['name']
+
+    @property
+    def json(self):
+        return self.card_json
+
+    @property
+    def id(self):
+        return self.card_json['id']
+
+    def fetch(self):
+        '''Refresh the base card JSON structure'''
+        self.card_json = self.connection.trello.fetch_json('/cards/' + self.id, query_params={'fields': 'all'})
+
+    def fetch_comments(self, force: bool = False):
         '''Fetch the comments on this card and return them in JSON format.
         '''
-        if 'comments' in card_json:
-            return card_json['comments']
+        if 'comments' in self.card_json and not force:
+            return self.card_json['comments']
         query_params = {'filter': 'commentCard'}
-        comments = connection.trello.fetch_json('/cards/' + card_json['id'] + '/actions', query_params=query_params)
+        comments = self.connection.trello.fetch_json('/cards/' + self.id + '/actions', query_params=query_params)
         sorted_comments = sorted(comments, key=lambda comment: comment['date'])
-        card_json['comments'] = sorted_comments
+        self.card_json['comments'] = sorted_comments
         return sorted_comments
 
-    @staticmethod
-    def fetch_attachments(card_json, connection):
+    def fetch_attachments(self, force: bool = False):
         '''Fetch the attachments on this card and return them in JSON format, after enriching the card JSON
         with the full attachment structure.
         '''
-        if 'attachments' in card_json:
-            return card_json['attachments']
-        attachments = connection.trello.fetch_json(
-            '/cards/' + card_json['id'] + '/attachments', query_params={'filter': 'false'}
+        if 'attachments' in self.card_json and not force:
+            return self.card_json['attachments']
+        attachments = self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/attachments', query_params={'filter': 'false'}
         )
-        card_json['attachments'] = attachments
+        self.card_json['attachments'] = attachments
         return attachments
 
-    @staticmethod
+    def attach_url(self, url: str):
+        self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/attachments', http_method='POST', post_args={'url': url}
+        )
+
+    def remove_attachment(self, attachment_id: str):
+        self.connection.trello.fetch_json('/cards/' + self.id + '/attachments/' + attachment_id, http_method='DELETE')
+
+    def delete(self):
+        self.connection.trello.fetch_json('/cards/' + self.id, http_method='DELETE')
+
+    def set_closed(self, closed: bool = True):
+        self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/closed', http_method='PUT', post_args={'value': closed}
+        )
+
+    def set_name(self, new_name: str):
+        self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/name', http_method='PUT', post_args={'value': new_name}
+        )
+        self.card_json['name'] = new_name
+
+    def add_label(self, label_id: str):
+        return self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/idLabels', http_method='POST', post_args={'value': label_id}
+        )
+
+    def remove_label(self, label_id: str):
+        self.connection.trello.fetch_json('/cards/' + self.id + '/idLabels/' + label_id, http_method='DELETE')
+
+    def comment(self, comment_text: str):
+        '''Add a comment to a card'''
+        comment_data = self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/actions/comments', http_method='POST', post_args={'text': comment_text}
+        )
+        return comment_data
+
+    def change_board(self, board_id: str, list_id: Optional[str] = None):
+        args = {'value': board_id}
+        if list_id is not None:
+            args['idList'] = list_id
+        self.connection.trello.fetch_json('/cards/' + self.id + '/idBoard', http_method='PUT', post_args=args)
+
     @return_on_eof
-    def add_labels(card, label_choices):
+    def rename(self, default: Optional[str] = None, variables: dict = {}):
+        if variables:
+            print('You can use the following variables in your new card title:')
+            for k, v in variables.items():
+                print(f'  ${k}: {v}')
+        suggestion = variables.get('title0', None) or self.card_json['name']
+        newname = prompt(f'Input new name for this card (blank for "{default or suggestion}"): ').strip()
+        if newname:
+            for k, v in variables.items():
+                expansion = f'${k}'
+                if expansion in newname:
+                    newname = newname.replace(expansion, v)
+            self.set_name(newname)
+        else:
+            # If there wasn't a default set for the card name, leave the card name unchanged
+            result = default or suggestion
+            if result != self.card_json['name']:
+                self.set_name(result)
+
+    @return_on_eof
+    def add_labels(self, label_choices):
         '''Give the user a way to toggle labels on this card by their
         name rather than by a numeric selection interface. Using
         prompt_toolkit, we have automatic completion which makes
@@ -79,32 +162,33 @@ class CardTool:
             userinput = prompt('gtd.py > tag > ', completer=label_completer).strip()
             if userinput not in label_choices.keys():
                 if prompt_for_confirmation(f'Unrecognized tag name {userinput}, would you like to create it?', False):
-                    label = card.board.add_label(userinput, 'black')
-                    card.add_label(label)
-                    click.echo(f'Successfully added tag {label.name} to board {card.board.name} and card {card.name}!')
-                    label_choices = build_name_lookup(card.board.get_labels(limit=200))
+                    label = self.connection.main_board().add_label(userinput, 'green')
+                    self.add_label(label.id)
+                    click.echo(
+                        f'Added tag {label.name} to board {self.connection.main_board().name} and to the card {self}'
+                    )
+                    label_choices = build_name_lookup(self.connection.main_board().get_labels(limit=200))
                     label_completer = FuzzyWordCompleter(label_choices.keys())
             else:
                 label_obj = label_choices[userinput]
                 try:
-                    card.add_label(label_obj)
+                    self.add_label(label_obj.id)
                     click.secho(f'Added tag {userinput}', fg='green')
                 except trello.exceptions.ResourceUnavailable:
                     # This label already exists on the card so remove it
-                    card.remove_label(label_obj)
+                    self.remove_label(label_obj.id)
                     click.secho(f'Removed tag {userinput}', fg='red')
 
-    @staticmethod
-    def title_to_link(card):
+    def title_to_link(self):
         # This assumes your link is in card.name somewhere
-        sp = card['name'].split()
+        sp = self.card_json['name'].split()
         links = [n for n in sp if VALID_URL_REGEX.search(n)]
-        existing_attachments = [a.name for a in card.get_attachments()]
-        user_parameters = {'oldname': card.name}
+        existing_attachments = [a['name'] for a in self.fetch_attachments()]
+        user_parameters = {'oldname': self.card_json['name']}
         for idx, link_name in enumerate(links):
             # Attach this link
             if link_name not in existing_attachments:
-                card.attach(url=link_name)
+                self.attach_url(link_name)
             # Get the URL & title of the link for the user to access in the renaming interface
             user_parameters[f'link{idx}'] = link_name
             possible_title = get_title_of_webpage(link_name)
@@ -112,23 +196,21 @@ class CardTool:
                 user_parameters[f'title{idx}'] = possible_title
         # Give the user a default title without the link, but allow them to use the title of the page from a link as a var instead
         reconstructed = ' '.join([n for n in sp if not VALID_URL_REGEX.search(n)])
-        CardTool.rename(card, variables=user_parameters, default=reconstructed)
+        self.rename(variables=user_parameters, default=reconstructed)
 
-    @staticmethod
     @return_on_eof
-    def manipulate_attachments(card):
+    def manipulate_attachments(self):
         '''Give the user a CRUD interface for attachments on this card'''
-        print('Enter a URL, "delete", "open", "print", or Enter to exit')
-        user_input = 'Nothing really'
+        print('Enter a URL, "delete", "open", or "print". Ctrl+D to exit')
         attachment_completer = WordCompleter(['delete', 'print', 'open', 'http://', 'https://'], ignore_case=True)
-        while user_input != '':
+        while True:
             user_input = prompt('gtd.py > attach > ', completer=attachment_completer).strip()
             if re.search(VALID_URL_REGEX, user_input):
                 # attach this link
-                card.attach(url=user_input)
+                self.attach_url(user_input)
                 print(f'Attached {user_input}')
             elif user_input in ['delete', 'open']:
-                attachment_opts = {a.name: a for a in card.get_attachments()}
+                attachment_opts = {a['name']: a for a in self.fetch_attachments()}
                 if not attachment_opts:
                     print('This card is free of attachments')
                     continue
@@ -136,41 +218,20 @@ class CardTool:
                 if dest is not None:
                     target = attachment_opts[dest]
                     if user_input == 'delete':
-                        card.remove_attachment(target.id)
+                        self.remove_attachment(target['id'])
+                        self.fetch_attachments(force=True)
                     elif user_input == 'open':
                         with DevNullRedirect():
-                            webbrowser.open(target.url)
+                            webbrowser.open(target['url'])
             elif user_input == 'print':
-                existing_attachments = card.get_attachments()
+                existing_attachments = self.fetch_attachments(force=True)
                 if existing_attachments:
                     print('Attachments:')
                     for a in existing_attachments:
-                        print('  ' + a.name)
+                        print('  ' + a['name'])
 
-    @staticmethod
     @return_on_eof
-    def rename(card, default=None, variables={}):
-        if variables:
-            print('You can use the following variables in your new card title:')
-            for k, v in variables.items():
-                print(f'  ${k}: {v}')
-        suggestion = variables.get('title0', None) or card.name
-        newname = prompt(f'Input new name for this card (blank for "{default or suggestion}"): ').strip()
-        if newname:
-            for k, v in variables.items():
-                expansion = f'${k}'
-                if expansion in newname:
-                    newname = newname.replace(expansion, v)
-            card.set_name(newname)
-        else:
-            # If there wasn't a default set for the card name, leave the card name unchanged
-            card.set_name(default or suggestion)
-
-    @staticmethod
-    @return_on_eof
-    def set_due_date(card):
-        '''prompt for the date to set this card due as'''
-
+    def set_due_date(self):
         def validate_date(text):
             return re.match(r'\d{2}\/\d{2}\/\d{4}', text) or re.match(r'[A-Z][a-z]{2} \d{2} \d{4}', text)
 
@@ -186,30 +247,37 @@ class CardTool:
                 print('Invalid date format!')
             else:
                 break
-        card.set_due(result)
-        card.fetch()  # Needed to pick up the new due date
+        # Set the due daet
+        self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/due', http_method='PUT', post_args={'value': result.isoformat()}
+        )
+        # Pick it up
+        self.fetch()
         print('Due date set')
         return result
 
-    @staticmethod
-    def move_to_list(card, list_choices):
+    def move_to_list(self, list_choices: dict):
         '''Select labels to add to this card
-        :param trello.Card card: the card to modify
-        :param dict list_choices: str->trello.List, the names and objects of lists on this board
+
+        Options:
+            list_choices: str->trello.List, the names and objects of lists on this board
         '''
         dest = single_select(sorted(list_choices.keys()))
         if dest is not None:
             destination_list = list_choices[dest]
-            card.change_list(destination_list.id)
+            self.connection.trello.fetch_json(
+                '/cards/' + self.id + '/idList', http_method='PUT', post_args={'value': destination_list.id}
+            )
             print(f'Moved to {destination_list.name}')
             return destination_list
 
-    @staticmethod
-    def change_description(card):
-        old_desc = card.desc or ''
+    def change_description(self):
+        old_desc = self.card_json['desc']
         new_desc = click.edit(text=old_desc)
-        if new_desc is not None:
-            card.set_description(new_desc)
+        if new_desc is not None and new_desc != old_desc:
+            self.connection.trello.fetch_json(
+                '/cards/' + self.id + '/desc', http_method='PUT', post_args={'value': new_desc}
+            )
         return new_desc
 
 
@@ -258,7 +326,8 @@ class CardView:
         '''
         if self.position < len(self.cards):
             # card = trello.Card.from_json(self.context.board, self.cards[self.position])
-            card = self.cards[self.position]
+            # card = self.cards[self.position]
+            card = Card(self.context.connection, self.cards[self.position])
             self.position += 1
             return card
         else:

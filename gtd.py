@@ -18,7 +18,7 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter
 
-from todo.card import CardView, CardTool
+from todo.card import CardView, Card
 from todo.input import prompt_for_confirmation
 from todo.display import Display
 from todo.exceptions import GTDException
@@ -55,12 +55,15 @@ class CLIContext:
         self._list_choices = build_name_lookup(self.connection.main_board().get_lists('open'))
         self._label_choices = build_name_lookup(self.connection.main_board().get_labels(limit=200))
 
-    def card_repl(self, card: dict):
+    def card_repl(self, card: dict) -> bool:
         '''card_repl is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
         - Are there attachments? Maybe you want to open them.
         - Does there appear to be a URL in the title? You might want to attach it.
         - Are there no tags? Maybe you want to add some.
         Then gives you a nice tab-completed menu that lets you do all common operations on a card.
+
+        Returns:
+            boolean: move forwards or backwards in the deck of cards
         '''
         on = Colors.yellow if self.config.color else ''
         off = Colors.reset if self.config.color else ''
@@ -68,14 +71,14 @@ class CLIContext:
         if self.config.prompt_for_open_attachments and card['badges']['attachments']:
             if prompt_for_confirmation(f'{on}Open attachments?{off}', False):
                 with DevNullRedirect():
-                    for url in [a['url'] for a in CardTool.fetch_attachments(card, self.connection) if a['url']]:
+                    for url in [a['url'] for a in card.fetch_attachments() if a['url']]:
                         webbrowser.open(url)
         if re.search(VALID_URL_REGEX, card['name']):
             if prompt_for_confirmation(f'{on}Link in title detected, want to attach it & rename?{off}', True):
-                CardTool.title_to_link(card)
-        if self.config.prompt_for_untagged_cards and not card.labels:
+                card.title_to_link()
+        if self.config.prompt_for_untagged_cards and not card['labels']:
             print(f'{on}No tags on this card yet, want to add some?{off}')
-            CardTool.add_labels(card, self._label_choices)
+            card.add_labels(self._label_choices)
         commands = {
             'archive': 'mark this card as closed',
             'attach': 'add, delete, or open attachments',
@@ -105,33 +108,32 @@ class CLIContext:
                 self.display.show_card(card)
             elif user_input in ['o', 'open']:
                 with DevNullRedirect():
-                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
+                    for url in [a['url'] for a in card.fetch_attachments() if a['url'] is not None]:
                         webbrowser.open(url)
             elif user_input in ['desc', 'description']:
-                if CardTool.change_description(card):
-                    print('Description changed!')
+                card.change_description()
             elif user_input == 'delete':
                 card.delete()
                 print('Card deleted')
                 break
             elif user_input == 'attach':
-                CardTool.manipulate_attachments(card)
+                card.manipulate_attachments()
             elif user_input == 'archive':
                 card.set_closed(True)
                 print('Card archived')
                 break
             elif user_input in ['t', 'tag']:
-                CardTool.add_labels(card, self._label_choices)
+                card.add_labels(self._label_choices)
             elif user_input == 'rename':
                 # TODO optional form 'rename New name of card'
-                CardTool.rename(card)
+                card.rename()
             elif user_input == 'duedate':
-                CardTool.set_due_date(card)
+                card.set_due_date()
             elif user_input in ['h', 'help']:
                 for cname, cdesc in commands.items():
                     print('{0:<16}| {1}{2}{3}'.format(cname, on, cdesc, off))
             elif user_input == 'change-list':
-                if CardTool.move_to_list(card, self._list_choices):
+                if card.move_to_list(self._list_choices):
                     break
             elif user_input in ['m', 'move']:
                 self.move_between_boards(card)
@@ -718,7 +720,7 @@ def batch_move(ctx, tags, no_tags, match, listname, attachments, has_due):
     for card in cards:
         ctx.display.show_card(card)
         if prompt_for_confirmation('Want to move this one?', True):
-            CardTool.move_to_list(card, ctx._list_choices)
+            card.move_to_list(ctx._list_choices)
 
 
 @batch.command('tag')
@@ -738,7 +740,7 @@ def batch_tag(ctx, tags, no_tags, match, listname, attachments, has_due):
     ctx.display.banner()
     for card in cards:
         ctx.display.show_card(card)
-        CardTool.add_labels(card, ctx._label_choices)
+        card.add_labels(ctx._label_choices)
 
 
 @batch.command('due')
@@ -759,7 +761,7 @@ def batch_due(ctx, tags, no_tags, match, listname, attachments, has_due):
     for card in cards:
         ctx.display.show_card(card)
         if prompt_for_confirmation('Set due date?'):
-            CardTool.set_due_date(card)
+            card.set_due_date()
 
 
 @batch.command('attach')
@@ -771,7 +773,7 @@ def batch_attach(ctx):
     for card in cards:
         ctx.display.show_card(card)
         if prompt_for_confirmation('Attach title?', True):
-            CardTool.title_to_link(card)
+            card.title_to_link()
 
 
 # batch }}}
@@ -802,7 +804,6 @@ def review(ctx, tags, no_tags, match, listname, attachments, has_due, by_due):
     ctx.display.banner()
     for card in cards:
         ctx.card_repl(card)
-    click.echo('All done, have a great day!')
 
 
 def main():
