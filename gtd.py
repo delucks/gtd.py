@@ -18,7 +18,7 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter
 
-from todo.card import CardView, Card
+from todo.card import CardView
 from todo.input import prompt_for_confirmation
 from todo.display import Display
 from todo.exceptions import GTDException
@@ -56,11 +56,13 @@ class CLIContext:
         self._label_choices = build_name_lookup(self.connection.main_board().get_labels(limit=200))
 
     def card_repl(self, card: dict) -> bool:
-        '''card_repl is the logic behind "gtd review". It makes assumptions about what a user might want to do with a card:
+        '''card_repl displays a command-prompt based UI for modifying a card, with tab-completion and suggestions.
+        It is the logic behind "gtd review" and the "-e" flag in "gtd add"
+
+        It makes assumptions about what a user might want to do with a card:
         - Are there attachments? Maybe you want to open them.
         - Does there appear to be a URL in the title? You might want to attach it.
         - Are there no tags? Maybe you want to add some.
-        Then gives you a nice tab-completed menu that lets you do all common operations on a card.
 
         Returns:
             boolean: move forwards or backwards in the deck of cards
@@ -82,19 +84,20 @@ class CLIContext:
         commands = {
             'archive': 'mark this card as closed',
             'attach': 'add, delete, or open attachments',
+            'change-list': 'move this to a different list on the same board',
             'comment': 'add a comment to this card',
             'delete': 'permanently delete this card',
             'duedate': 'add a due date or change the due date',
             'description': 'change the description of this card (desc)',
             'help': 'display this help output (h)',
-            'change-list': 'move this to a different list on the same board',
             'move': 'move to a different board and list (m)',
             'next': 'move to the next card (n)',
-            'prev': 'go back to the previous card (p)',
             'open': 'open all links on this card (o)',
+            'prev': 'go back to the previous card (p)',
             'print': 're-display this card',
             'rename': 'change title of this card',
             'tag': 'add or remove tags on this card (t)',
+            'unarchive': 'mark this card as open',
             'quit': 'exit program',
         }
         command_completer = FuzzyWordCompleter(commands.keys())
@@ -124,7 +127,9 @@ class CLIContext:
             elif user_input == 'archive':
                 card.set_closed(True)
                 print('Card archived')
-                return True
+            elif user_input == 'unarchive':
+                card.set_closed(False)
+                print('Card returned to board')
             elif user_input in ['t', 'tag']:
                 card.add_labels(self._label_choices)
             elif user_input == 'rename':
