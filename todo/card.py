@@ -14,9 +14,10 @@ from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
+from todo.connection import Connection
+from todo.exceptions import GTDException
 from todo.input import prompt_for_confirmation, single_select
 from todo.misc import get_title_of_webpage, DevNullRedirect, VALID_URL_REGEX, return_on_eof, build_name_lookup
-from todo.exceptions import GTDException
 
 
 def parse_user_date_input(user_input):
@@ -33,11 +34,12 @@ def parse_user_date_input(user_input):
 
 
 class Card:
-    '''This class is an alternative to py-trello's Card that can reuse the entire JSON structure rather than calling the API
-    for each remote attribute.
+    '''This class is an alternative to py-trello's Card that can reuse the entire JSON structure rather than calling the
+    API for each remote attribute. The only network calls are to fetch external attributes like comments or attachments,
+    unless you call Card.fetch() to refresh the base JSON structure.
     '''
 
-    def __init__(self, connection, card_json):
+    def __init__(self, connection: Connection, card_json: dict):
         self.card_json = card_json
         self.connection = connection
 
@@ -61,7 +63,8 @@ class Card:
         self.card_json = self.connection.trello.fetch_json('/cards/' + self.id, query_params={'fields': 'all'})
 
     def fetch_comments(self, force: bool = False):
-        '''Fetch the comments on this card and return them in JSON format.
+        '''Fetch the comments on this card and return them in JSON format, adding them into self.card_json
+        to cache until the next run.
         '''
         if 'comments' in self.card_json and not force:
             return self.card_json['comments']
@@ -84,47 +87,56 @@ class Card:
         return attachments
 
     def attach_url(self, url: str):
-        self.connection.trello.fetch_json(
+        '''Attach a link from the internet'''
+        return self.connection.trello.fetch_json(
             '/cards/' + self.id + '/attachments', http_method='POST', post_args={'url': url}
         )
 
     def remove_attachment(self, attachment_id: str):
-        self.connection.trello.fetch_json('/cards/' + self.id + '/attachments/' + attachment_id, http_method='DELETE')
+        '''Remove an attachment by ID'''
+        return self.connection.trello.fetch_json(
+            '/cards/' + self.id + '/attachments/' + attachment_id, http_method='DELETE'
+        )
 
     def delete(self):
-        self.connection.trello.fetch_json('/cards/' + self.id, http_method='DELETE')
+        '''Permanently delete the card'''
+        return self.connection.trello.fetch_json('/cards/' + self.id, http_method='DELETE')
 
     def set_closed(self, closed: bool = True):
-        self.connection.trello.fetch_json(
+        '''Archive or unarchive this card'''
+        return self.connection.trello.fetch_json(
             '/cards/' + self.id + '/closed', http_method='PUT', post_args={'value': closed}
         )
 
     def set_name(self, new_name: str):
-        self.connection.trello.fetch_json(
+        '''Change this card's name'''
+        self.card_json['name'] = new_name
+        return self.connection.trello.fetch_json(
             '/cards/' + self.id + '/name', http_method='PUT', post_args={'value': new_name}
         )
-        self.card_json['name'] = new_name
 
     def add_label(self, label_id: str):
+        '''Add a label to this card by ID'''
         return self.connection.trello.fetch_json(
             '/cards/' + self.id + '/idLabels', http_method='POST', post_args={'value': label_id}
         )
 
     def remove_label(self, label_id: str):
-        self.connection.trello.fetch_json('/cards/' + self.id + '/idLabels/' + label_id, http_method='DELETE')
+        '''Remove a label from this card by ID'''
+        return self.connection.trello.fetch_json('/cards/' + self.id + '/idLabels/' + label_id, http_method='DELETE')
 
-    def comment(self, comment_text: str):
+    def comment(self, comment_text: str) -> dict:
         '''Add a comment to a card'''
-        comment_data = self.connection.trello.fetch_json(
+        return self.connection.trello.fetch_json(
             '/cards/' + self.id + '/actions/comments', http_method='POST', post_args={'text': comment_text}
         )
-        return comment_data
 
-    def change_board(self, board_id: str, list_id: Optional[str] = None):
+    def change_board(self, board_id: str, list_id: Optional[str] = None) -> None:
+        '''Change the board of this card, and optionally select the list the card should move to'''
         args = {'value': board_id}
         if list_id is not None:
             args['idList'] = list_id
-        self.connection.trello.fetch_json('/cards/' + self.id + '/idBoard', http_method='PUT', post_args=args)
+        return self.connection.trello.fetch_json('/cards/' + self.id + '/idBoard', http_method='PUT', post_args=args)
 
     @return_on_eof
     def rename(self, default: Optional[str] = None, variables: dict = {}):
