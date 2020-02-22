@@ -28,25 +28,28 @@ class Display:
         self.config = config
         self.connection = connection
         self.primary = primary_color
-        self.fields = Display.build_fields()
+        self.fields = self.build_fields()
 
     @staticmethod
-    def build_fields():
+    def valid_fields():
+        '''Valid fields to sort a table of cards by'''
+        return ['name', 'list', 'tags', 'desc', 'due', 'activity', 'id', 'url']
+
+    def build_fields(self):
         '''This creates the dictionary of field name -> getter function that's used to translate the JSON
         response into a table. It's created once and bound to this object so the CLI functions can check if their
         --field arguments are valid field names before invoking the functions that output onto the screen
         '''
         fields = OrderedDict()
         # This is done repetitively to establish column order
-        fields['name'] = lambda c: c.name
-        fields['list'] = lambda c: c.get_list().name
-        fields['tags'] = lambda c: '\n'.join([l.name for l in c.labels]) if c.labels else ''
-        fields['desc'] = lambda c: c.desc
-        fields['due'] = lambda c: c.due[:10] if c.due is not None else ''
-        fields['activity'] = lambda c: c.dateLastActivity.strftime('%Y-%m-%d')
-        fields['board'] = lambda c: c.board.name
-        fields['id'] = lambda c: getattr(c, 'id')
-        fields['url'] = lambda c: getattr(c, 'shortUrl')
+        fields['name'] = lambda c: c['name']
+        fields['list'] = lambda c: self.connection.lists_by_id()[c['idList']]
+        fields['tags'] = lambda c: '\n'.join([l['name'] for l in c['labels']]) if c['labels'] else ''
+        fields['desc'] = lambda c: c['desc']
+        fields['due'] = lambda c: c['due'][:10] if c['due'] else ''
+        fields['activity'] = lambda c: c['dateLastActivity'][:10]
+        fields['id'] = lambda c: c.id
+        fields['url'] = lambda c: c['shortUrl']
         return fields
 
     def banner(self):
@@ -140,7 +143,7 @@ class Display:
         possible = table.get_string(fields=fields, sortby=sort)
         fset = set(fields)
         # Fields in increasing order of importance
-        to_remove = ['desc', 'id', 'board', 'url', 'activity', 'list']
+        to_remove = ['desc', 'id', 'url', 'activity', 'list']
         # Wait until we're under max width or until we can't discard more fields
         while len(possible.splitlines()[0]) >= maxwidth and to_remove:
             # Remove a field one at a time

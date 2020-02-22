@@ -173,7 +173,7 @@ pass_context = click.make_pass_decorator(CLIContext)
 
 
 def validate_fields(command_context, param, value):
-    valid = Display.build_fields().keys()
+    valid = Display.valid_fields()
     possible = value.split(',') if value else []
     for field in possible:
         if field not in valid:
@@ -182,7 +182,7 @@ def validate_fields(command_context, param, value):
 
 
 def validate_sort(command_context, param, value):
-    if value and value not in Display.build_fields().keys():
+    if value and value not in Display.valid_fields():
         raise click.BadParameter(f'Sort parameter {value} is not a valid field!')
     return value
 

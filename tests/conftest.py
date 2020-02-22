@@ -14,7 +14,7 @@ def config():
 @pytest.fixture
 def test_conn(config):
     if config.test_board is None:
-        pytest.fail('Define test_board in your config to run gtd.py tests')
+        pytest.fail('Define test_board in your config to run gtd.py tests. This board will be deleted as part of the tests, so make sure the name does not conflict with an existing board name')
     return TrelloConnection(config)
 
 

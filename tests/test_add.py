@@ -1,4 +1,3 @@
-import click
 from click.testing import CliRunner
 from gtd import cli
 from conftest import TEST_LIST_INBOX
