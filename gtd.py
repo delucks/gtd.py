@@ -10,7 +10,6 @@ import webbrowser
 
 import yaml
 import click
-import trello
 import requests
 import prettytable
 from requests_oauthlib import OAuth1Session
@@ -18,7 +17,7 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter
 
-from todo.card import CardView
+from todo.card import Card, CardView
 from todo.input import prompt_for_confirmation
 from todo.display import Display
 from todo.exceptions import GTDException
@@ -156,7 +155,7 @@ class CLIContext:
                 print(f'{on}{user_input}{off} is not a command, type "{on}help{off}" to view available commands')
 
     @return_on_eof
-    def move_between_boards(self, card: trello.Card) -> None:
+    def move_between_boards(self, card: Card) -> None:
         boards_by_name = self.connection.boards_by_name()
         board_name = prompt('gtd.py > move > board name? ', completer=FuzzyWordCompleter(boards_by_name.keys()))
         board_id = boards_by_name[board_name]['id']
