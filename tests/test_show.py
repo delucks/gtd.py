@@ -35,6 +35,20 @@ def test_show_boards():
     assert result.exit_code == 0, result.output
 
 
+def test_show_tags(config):
+    runner = CliRunner()
+    args = ['--board', config.test_board, 'show', 'tags', '--json']
+    result = runner.invoke(cli, args)
+    assert result.exit_code == 0, result.output
+    try:
+        json.loads(result.output)
+    except json.decoder.JSONDecodeError:
+        print(result.output)
+        pytest.fail(f'Output of `{" ".join(args)}` is not valid JSON')
+    result = runner.invoke(cli, ['--board', config.test_board, 'show', 'tags'])
+    assert result.exit_code == 0, result.output
+
+
 def test_show_lists(config, test_board):
     '''Mostly ditto for "show lists"
     '''
@@ -58,3 +72,5 @@ def test_show_lists(config, test_board):
     assert len(all_results) > len(open_results)
     assert len(all_results) == len(test_board.get_lists('all'))
     assert len(open_results) == len(test_board.get_lists('open'))
+    result = runner.invoke(cli, ['show', 'lists'])
+    assert result.exit_code == 0, result.output
