@@ -18,7 +18,8 @@ from requests_oauthlib.oauth1_session import TokenRequestDenied
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyWordCompleter
 
-from todo.input import prompt_for_confirmation, CardView, CardTool
+from todo.card import CardView, CardTool
+from todo.input import prompt_for_confirmation
 from todo.display import Display
 from todo.exceptions import GTDException
 from todo.misc import (
@@ -63,14 +64,13 @@ class CLIContext:
         '''
         on = Colors.yellow if self.config.color else ''
         off = Colors.reset if self.config.color else ''
-        card.fetch()
         self.display.show_card(card)
-        if self.config.prompt_for_open_attachments and card.get_attachments():
+        if self.config.prompt_for_open_attachments and card['badges']['attachments']:
             if prompt_for_confirmation(f'{on}Open attachments?{off}', False):
                 with DevNullRedirect():
-                    for url in [a.url for a in card.get_attachments() if a.url is not None]:
+                    for url in [a['url'] for a in CardTool.fetch_attachments(card, self.connection) if a['url']]:
                         webbrowser.open(url)
-        if re.search(VALID_URL_REGEX, card.name):
+        if re.search(VALID_URL_REGEX, card['name']):
             if prompt_for_confirmation(f'{on}Link in title detected, want to attach it & rename?{off}', True):
                 CardTool.title_to_link(card)
         if self.config.prompt_for_untagged_cards and not card.labels:

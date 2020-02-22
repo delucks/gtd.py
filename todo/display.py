@@ -7,7 +7,7 @@ import click
 import prettytable
 
 from todo.exceptions import GTDException
-from todo.input import CardTool
+from todo.card import CardTool
 from todo.misc import Colors, get_banner, mongo_id_to_date
 
 
