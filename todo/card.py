@@ -318,6 +318,12 @@ class Card:
             checklists_to_edit += "\n"
 
         new_checklists_edited = click.edit(text=checklists_to_edit)
+        if new_checklists_edited == checklists_to_edit:
+            #  no change done
+            return
+        elif new_checklists_edited is None:
+            #  no save in editor
+            return
 
         if new_checklists_edited.endswith("\n"):
             new_checklists_edited = new_checklists_edited[:-1]
@@ -342,6 +348,7 @@ class Card:
                 elif line[0] == " ":
                     cl.add_checklist_item(line[1], checked=False)
                 new_checklists.append(cl)
+
         self.card_json['Checklists'] = new_checklists
 
         for old_checklist in old_checklists:
