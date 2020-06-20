@@ -154,3 +154,12 @@ class Display:
             indent_print('Description', '')
             for line in card['desc'].splitlines():
                 print(' ' * 4 + line)
+
+        indent_print('Checklists', '')
+        for checklist in card['Checklists']:
+            print(' ' * 4 + checklist.name + ":")
+            for item in checklist.items:
+                if item['state'] == 'complete':
+                    print(' ' * 6 + "[x] " + item['name'])
+                elif item['state'] == 'incomplete':
+                    print(' ' * 6 + "[ ] " + item['name'])

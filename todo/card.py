@@ -10,6 +10,7 @@ from typing import Optional
 import arrow
 import click
 import trello
+
 from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
@@ -61,6 +62,14 @@ class Card:
     def fetch(self):
         '''Refresh the base card JSON structure'''
         self.card_json = self.connection.trello.fetch_json('/cards/' + self.id, query_params={'fields': 'all'})
+        checklists = self.connection.main_board().get_checklists()
+
+        this_checklist = []
+        for id in self.card_json['idChecklists']:
+            for item in checklists:
+                if id == item.id:
+                    this_checklist.append(item)
+        self.card_json['Checklists'] = this_checklist
 
     def fetch_comments(self, force: bool = False):
         '''Fetch the comments on this card and return them in JSON format, adding them into self.card_json
@@ -292,6 +301,54 @@ class Card:
             )
         return new_desc
 
+    def change_checklists(self):
+        old_checklists = self.card_json['Checklists']
+        client = old_checklists[0].client
+
+        checklists_to_edit = ""
+        for checklist in old_checklists:
+            checklists_to_edit += "{name}:\n".format(
+                    name=checklist.name.replace("\n", " ")
+                    )
+            for item in checklist.items:
+                if item['state'] == 'complete':
+                    checklists_to_edit += ' ' * 6 + "[x] " + item['name'] + "\n"
+                elif item['state'] == 'incomplete':
+                    checklists_to_edit += ' ' * 6 + "[ ] " + item['name'] + "\n"
+            checklists_to_edit += "\n"
+
+        new_checklists_edited = click.edit(text=checklists_to_edit)
+
+        if new_checklists_edited.endswith("\n"):
+            new_checklists_edited = new_checklists_edited[:-1]
+
+        new_checklists = []
+        for checklist in new_checklists_edited.split("\n\n"):
+            splitted_lines = checklist.split(":\n")
+            name = splitted_lines[0].split(":")[0]
+
+            json_obj = client.fetch_json(
+                '/cards/' + self.id + '/checklists',
+                http_method='POST',
+                post_args={'name': name}, )
+
+            cl = trello.checklist.Checklist(client, [], json_obj, trello_card=self.id)
+
+            for line in splitted_lines[1].splitlines():
+                line = line.lstrip()
+                line = line[1:].split("] ")
+                if line[0] == "x" or line[0] == "X":
+                    cl.add_checklist_item(line[1], checked=True)
+                elif line[0] == " ":
+                    cl.add_checklist_item(line[1], checked=False)
+                new_checklists.append(cl)
+        self.card_json['Checklists'] = new_checklists
+
+        for old_checklist in old_checklists:
+            old_checklist.delete()
+
+        return new_checklists
+
 
 def search_for_regex(card, title_regex, regex_flags):
     try:
@@ -395,6 +452,8 @@ class CardView:
             cards_json = context.connection.trello.fetch_json(f'/boards/{context.board.id}', query_params=query_params)
             target_cards.extend(cards_json['cards'])
 
+        checklists = context.board.get_checklists()
+
         # Post-process the returned JSON, filtering down to the other passed parameters
         filters = []
         post_processed_cards = []
@@ -414,6 +473,12 @@ class CardView:
 
         for card in target_cards:
             if all(filter_func(card) for filter_func in filters):
+                this_checklist = []
+                for id in card['idChecklists']:
+                    for item in checklists:
+                        if id == item.id:
+                            this_checklist.append(item)
+                card['Checklists'] = this_checklist
                 post_processed_cards.append(card)
 
         if not post_processed_cards:
