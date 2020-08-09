@@ -306,7 +306,9 @@ def check_for_label_presence(card, tags):
     each is on this card'''
     if card['idLabels']:
         user_tags = set(tags.split(','))
-        card_tags = set(card['_labels'])
+        card_tags = set()
+        for label in card['labels']:
+            card_tags.add(label['name'])
         return user_tags.issubset(card_tags)
     else:
         return False
