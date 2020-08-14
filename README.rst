@@ -406,7 +406,7 @@ Setup
 
 ::
 
-  $ pip install -u gtd.py
+  $ pip3 install -U gtd.py
   $ gtd onboard
 
 The ``onboard`` command will assist you through the process of getting a Trello API key for use with this program and putting it in the correct file. This will happen automatically if you run a command that requires authentication without having your API keys set.
