@@ -18,26 +18,18 @@ In the following examples I'll be working with a sample board, that I created li
 
 ::
 
-   $ gtd add board PublicShowTest
-   Added board PublicShowTest
-   $ gtd add list 'To Do'
-   Successfully added list <List To Do>!
-   $ gtd add list 'Weekly Tasks'
-   Successfully added list <List Weekly Tasks>!
-   $ for task in 'Do dishes' 'Clean bathroom' 'Write some python' 'Eat a sandwich'; do gtd add card "$task"; done
-   Successfully added card <Card Do dishes>!
-   Successfully added card <Card Clean bathroom>!
-   Successfully added card <Card Write some python>!
-   Successfully added card <Card Eat a sandwich>!
-   $ gtd show cards
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | name              | list  | tags | desc | due | last activity                    | board          | id                       | url                           |
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | Do dishes         | To Do |      |      |     | 2018-08-23 00:10:52.513000+00:00 | PublicShowTest | 5b7dfb8c5973738e1ed125ab | https://trello.com/c/DrZ2tFr0 |
-   | Clean bathroom    | To Do |      |      |     | 2018-08-23 00:10:55.360000+00:00 | PublicShowTest | 5b7dfb8fed823c431514804d | https://trello.com/c/QVATaeaH |
-   | Write some python | To Do |      |      |     | 2018-08-23 00:10:56.477000+00:00 | PublicShowTest | 5b7dfb9051b9466d0da1c2b7 | https://trello.com/c/p4yeGbkk |
-   | Eat a sandwich    | To Do |      |      |     | 2018-08-23 00:10:57.614000+00:00 | PublicShowTest | 5b7dfb91b7b7d66dcc7a21b6 | https://trello.com/c/HL9lJKgZ |
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
+  $ gtd add board PublicShowTest
+  Added board PublicShowTest
+  $ echo "board: PublicShowTest" >> ~/.config/gtd/gtd.yaml
+  $ gtd add list 'To Do'
+  Successfully added list <List To Do>!
+  $ gtd add list 'Weekly Tasks'
+  Successfully added list <List Weekly Tasks>!
+  $ for task in 'Do dishes' 'Clean bathroom' 'Write some python' 'Eat a sandwich'; do gtd add card "$task"; done
+  Successfully added card "Do dishes"!
+  Successfully added card "Clean bathroom"!
+  Successfully added card "Write some python"!
+  Successfully added card "Eat a sandwich"!
 
 
 Looking Around
@@ -47,53 +39,56 @@ The ``show`` subcommand allows you to view what's on your board right now. Let's
 
 ::
 
-   $ gtd show lists
-   To Do
-   Doing
-   Done
-   Weekly Tasks
-   $ gtd show cards
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | name              | list  | tags | desc | due | last activity                    | board          | id                       | url                           |
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | Do dishes         | To Do |      |      |     | 2018-08-23 00:10:52.513000+00:00 | PublicShowTest | 5b7dfb8c5973738e1ed125ab | https://trello.com/c/DrZ2tFr0 |
-   | Clean bathroom    | To Do |      |      |     | 2018-08-23 00:10:55.360000+00:00 | PublicShowTest | 5b7dfb8fed823c431514804d | https://trello.com/c/QVATaeaH |
-   | Write some python | To Do |      |      |     | 2018-08-23 00:10:56.477000+00:00 | PublicShowTest | 5b7dfb9051b9466d0da1c2b7 | https://trello.com/c/p4yeGbkk |
-   | Eat a sandwich    | To Do |      |      |     | 2018-08-23 00:10:57.614000+00:00 | PublicShowTest | 5b7dfb91b7b7d66dcc7a21b6 | https://trello.com/c/HL9lJKgZ |
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
+  $ gtd show lists
+  Weekly Tasks (5f679dbc195e7885699ceb64)
+  To Do (5f679d625b4bbd1a91878fb8)
+  Doing (5f679d625b4bbd1a91878fb9)
+  Done (5f679d625b4bbd1a91878fba)
+  $ gtd show cards
+  Fetching cards  [########################################################################################################]  100%
+  +-------------------+--------------+------+------+-----+------------+--------------------------+-------------------------------+
+  | name              | list         | tags | desc | due | activity   | id                       | url                           |
+  +-------------------+--------------+------+------+-----+------------+--------------------------+-------------------------------+
+  | Clean bathroom    | Weekly Tasks |      |      |     | 2020-09-20 | 5f679de5b92a1708bd7c8c93 | https://trello.com/c/ds3tuegh |
+  | Do dishes         | Weekly Tasks |      |      |     | 2020-09-20 | 5f679de3b9c40b795bd6e08b | https://trello.com/c/8qBVAraN |
+  | Eat a sandwich    | Weekly Tasks |      |      |     | 2020-09-20 | 5f679de818062617023a4405 | https://trello.com/c/o5Oph6AD |
+  | Write some python | Weekly Tasks |      |      |     | 2020-09-20 | 5f679de74d9e0e69f717686f | https://trello.com/c/fflo7zzp |
+  +-------------------+--------------+------+------+-----+------------+--------------------------+-------------------------------+
 
 
 The ``show cards`` command will return all the cards which match your supplied arguments as a table, in JSON format, or in TSV.
 
 ::
 
-   # Show cards from the list "Inbox" matching a regular expression on their titles
-   $ gtd show cards -l Inbox -m 'https?'
-   # Show cards which have no tags but have due dates, in pretty-printed JSON format
-   $ gtd show cards --no-tags --has-due -j
+  # Show cards from the list "Inbox" matching a regular expression on their titles
+  $ gtd show cards -l Inbox --match 'https?'
+  # Show cards which have no tags but have due dates, in pretty-printed JSON format
+  $ gtd show cards --no-tags --has-due --json
+  # Closed cards which have attachments and are tagged as "Pictures"
+  $ gtd show cards --status closed --attachments -t Pictures
 
 
 Similarly, ``grep`` does what you would expect:
 
 ::
 
-   $ gtd grep dishes
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | name              | list  | tags | desc | due | last activity                    | board          | id                       | url                           |
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | Do dishes         | To Do |      |      |     | 2018-08-23 00:10:52.513000+00:00 | PublicShowTest | 5b7dfb8c5973738e1ed125ab | https://trello.com/c/DrZ2tFr0 |
-   +-------------------+-------+------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
+  $ gtd grep dishes
+  +-----------+--------------+------+------+-----+------------+--------------------------+-------------------------------+
+  | name      | list         | tags | desc | due | activity   | id                       | url                           |
+  +-----------+--------------+------+------+-----+------------+--------------------------+-------------------------------+
+  | Do dishes | Weekly Tasks |      |      |     | 2020-09-20 | 5f679de3b9c40b795bd6e08b | https://trello.com/c/8qBVAraN |
+  +-----------+--------------+------+------+-----+------------+--------------------------+-------------------------------+
 
 It also faithfully implements some flags from GNU ``grep``, including -c, -i, and -e! An invocation of this command is similar to a longer invocation of ``show``: ``gtd grep 'some_pattern'`` is equivalent to ``gtd show cards -m 'some_pattern'``.
 
 ::
 
-   # Filter all cards based on a regex
-   $ gtd grep 'http.*amazon'
-   # or multiple regexes!
-   $ gtd grep -e '[Jj]ob' -e 'career' -e '[oO]pportunity?'
-   # Use other popular grep flags!
-   $ gtd grep -ci 'meeting'
+  # Filter all cards based on a regex
+  $ gtd grep 'http.*amazon'
+  # or multiple regexes!
+  $ gtd grep -e '[Jj]ob' -e 'career' -e '[oO]pportunity?'
+  # Count matches of a case-insensitive pattern
+  $ gtd grep -ci 'meeting'
 
 Creating Things
 ^^^^^^^^^^^^^^^^
@@ -109,28 +104,26 @@ The ``add tag``, ``add list``, and ``add board`` subcommands all work pretty muc
 
 ::
 
-   $ gtd add tag 'Household'
-   Successfully added tag <Label Household>!
-   $ gtd add tag 'Food'
-   Successfully added tag <Label Food>!
-   $ gtd add tag 'Programming'
-   Successfully added tag <Label Programming>!
+  $ for tag in Household Food Programming; do gtd add tag "$tag"; done
+  Created tag "Household"
+  Created tag "Food"
+  Created tag "Programming"
 
 
 The command you'll probably use most frequently is ``add card``.
 
 ::
 
-   $ gtd add card 'Purchase a pomelo'
-   Successfully added card <Card Purchase a pomelo>!
+  $ gtd add card 'Purchase a pomelo'
+  Successfully added card "Purchase a pomelo"!
 
 You can also specify a description for the new card with ``-m``. New cards are put in the first list by default, so when you're laying out a board, make your first list the "inbox". You can also omit the title argument, like so:
 
 ::
 
-   # Open $EDITOR so you can write the card title
-   $ gtd add card
-   Successfully added card <Card This was written in vim>!
+  # Open $EDITOR so you can write the card title
+  $ gtd add card
+  Successfully added card "This was written in vim"!
 
 
 Manipulating Cards in Bulk
@@ -140,146 +133,150 @@ Frequently it's useful to move a whole bunch of cards at once, tag cards that ma
 
 ::
 
-   $ gtd batch tag -l 'To Do'
-   Card 5b7dfb8c5973738e1ed125ab
-     Name:         Do dishes
-     List:         To Do
-     Created:      2018-08-22 20:10:52 (1534983052.0)
-     Age:          0:02:04.641306
-   Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit
-   tag > Household
-   Added tag Household
-   tag >
-   Card 5b7dfb8fed823c431514804d
-     Name:         Clean bathroom
-     List:         To Do
-     Created:      2018-08-22 20:10:55 (1534983055.0)
-     Age:          0:02:08.795000
-   Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit
-   tag > Household
-   Added tag Household
-   tag >
-   Card 5b7dfb9051b9466d0da1c2b7
-     Name:         Write some python
-     List:         To Do
-     Created:      2018-08-22 20:10:56 (1534983056.0)
-     Age:          0:02:11.258759
-   Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit
-   tag >
-   tag > Programming
-   Added tag Programming
-   tag >
-   Card 5b7dfb91b7b7d66dcc7a21b6
-     Name:         Eat a sandwich
-     List:         To Do
-     Created:      2018-08-22 20:10:57 (1534983057.0)
-     Age:          0:02:13.094361
-   Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit
-   tag > Food
-   Added tag Food
-   tag > ^C
-   Exiting...
-   $
+  $ gtd batch tag -l 'Weekly Tasks'
+  Card 5f679de3b9c40b795bd6e08b
+    Name:         Do dishes
+    List:         Weekly Tasks
+    Created:      2020-09-20 14:22:27 (1600626147)
+    Age:          0:12:18.823795
+  Enter a tag name to toggle it, <TAB> completes. Ctrl+D to exit
+  gtd.py > tag > Household
+  Added tag Household
+  gtd.py > tag >
+  Card 5f679de5b92a1708bd7c8c93
+    Name:         Clean bathroom
+    List:         Weekly Tasks
+    Created:      2020-09-20 14:22:29 (1600626149)
+    Age:          0:12:31.717111
+  Enter a tag name to toggle it, <TAB> completes. Ctrl+D to exit
+  gtd.py > tag > Household
+  Added tag Household
+  gtd.py > tag >
+  Card 5f679de74d9e0e69f717686f
+    Name:         Write some python
+    List:         Weekly Tasks
+    Created:      2020-09-20 14:22:31 (1600626151)
+    Age:          0:12:43.708735
+  Enter a tag name to toggle it, <TAB> completes. Ctrl+D to exit
+  gtd.py > tag > Programming
+  Added tag Programming
+  gtd.py > tag >
+  Card 5f679de818062617023a4405
+    Name:         Eat a sandwich
+    List:         Weekly Tasks
+    Created:      2020-09-20 14:22:32 (1600626152)
+    Age:          0:12:46.228887
+  Enter a tag name to toggle it, <TAB> completes. Ctrl+D to exit
+  gtd.py > tag > Food
+  Added tag Food
+  gtd.py > tag >
 
-A few things there - the tag names are auto-completed on a python-prompt-toolkit interactive prompt that's case insensitive. Moving from one card to the next in this context happens with Enter, for speed of use reasons. Getting out of the interface was done with Control+C.
+A few things there - the tag names are fuzzy matched on a python-prompt-toolkit interactive prompt that's case insensitive. Moving from one card to the next in this context happens with Ctrl+D, a convention that's used throughout the nested menu system. Getting out of the interface is done with Control+C.
 Let's put together this ``batch`` knowledge with some stuff we've seen already...
 
 ::
 
-   $ gtd add tag 'Shopping'
-   Successfully added tag <Label Shopping>!
-   $ gtd batch tag --no-tags
-   Card 5b7dfc27faa4645e373e9e59
-     Name:         Purchase a pomelo
-     List:         To Do
-     Created:      2018-08-22 20:13:27 (1534983207.0)
-     Age:          0:00:15.705034
-   Enter a tag name to toggle it, <TAB> completes. Give "ls" to list tags, Enter to exit
-   tag > Shopping
-   Added tag Shopping
-   tag >
-   $ gtd show cards -l 'To Do'
-   +-------------------+-------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | name              | list  | tags        | desc | due | last activity                    | board          | id                       | url                           |
-   +-------------------+-------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | Do dishes         | To Do | Household   |      |     | 2018-08-23 00:13:01.438000+00:00 | PublicShowTest | 5b7dfb8c5973738e1ed125ab | https://trello.com/c/DrZ2tFr0 |
-   | Clean bathroom    | To Do | Household   |      |     | 2018-08-23 00:13:06.606000+00:00 | PublicShowTest | 5b7dfb8fed823c431514804d | https://trello.com/c/QVATaeaH |
-   | Write some python | To Do | Programming |      |     | 2018-08-23 00:13:09.352000+00:00 | PublicShowTest | 5b7dfb9051b9466d0da1c2b7 | https://trello.com/c/p4yeGbkk |
-   | Eat a sandwich    | To Do | Food        |      |     | 2018-08-23 00:13:11.972000+00:00 | PublicShowTest | 5b7dfb91b7b7d66dcc7a21b6 | https://trello.com/c/HL9lJKgZ |
-   | Purchase a pomelo | To Do | Shopping    |      |     | 2018-08-23 00:13:47.890000+00:00 | PublicShowTest | 5b7dfc27faa4645e373e9e59 | https://trello.com/c/i7yvMTgD |
-   +-------------------+-------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
+  $ gtd add tag 'Shopping'
+  Created tag "Shopping"
+  $ gtd batch tag --no-tags
+  Card 5f679ff8f48c48484a2809db
+    Name:         Purchase a pomelo
+    List:         Weekly Tasks
+    Created:      2020-09-20 14:31:20 (1600626680)
+    Age:          0:10:00.322370
+  Enter a tag name to toggle it, <TAB> completes. Ctrl+D to exit
+  gtd.py > tag > Food
+  Added tag Food
+  gtd.py > tag >
+  $ gtd show cards -l 'Weekly Tasks'
+  +-------------------------+--------------+-------------+------+-----+------------+--------------------------+-------------------------------+
+  | name                    | list         | tags        | desc | due | activity   | id                       | url                           |
+  +-------------------------+--------------+-------------+------+-----+------------+--------------------------+-------------------------------+
+  | Clean bathroom          | Weekly Tasks | Household   |      |     | 2020-09-20 | 5f679de5b92a1708bd7c8c93 | https://trello.com/c/ds3tuegh |
+  | Do dishes               | Weekly Tasks | Household   |      |     | 2020-09-20 | 5f679de3b9c40b795bd6e08b | https://trello.com/c/8qBVAraN |
+  | Eat a sandwich          | Weekly Tasks | Food        |      |     | 2020-09-20 | 5f679de818062617023a4405 | https://trello.com/c/o5Oph6AD |
+  | Purchase a pomelo       | Weekly Tasks | Food        |      |     | 2020-09-20 | 5f679ff8f48c48484a2809db | https://trello.com/c/K6N4ilHZ |
+  | This was written in vim | Weekly Tasks | Programming |      |     | 2020-09-20 | 5f67a0180ce40186bbff7cf6 | https://trello.com/c/o8vucw6f |
+  | Write some python       | Weekly Tasks | Programming |      |     | 2020-09-20 | 5f679de74d9e0e69f717686f | https://trello.com/c/fflo7zzp |
+  +-------------------------+--------------+-------------+------+-----+------------+--------------------------+-------------------------------+
 
 Now we've tagged all those new cards in very few keystrokes! Let's move them to more appropriate lists based on their status.
 
 ::
 
-   $ gtd batch move -l 'To Do'
-   Card 5b7dfb8c5973738e1ed125ab
-     Name:         Do dishes
-     List:         To Do
-     Tags:         Household
-     Created:      2018-08-22 20:10:52 (1534983052.0)
-     Age:          0:03:41.454345
-   Want to move this one? (Y/n)
-   [a] Doing
-   [s] Done
-   [d] To Do
-   [f] Weekly Tasks
-   Press the character corresponding to your choice, selection will happen immediately. Enter to cancel
-   Moved to Doing
-   Card 5b7dfb8fed823c431514804d
-     Name:         Clean bathroom
-     List:         To Do
-     Tags:         Household
-     Created:      2018-08-22 20:10:55 (1534983055.0)
-     Age:          0:03:44.269575
-   Want to move this one? (Y/n)
-   [a] Doing
-   [s] Done
-   [d] To Do
-   [f] Weekly Tasks
-   Press the character corresponding to your choice, selection will happen immediately. Enter to cancel
-   Moved to Weekly Tasks
-   Card 5b7dfb9051b9466d0da1c2b7
-     Name:         Write some python
-     List:         To Do
-     Tags:         Programming
-     Created:      2018-08-22 20:10:56 (1534983056.0)
-     Age:          0:03:46.857946
-   Want to move this one? (Y/n)
-   [a] Doing
-   [s] Done
-   [d] To Do
-   [f] Weekly Tasks
-   Press the character corresponding to your choice, selection will happen immediately. Enter to cancel
-   Moved to Doing
-   Card 5b7dfb91b7b7d66dcc7a21b6
-     Name:         Eat a sandwich
-     List:         To Do
-     Tags:         Food
-     Created:      2018-08-22 20:10:57 (1534983057.0)
-     Age:          0:03:50.235275
-   Want to move this one? (Y/n)
-   [a] Doing
-   [s] Done
-   [d] To Do
-   [f] Weekly Tasks
-   Press the character corresponding to your choice, selection will happen immediately. Enter to cancel
-   Moved to Done
-   Card 5b7dfc27faa4645e373e9e59
-     Name:         Purchase a pomelo
-     List:         To Do
-     Tags:         Shopping
-     Created:      2018-08-22 20:13:27 (1534983207.0)
-     Age:          0:01:24.753457
-   Want to move this one? (Y/n)
-   [a] Doing
-   [s] Done
-   [d] To Do
-   [f] Weekly Tasks
-   Press the character corresponding to your choice, selection will happen immediately. Enter to cancel
-   Moved to To Do
-   $
+  $ gtd batch move -l 'Weekly Tasks'
+  Card 5f679de3b9c40b795bd6e08b
+    Name:         Do dishes
+    List:         Weekly Tasks
+    Tags:         Household
+    Created:      2020-09-20 14:22:27 (1600626147)
+    Age:          0:21:53.605262
+  Want to move this one? (Y/n)
+  [a] Doing
+  [s] Done
+  [d] To Do
+  [f] Weekly Tasks
+  Press the character corresponding to your choice, selection will happen immediately. Ctrl+D to cancel
+  Moved to To Do
+  Card 5f679de5b92a1708bd7c8c93
+    Name:         Clean bathroom
+    List:         Weekly Tasks
+    Tags:         Household
+    Created:      2020-09-20 14:22:29 (1600626149)
+    Age:          0:21:57.033431
+  Want to move this one? (Y/n)
+  Card 5f679de74d9e0e69f717686f
+    Name:         Write some python
+    List:         Weekly Tasks
+    Tags:         Programming
+    Created:      2020-09-20 14:22:31 (1600626151)
+    Age:          0:21:59.924228
+  Want to move this one? (Y/n)
+  [a] Doing
+  [s] Done
+  [d] To Do
+  [f] Weekly Tasks
+  Press the character corresponding to your choice, selection will happen immediately. Ctrl+D to cancel
+  Moved to To Do
+  Card 5f679de818062617023a4405
+    Name:         Eat a sandwich
+    List:         Weekly Tasks
+    Tags:         Food
+    Created:      2020-09-20 14:22:32 (1600626152)
+    Age:          0:22:04.439588
+  Want to move this one? (Y/n)
+  [a] Doing
+  [s] Done
+  [d] To Do
+  [f] Weekly Tasks
+  Press the character corresponding to your choice, selection will happen immediately. Ctrl+D to cancel
+  Moved to Doing
+  Card 5f679ff8f48c48484a2809db
+    Name:         Purchase a pomelo
+    List:         Weekly Tasks
+    Tags:         Food
+    Created:      2020-09-20 14:31:20 (1600626680)
+    Age:          0:13:25.517654
+  Want to move this one? (Y/n)
+  [a] Doing
+  [s] Done
+  [d] To Do
+  [f] Weekly Tasks
+  Press the character corresponding to your choice, selection will happen immediately. Ctrl+D to cancel
+  Moved to To Do
+  Card 5f67a0180ce40186bbff7cf6
+    Name:         This was written in vim
+    List:         Weekly Tasks
+    Tags:         Programming
+    Created:      2020-09-20 14:31:52 (1600626712)
+    Age:          0:12:57.808064
+  Want to move this one? (Y/n)
+  [a] Doing
+  [s] Done
+  [d] To Do
+  [f] Weekly Tasks
+  Press the character corresponding to your choice, selection will happen immediately. Ctrl+D to cancel
+  Moved to Done
 
 Here are some more ideas for you to play with:
 
@@ -300,39 +297,45 @@ What if you don't know what kind of action you want to take on a card before you
 
 ::
 
-   $ gtd review -l Doing
-   Card 5b7dfb8c5973738e1ed125ab
-     Name:         Do dishes
-     List:         Doing
-     Tags:         Household
-     Created:      2018-08-22 20:10:52 (1534983052.0)
-     Age:          0:05:07.735033
-   gtd.py > description
-   # Editor session here
-   Description changed!
-   gtd.py > next
-   Card 5b7dfb9051b9466d0da1c2b7
-     Name:         Write some python
-     List:         Doing
-     Tags:         Programming
-     Created:      2018-08-22 20:10:56 (1534983056.0)
-     Age:          0:05:22.404917
-   gtd.py > duedate
-   Enter a date in format "Jun 15 2018", "06/15/2018" or "15/06/2018"
-   date > Aug 30 2018
-   Due date set
-   gtd.py > print
-   Card 5b7dfb9051b9466d0da1c2b7
-     Name:         Write some python
-     List:         Doing
-     Tags:         Programming
-     Created:      2018-08-22 20:10:56 (1534983056.0)
-     Age:          0:05:48.787922
-     Due:          2018-08-30 04:00:00+00:00
-     Remaining:    7 days, 3:43:15.067634
-   gtd.py > next
-   All done, have a great day!
-   $
+  $ gtd review -l 'To Do'
+  Card 5f679de3b9c40b795bd6e08b
+    Name:         Do dishes
+    List:         To Do
+    Tags:         Household
+    Created:      2020-09-20 14:22:27 (1600626147)
+    Age:          0:26:33.816457
+  gtd.py > description
+  # Editor session happened here
+  gtd.py > print
+  Card 5f679de3b9c40b795bd6e08b
+    Name:         Do dishes
+    List:         To Do
+    Tags:         Household
+    Created:      2020-09-20 14:22:27 (1600626147)
+    Age:          0:26:51.939956
+    Description
+      Hello README!
+  gtd.py > next
+  Card 5f679de74d9e0e69f717686f
+    Name:         Write some python
+    List:         To Do
+    Tags:         Programming
+    Created:      2020-09-20 14:22:31 (1600626151)
+    Age:          0:26:55.298909
+  gtd.py > duedate
+  gtd.py > duedate > Oct 01 2020
+  Due date set
+  gtd.py > print
+  Card 5f679de74d9e0e69f717686f
+    Name:         Write some python
+    List:         To Do
+    Tags:         Programming
+    Created:      2020-09-20 14:22:31 (1600626151)
+    Age:          0:27:16.702654
+    Due:          2020-10-01 00:00:00
+    Remaining:    10 days, 5:10:12.297117
+  gtd.py > quit
+  $
 
 
 Deleting Things
@@ -342,17 +345,15 @@ The ``delete`` subcommand allows you to get rid of lists & cards. By default, ca
 
 ::
 
-   $ gtd add card 'cannon fodder'
-   Successfully added card <Card cannon fodder>!
-   $ gtd delete cards -m cannon
-   Card 5b7e061d94997510c6ee0ce9
-     Name:         cannon fodder
-     List:         Weekly Tasks
-     Created:      2018-08-22 20:55:57 (1534985757.0)
-     Age:          0:00:14.543394
-   Delete this card? (y/N) y
-   Card archived!
-   $
+  $ gtd add card 'cannon fodder' && gtd delete cards -m cannon
+  Successfully added card "cannon fodder"!
+  Card 5f67a4df77046c54669bbde0
+    Name:         cannon fodder
+    List:         Weekly Tasks
+    Created:      2020-09-20 14:52:15 (1600627935)
+    Age:          0:00:02.914247
+  Delete this card? (y/N)
+  Card archived!
 
 Here are some other examples of ``delete``:
 
@@ -370,36 +371,38 @@ Now that we've added a lot more to our sample board, let's try some more advance
 
 ::
 
-   $ gtd show cards -t Household
-   +----------------+--------------+-----------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | name           | list         | tags      | desc | due | last activity                    | board          | id                       | url                           |
-   +----------------+--------------+-----------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | Do dishes      | Doing        | Household |      |     | 2018-08-23 00:14:39.081000+00:00 | PublicShowTest | 5b7dfb8c5973738e1ed125ab | https://trello.com/c/DrZ2tFr0 |
-   | Clean bathroom | Weekly Tasks | Household |      |     | 2018-08-23 00:14:42.663000+00:00 | PublicShowTest | 5b7dfb8fed823c431514804d | https://trello.com/c/QVATaeaH |
-   +----------------+--------------+-----------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   $ gtd show cards --by name
-   +-------------------+--------------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | name              | list         | tags        | desc | due | last activity                    | board          | id                       | url                           |
-   +-------------------+--------------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | Clean bathroom    | Weekly Tasks | Household   |      |     | 2018-08-23 00:14:42.663000+00:00 | PublicShowTest | 5b7dfb8fed823c431514804d | https://trello.com/c/QVATaeaH |
-   | Do dishes         | Doing        | Household   |      |     | 2018-08-23 00:14:39.081000+00:00 | PublicShowTest | 5b7dfb8c5973738e1ed125ab | https://trello.com/c/DrZ2tFr0 |
-   | Eat a sandwich    | Done         | Food        |      |     | 2018-08-23 00:14:51.535000+00:00 | PublicShowTest | 5b7dfb91b7b7d66dcc7a21b6 | https://trello.com/c/HL9lJKgZ |
-   | Purchase a pomelo | To Do        | Shopping    |      |     | 2018-08-23 00:13:47.890000+00:00 | PublicShowTest | 5b7dfc27faa4645e373e9e59 | https://trello.com/c/i7yvMTgD |
-   | Write some python | Doing        | Programming |      |     | 2018-08-23 00:14:47.048000+00:00 | PublicShowTest | 5b7dfb9051b9466d0da1c2b7 | https://trello.com/c/p4yeGbkk |
-   +-------------------+--------------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   $ gtd show cards --by list
-   +-------------------+--------------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | name              | list         | tags        | desc | due | last activity                    | board          | id                       | url                           |
-   +-------------------+--------------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
-   | Do dishes         | Doing        | Household   |      |     | 2018-08-23 00:14:39.081000+00:00 | PublicShowTest | 5b7dfb8c5973738e1ed125ab | https://trello.com/c/DrZ2tFr0 |
-   | Write some python | Doing        | Programming |      |     | 2018-08-23 00:14:47.048000+00:00 | PublicShowTest | 5b7dfb9051b9466d0da1c2b7 | https://trello.com/c/p4yeGbkk |
-   | Eat a sandwich    | Done         | Food        |      |     | 2018-08-23 00:14:51.535000+00:00 | PublicShowTest | 5b7dfb91b7b7d66dcc7a21b6 | https://trello.com/c/HL9lJKgZ |
-   | Purchase a pomelo | To Do        | Shopping    |      |     | 2018-08-23 00:13:47.890000+00:00 | PublicShowTest | 5b7dfc27faa4645e373e9e59 | https://trello.com/c/i7yvMTgD |
-   | Clean bathroom    | Weekly Tasks | Household   |      |     | 2018-08-23 00:14:42.663000+00:00 | PublicShowTest | 5b7dfb8fed823c431514804d | https://trello.com/c/QVATaeaH |
-   +-------------------+--------------+-------------+------+-----+----------------------------------+----------------+--------------------------+-------------------------------+
+  $ gtd show cards -t Household
+  +----------------+--------------+-----------+---------------+-----+------------+--------------------------+-------------------------------+
+  | name           | list         | tags      | desc          | due | activity   | id                       | url                           |
+  +----------------+--------------+-----------+---------------+-----+------------+--------------------------+-------------------------------+
+  | Clean bathroom | Weekly Tasks | Household |               |     | 2020-09-20 | 5f679de5b92a1708bd7c8c93 | https://trello.com/c/ds3tuegh |
+  | Do dishes      | To Do        | Household | Hello README! |     | 2020-09-20 | 5f679de3b9c40b795bd6e08b | https://trello.com/c/8qBVAraN |
+  |                |              |           |               |     |            |                          |                               |
+  +----------------+--------------+-----------+---------------+-----+------------+--------------------------+-------------------------------+
+  $ gtd show cards --by name --fields name,list,tags,desc
+  +-------------------------+--------------+-------------+---------------+
+  | name                    | list         | tags        | desc          |
+  +-------------------------+--------------+-------------+---------------+
+  | Clean bathroom          | Weekly Tasks | Household   |               |
+  | Do dishes               | To Do        | Household   | Hello README! |
+  |                         |              |             |               |
+  | Eat a sandwich          | Doing        | Food        |               |
+  | Purchase a pomelo       | To Do        | Food        |               |
+  | This was written in vim | Done         | Programming |               |
+  | Write some python       | To Do        | Programming |               |
+  +-------------------------+--------------+-------------+---------------+
 
 You can also filter the fields that are shown with the ``--fields`` argument. By default, ``gtd.py`` will trim down the fields until it fits your current terminal width. It'll only wrap if you have really long card titles relative to the width of your terminal.
 
+The JSON and TSV output formats are handy for programmatically retrieving information from your Trello account. For example, here are two methods to find the shortlink for every card on a list:
+
+::
+
+  $ gtd show cards --by list --fields list,url --tsv | awk '/^Doing/{print $NF}'
+  https://trello.com/c/o5Oph6AD
+  $ LIST_ID=$(gtd show lists --json | jq -r '.[]|select(.name == "Doing")|.id')
+  $ gtd show cards --json | jq ".[]|select(.idList == \"$LIST_ID\")|.shortUrl"
+  "https://trello.com/c/o5Oph6AD"
 
 Setup
 ------
@@ -436,8 +439,8 @@ All four of these properties are required, ``gtd`` will fail to run without them
 
 ::
 
-  board: "Name of the Trello board you want to work with (case sensitive)"
-  inbox_list: "Name of the list for new cards"
+  board: "Case-sensitive name of Trello board to use without --board argument"
+  inbox_list: "Name of the default list for new cards"
   color: True
   banner: False
   prompt_for_untagged_cards: True
@@ -470,11 +473,11 @@ Contributing
 
 Contributions would be great! If you think something could be improved just go change it and ask!
 
-There are some tests for the command-line interface to make sure everything works properly. There are currently a few subcommands fully covered with more planned. To run these tests, first use the "onboard" command to create a configuration file. Then add a property `test_board` to the configuration file, with the name of a board you can dedicate to running these tests. The tests will destroy an existing board. Then, run:
+There are some tests for the command-line interface to make sure everything works properly. There are currently a few subcommands fully covered with more planned. To run these tests, first use the "onboard" command to create a configuration file. Then add a property ``test_board`` to the configuration file, with the name of a board you can dedicate to running these tests. If the board does not yet exist it will be created during the test run. The tests will destroy an existing board. Then, run:
 
 ::
 
- make tests
+ make test
  # OR,
  python -m pytest tests/
 
