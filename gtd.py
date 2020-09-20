@@ -126,6 +126,7 @@ class CLIContext:
             elif user_input == 'archive':
                 card.set_closed(True)
                 print('Card archived')
+                return True
             elif user_input == 'unarchive':
                 card.set_closed(False)
                 print('Card returned to board')
