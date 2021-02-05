@@ -16,6 +16,7 @@ from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
 from todo.connection import TrelloConnection
+from todo.checklist_handler import ChecklistHandler
 from todo.exceptions import GTDException
 from todo.input import prompt_for_confirmation, single_select
 from todo.misc import get_title_of_webpage, DevNullRedirect, VALID_URL_REGEX, return_on_eof, build_name_lookup
@@ -303,21 +304,12 @@ class Card:
 
     def change_checklists(self):
         old_checklists = self.card_json['Checklists']
-        client = old_checklists[0].client
 
-        checklists_to_edit = ""
-        for checklist in old_checklists:
-            checklists_to_edit += "{name}:\n".format(
-                    name=checklist.name.replace("\n", " ")
-                    )
-            for item in checklist.items:
-                if item['state'] == 'complete':
-                    checklists_to_edit += ' ' * 6 + "[x] " + item['name'] + "\n"
-                elif item['state'] == 'incomplete':
-                    checklists_to_edit += ' ' * 6 + "[ ] " + item['name'] + "\n"
-            checklists_to_edit += "\n"
+        checklist_handling = ChecklistHandler(connection=self.connection, id=self.id, checklists=old_checklists)
+        checklists_to_edit = checklist_handling.parse_checklists()
 
         new_checklists_edited = click.edit(text=checklists_to_edit)
+
         if new_checklists_edited == checklists_to_edit:
             #  no change done
             return
@@ -325,34 +317,9 @@ class Card:
             #  no save in editor
             return
 
-        if new_checklists_edited.endswith("\n"):
-            new_checklists_edited = new_checklists_edited[:-1]
-
-        new_checklists = []
-        for checklist in new_checklists_edited.split("\n\n"):
-            splitted_lines = checklist.split(":\n")
-            name = splitted_lines[0].split(":")[0]
-
-            json_obj = client.fetch_json(
-                '/cards/' + self.id + '/checklists',
-                http_method='POST',
-                post_args={'name': name}, )
-
-            cl = trello.checklist.Checklist(client, [], json_obj, trello_card=self.id)
-
-            for line in splitted_lines[1].splitlines():
-                line = line.lstrip()
-                line = line[1:].split("] ")
-                if line[0] == "x" or line[0] == "X":
-                    cl.add_checklist_item(line[1], checked=True)
-                elif line[0] == " ":
-                    cl.add_checklist_item(line[1], checked=False)
-            new_checklists.append(cl)
-
+        new_checklists = checklist_handling.parse_edited_checklists(new_checklists_edited=new_checklists_edited)
         self.card_json['Checklists'] = new_checklists
-
-        for old_checklist in old_checklists:
-            old_checklist.delete()
+        checklist_handling.remove_old_checklists()
 
         return new_checklists
 
