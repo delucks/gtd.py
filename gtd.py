@@ -131,6 +131,7 @@ class CLIContext:
             elif user_input == 'archive':
                 card.set_closed(True)
                 print('Card archived')
+                return True
             elif user_input == 'unarchive':
                 card.set_closed(False)
                 print('Card returned to board')
@@ -460,7 +461,7 @@ def show_lists(ctx, use_json, show_all):
         return
     ctx.display.banner()
     for list_struct in lists_json:
-        print(f'list_struct["name"] (list_struct["id"])')
+        print(f'{list_struct["name"]} ({list_struct["id"]})')
 
 
 @show.command('tags')

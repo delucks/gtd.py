@@ -370,7 +370,9 @@ def check_for_label_presence(card, tags):
     each is on this card'''
     if card['idLabels']:
         user_tags = set(tags.split(','))
-        card_tags = set(card['_labels'])
+        card_tags = set()
+        for label in card['labels']:
+            card_tags.add(label['name'])
         return user_tags.issubset(card_tags)
     else:
         return False
@@ -452,8 +454,8 @@ class CardView:
                     target_list_ids.append(list_object['id'])
             # Iteratively pull IDs from each list, passing the common parameters to them
             for list_id in target_list_ids:
-                cards_json = context.connection.trello.fetch_json(f'/lists/{list_id}', query_params=query_params)
-                target_cards.extend(cards_json['cards'])
+                cards_json = context.connection.trello.fetch_json(f'/lists/{list_id}/cards', query_params=query_params)
+                target_cards.extend(cards_json)
         else:
             # If no lists are passed, call the board's card resource
             cards_json = context.connection.trello.fetch_json(f'/boards/{context.board.id}', query_params=query_params)
