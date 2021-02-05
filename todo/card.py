@@ -347,7 +347,7 @@ class Card:
                     cl.add_checklist_item(line[1], checked=True)
                 elif line[0] == " ":
                     cl.add_checklist_item(line[1], checked=False)
-                new_checklists.append(cl)
+            new_checklists.append(cl)
 
         self.card_json['Checklists'] = new_checklists
 
