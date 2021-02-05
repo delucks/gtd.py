@@ -67,7 +67,12 @@ class ChecklistHandler:
         while cleaned_checklist_string != cleaned_checklist_string.replace("\t", "  "):
             cleaned_checklist_string = cleaned_checklist_string.replace("\t", "  ")
 
+        while cleaned_checklist_string != cleaned_checklist_string.replace("[]", "[ ]"):
+            cleaned_checklist_string = cleaned_checklist_string.replace("[]", "[ ]")
+
         cleaned_checklist_string = re.sub(r"\n\n(\s+)\[", "\n      [", cleaned_checklist_string)
+        cleaned_checklist_string = re.sub(r"](\s+)(\w)", r"] \2", cleaned_checklist_string)
+        cleaned_checklist_string = re.sub(r"\[(\w)\](\w)", r"[\1]] \2", cleaned_checklist_string)
 
         return cleaned_checklist_string
 
