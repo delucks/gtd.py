@@ -85,6 +85,11 @@ class ChecklistHandler:
             print("Opening editor again")
             time.sleep(3)
             return None, False
+        except:
+            print("Unknown error!")
+            print("Opening editor again")
+            time.sleep(3)
+            return None, False
 
         new_checklists = []
         print("Adjusting checklists...")
