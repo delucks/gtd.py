@@ -10,6 +10,7 @@ from typing import Optional
 import arrow
 import click
 import trello
+import time
 
 from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
@@ -307,17 +308,20 @@ class Card:
 
         checklist_handling = ChecklistHandler(connection=self.connection, id=self.id, checklists=old_checklists)
         checklists_to_edit = checklist_handling.parse_checklists()
+        success = False
+        editor_content = checklists_to_edit
+        while not success:
+            new_checklists_edited = click.edit(text=editor_content)
 
-        new_checklists_edited = click.edit(text=checklists_to_edit)
-
-        if new_checklists_edited == checklists_to_edit:
-            #  no change done
-            return
-        elif new_checklists_edited is None:
-            #  no save in editor
-            return
-
-        new_checklists = checklist_handling.parse_edited_checklists(new_checklists_edited=new_checklists_edited)
+            if new_checklists_edited == checklists_to_edit:
+                #  no change done
+                return
+            elif new_checklists_edited is None:
+                #  no save in editor
+                #  discard changes if editing failed
+                return
+            new_checklists, success = checklist_handling.parse_edited_checklists(new_checklists_edited=new_checklists_edited)
+            editor_content = new_checklists_edited
         self.card_json['Checklists'] = new_checklists
         checklist_handling.remove_old_checklists()
 
