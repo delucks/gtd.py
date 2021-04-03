@@ -62,6 +62,7 @@ class TrelloConnection:
                 board_json = self.boards[0]
         board_object = trello.Board.from_json(self.trello, json_obj=board_json)
         self._main_board = board_object
+
         return board_object
 
     def boards_by_name(self):

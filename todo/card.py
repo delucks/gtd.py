@@ -10,11 +10,14 @@ from typing import Optional
 import arrow
 import click
 import trello
+import time
+
 from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator
 from prompt_toolkit.completion import WordCompleter, FuzzyWordCompleter
 
 from todo.connection import TrelloConnection
+from todo.checklist_handler import ChecklistHandler
 from todo.exceptions import GTDException
 from todo.input import prompt_for_confirmation, single_select
 from todo.misc import get_title_of_webpage, DevNullRedirect, VALID_URL_REGEX, return_on_eof, build_name_lookup
@@ -61,6 +64,14 @@ class Card:
     def fetch(self):
         '''Refresh the base card JSON structure'''
         self.card_json = self.connection.trello.fetch_json('/cards/' + self.id, query_params={'fields': 'all'})
+        checklists = self.connection.main_board().get_checklists()
+
+        this_checklist = []
+        for id in self.card_json['idChecklists']:
+            for item in checklists:
+                if id == item.id:
+                    this_checklist.append(item)
+        self.card_json['Checklists'] = this_checklist
 
     def fetch_comments(self, force: bool = False):
         '''Fetch the comments on this card and return them in JSON format, adding them into self.card_json
@@ -292,6 +303,30 @@ class Card:
             )
         return new_desc
 
+    def change_checklists(self):
+        old_checklists = self.card_json['Checklists']
+
+        checklist_handling = ChecklistHandler(connection=self.connection, id=self.id, checklists=old_checklists)
+        checklists_to_edit = checklist_handling.parse_checklists()
+        success = False
+        editor_content = checklists_to_edit
+        while not success:
+            new_checklists_edited = click.edit(text=editor_content)
+
+            if new_checklists_edited == checklists_to_edit:
+                #  no change done
+                return
+            elif new_checklists_edited is None:
+                #  no save in editor
+                #  discard changes if editing failed
+                return
+            new_checklists, success = checklist_handling.parse_edited_checklists(new_checklists_edited=new_checklists_edited)
+            editor_content = new_checklists_edited
+        self.card_json['Checklists'] = new_checklists
+        checklist_handling.remove_old_checklists()
+
+        return new_checklists
+
 
 def search_for_regex(card, title_regex, regex_flags):
     try:
@@ -397,6 +432,8 @@ class CardView:
             cards_json = context.connection.trello.fetch_json(f'/boards/{context.board.id}', query_params=query_params)
             target_cards.extend(cards_json['cards'])
 
+        checklists = context.board.get_checklists()
+
         # Post-process the returned JSON, filtering down to the other passed parameters
         filters = []
         post_processed_cards = []
@@ -416,6 +453,12 @@ class CardView:
 
         for card in target_cards:
             if all(filter_func(card) for filter_func in filters):
+                this_checklist = []
+                for id in card['idChecklists']:
+                    for item in checklists:
+                        if id == item.id:
+                            this_checklist.append(item)
+                card['Checklists'] = this_checklist
                 post_processed_cards.append(card)
 
         if not post_processed_cards:

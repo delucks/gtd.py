@@ -50,6 +50,8 @@ class CLIContext:
         self.connection = TrelloConnection(config)
         self.display = Display(config, self.connection)
         self.board = self.connection.main_board()
+        self.checklists = self.board.get_checklists()
+
         # Cached state for card_repl
         self._list_choices = build_name_lookup(self.connection.main_board().get_lists('open'))
         self._label_choices = build_name_lookup(self.connection.main_board().get_labels(limit=200))
@@ -88,6 +90,7 @@ class CLIContext:
             'delete': 'permanently delete this card',
             'duedate': 'add a due date or change the due date',
             'description': 'change the description of this card (desc)',
+            'checklists': 'change the checklists of this card (check)',
             'help': 'display this help output (h)',
             'move': 'move to a different board and list (m)',
             'next': 'move to the next card (n)',
@@ -117,6 +120,8 @@ class CLIContext:
                         webbrowser.open(url)
             elif user_input in ['desc', 'description']:
                 card.change_description()
+            elif user_input in ['check', 'checklists']:
+                card.change_checklists()
             elif user_input == 'delete':
                 card.delete()
                 print('Card deleted')
