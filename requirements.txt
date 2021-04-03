@@ -1,4 +1,4 @@
-PyYAML==3.13
+PyYAML==5.4
 py-trello==0.15.0
 click==7.0
 prompt_toolkit==3.0.3
