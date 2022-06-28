@@ -3,7 +3,7 @@ py-trello==0.15.0
 click==7.0
 prompt_toolkit==3.0.3
 prettytable==0.7.2
-arrow==0.12.1
+arrow==0.15.1
 flake8==3.7.7
 black>=19.3b0
 pytest==2.9.2
