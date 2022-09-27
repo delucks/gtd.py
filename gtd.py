@@ -227,8 +227,9 @@ def tsv_option(f):
 @click.pass_context
 def cli(top_level_context, board, color, banner):
     '''gtd.py'''
+    filename= os.getenv('GTDPYRC')
     try:
-        config = Configuration.from_file()
+        config = Configuration.from_file(filename)
     except GTDException:
         click.echo('Could not find a valid config file for gtd.')
         if click.confirm('Would you like to create it interactively?'):
